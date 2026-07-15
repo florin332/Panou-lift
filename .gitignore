@@ -1,0 +1,23 @@
+# PlatformIO
+.pio/
+
+# VS Code
+.vscode/.browse_c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch/
+
+# Build artifacts
+*.o
+*.obj
+*.elf
+*.bin
+*.uf2
+*.map
+
+# Logs
+*.log
+
+# Windows
+Thumbs.db
+Desktop.ini
