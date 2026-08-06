@@ -23,8 +23,16 @@
 namespace Display
 {
     // Dual hardware display instances bound via Pins layout mappings
-    static Adafruit_ST7735 tft1 = Adafruit_ST7735(Pins::TFT1::CS, Pins::TFT1::DC, Pins::TFT1::RST);
-    static Adafruit_ST7735 tft2 = Adafruit_ST7735(Pins::TFT2::CS, Pins::TFT2::DC, Pins::TFT2::RST);
+static Adafruit_ST7735 tft1 =
+    Adafruit_ST7735(Pins::TFT1::CS,
+                    Pins::TFT1::DC,
+                    Pins::TFT1::RST);
+
+static Adafruit_ST7735 tft2 =
+    Adafruit_ST7735(&SPI1,
+                    Pins::TFT2::CS,
+                    Pins::TFT2::DC,
+                    Pins::TFT2::RST);
 
     // Isolated internal color constants mapped for 16-bit 565 format execution
     constexpr uint16_t COLOR_BLACK  = 0x0000;
@@ -35,31 +43,53 @@ namespace Display
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
     constexpr uint16_t COLOR_RED    = 0xF800;
 
-        void init() {
-        // Force fast hardware SPI bus speeds matching maximum board specifications
-        SPI.setRX(Pins::TFT1::MOSI); // Shared native line
-        SPI.setSCK(Pins::TFT1::SCK);
-        SPI.setTX(Pins::TFT1::MOSI);
-        SPI.begin();
+void init()
+{
+    // =========================================================
+    // TFT1 -> SPI0
+    // =========================================================
+    SPI.setTX(Pins::TFT1::MOSI);
+    SPI.setSCK(Pins::TFT1::SCK);
 
-        // Pin handshakes for clean low-level display state machine bootup
-        pinMode(Pins::TFT1::CS, OUTPUT);
-        pinMode(Pins::TFT2::CS, OUTPUT);
-        digitalWrite(Pins::TFT1::CS, HIGH);
-        digitalWrite(Pins::TFT2::CS, HIGH);
+    // =========================================================
+    // TFT2 -> SPI1
+    // =========================================================
+    SPI1.setTX(Pins::TFT2::MOSI);
+    SPI1.setSCK(Pins::TFT2::SCK);
 
-        // ST7735 mechanical setup configuration sequence
-        tft1.initR(INITR_BLACKTAB);
-        tft2.initR(INITR_BLACKTAB);
+    // =========================================================
+    // SPI speeds - identical to known-good V9.01
+    // =========================================================
+    tft1.setSPISpeed(8000000UL);
+    tft2.setSPISpeed(8000000UL);
 
-        // Hardware orientation configuration rotation sequence
-        tft1.setRotation(2);
-        tft2.setRotation(2);
+    // =========================================================
+    // CS idle state
+    // =========================================================
+    pinMode(Pins::TFT1::CS, OUTPUT);
+    pinMode(Pins::TFT2::CS, OUTPUT);
 
-        // Initialize display context with standard canvas clear execution
-        tft1.fillScreen(COLOR_BLACK);
-        tft2.fillScreen(COLOR_BLACK);
-    }
+    digitalWrite(Pins::TFT1::CS, HIGH);
+    digitalWrite(Pins::TFT2::CS, HIGH);
+
+    // =========================================================
+    // ST7735 initialization
+    // =========================================================
+    tft1.initR(INITR_BLACKTAB);
+    tft2.initR(INITR_BLACKTAB);
+
+    // =========================================================
+    // Orientation
+    // =========================================================
+    tft1.setRotation(0);
+    tft2.setRotation(0);
+
+    // =========================================================
+    // Initial clear
+    // =========================================================
+    tft1.fillScreen(COLOR_BLACK);
+    tft2.fillScreen(COLOR_BLACK);
+}
 
     void update(const SharedPanel &localPanel) {
         // High-frequency passenger screen updates execute natively right here
@@ -155,6 +185,19 @@ namespace Display
         tft.setCursor(94, yPos);
         tft.print("Next a"); 
     }
+    
+    void drawText(DisplayTarget target, int16_t x, int16_t y,
+        const GFXfont* font, const char* text, uint16_t color) {
+       if (!font || !text) return;
+       Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
+       tft.setFont(font);
+       tft.setTextColor(color);
+       tft.setCursor(x, y);
+       tft.print(text);
+    }
+
+    
+
 } // Closes namespace Display
 
 

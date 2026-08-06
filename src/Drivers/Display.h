@@ -4,6 +4,7 @@
 #define DISPLAY_H
 
 #include "SharedPanel.h"
+#include <Adafruit_GFX.h>  // ← NOU: pentru GFXfont*
 
 enum class DisplayTarget : uint8_t {
     Left,
@@ -25,6 +26,10 @@ namespace Display
     void printMenuLineExt(DisplayTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare);
     void printMenuLineHex(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoareHex);
     void printMenuFooterDecoration(DisplayTarget target, const char* numarPaginaText);
+
+    // Primitivă de bază pentru text. Presentation decide când e erase (BLACK) și când e draw.
+    void drawText(DisplayTarget target, int16_t x, int16_t y,
+                  const GFXfont* font, const char* text, uint16_t color);
 }
 
 #endif // DISPLAY_H

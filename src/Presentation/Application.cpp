@@ -21,6 +21,7 @@
 #include "DiagnosticsNavigator.h" 
 #include "UIPresenter.h"      // <--- REPARAT: Oferă vizibilitatea pentru UIPresenter
 #include "DisplayRenderer.h"  // <--- REPARAT: Oferă vizibilitatea pentru DisplayRenderer
+#include "PanelRenderer.h"
 
 #include <EEPROM.h>
 #include "hardware/structs/vreg_and_chip_reset.h"
@@ -64,40 +65,38 @@ namespace Application
 
         
     void runCore0() {
-        SharedPanel localSnapshot = {};
-        static unsigned long lastDiagMillis = 0;
+    SharedPanel localSnapshot = {};
+    static unsigned long lastDiagMillis = 0;
 
-        if (shared_panel_read(gSharedMemory, localSnapshot)) {
-            Presentation::update(localSnapshot);
+    if (shared_panel_read(gSharedMemory, localSnapshot)) {
+        Presentation::update(localSnapshot);
 
-            // Citim starea asincronă a butoanelor din spatele panoului procesată de Core 1
-            const DiagnosticsNavigator::NavigatorState &nav = DiagnosticsNavigator::getState();
-            
-            if (nav.isMenuOpen) {
-                // Rulăm randarea o dată la 500ms pentru fluiditate optică, fără a bloca bus-ul SPI
-                if (millis() - lastDiagMillis >= 500) {
-                    lastDiagMillis = millis();
-                    
-                    ProcessedDiagnostics info;
-                    Diagnostics::interpret(localSnapshot, info);
-                    
-                    // 1. Instanțiem modelul logic pur în memoria stivei Core 0
-                    PageModel logicalPage;
-                    
-                    // 2. Deducem indexul corect pe baza profilului selectat nativ de navigator
-                    uint8_t pageIdx = (nav.currentProfile == DiagnosticsProfile::Service) 
-                                      ? nav.servicePageIndex 
-                                      : nav.developerPageIndex;
-                    
-                    // 3. UIPresenter asamblează modelul abstract în memorie (Fără pixeli)
-                    UIPresenter::buildPage(info, nav.currentProfile, pageIdx, logicalPage);
-                    
-                    // 4. Adaptorul desenează mecanic modelul pe ecranul din Stânga
-                    DisplayRenderer::render(DisplayTarget::Left, logicalPage);
-                }
+        const DiagnosticsNavigator::NavigatorState &nav = DiagnosticsNavigator::getState();
+
+        // --- ECRAN PRINCIPAL ---
+        PanelRenderer::render(DisplayTarget::Right, localSnapshot.lift2, "ASCENSOR 2");
+
+        if (!nav.isMenuOpen) {
+            PanelRenderer::render(DisplayTarget::Left, localSnapshot.lift1, "ASCENSOR 1");
+        } else {
+            PanelRenderer::invalidate(DisplayTarget::Left);
+        }
+
+        // --- MENIU DIAGNOSTIC ---
+        if (nav.isMenuOpen) {
+            if (millis() - lastDiagMillis >= 500) {
+                lastDiagMillis = millis();
+                ProcessedDiagnostics info;
+                Diagnostics::interpret(localSnapshot, info);
+                PageModel logicalPage;
+                uint8_t pageIdx = (nav.currentProfile == DiagnosticsProfile::Service)
+                    ? nav.servicePageIndex : nav.developerPageIndex;
+                UIPresenter::buildPage(info, nav.currentProfile, pageIdx, logicalPage);
+                DisplayRenderer::render(DisplayTarget::Left, logicalPage);
             }
         }
     }
+}
 
 
 

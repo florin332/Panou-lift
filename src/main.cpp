@@ -13,6 +13,7 @@
 #include "UIPresenter.h"
 #include "DisplayRenderer.h"
 #include "DiagnosticsNavigator.h"
+#include "Display.h"
 
 // Variabile pentru testul asincron de comunicație pe Serial
 static unsigned long lastSerialMillis = 0;
@@ -21,7 +22,7 @@ static uint32_t heartbeatCounter = 0;
 void setup() {
     // 1. Inițializăm portul Serial nativ prin USB la viteza configurată în platformio.ini
     Serial.begin(115200);
-    
+    Application::init();
     // 2. Inițializările hardware standard ale aplicației (V10.28)
     // (Aici rulează init-urile tale pentru pini, ecrane și memorii din celelalte module)
 }
@@ -29,7 +30,7 @@ void setup() {
 void loop() {
     unsigned long currentMillis = millis();
 
-    // TEST DE COMUNICAȚIE: Trimitem o linie text o dată la 1000ms (1 secundă) complet asincron
+    // TEST DE COMUNICAȚIE: Trimitem o linie text o dată la 1000ms (1 secundă) complet asincron - este necesar?
     if (currentMillis - lastSerialMillis >= 1000) {
         lastSerialMillis = currentMillis;
         heartbeatCounter++;
@@ -42,4 +43,10 @@ void loop() {
     }
 
     // Execuția mașinii de stări principale și a nucleelor (Rămâne neschimbată)
+    // Core 1 logic (comunicație, butoane, scriere memorie partajată)
+    Application::runCore1();
+    
+    // Core 0 logic (randare, citire memorie partajată, meniu)
+    Application::runCore0();
+
 }
