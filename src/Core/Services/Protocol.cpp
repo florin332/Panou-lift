@@ -1,5 +1,7 @@
 // Drivers/Protocol.cpp (UART Nativ și Transmisie Fixă 
 
+// Drivers/Protocol.cpp (UART Nativ și Transmisie Fixă - V10.29)
+
 #include "Protocol.h" // Local în src/Logic/
 
 // Rute către folderul src/ (Urcat un nivel și intrat în core)
@@ -14,12 +16,12 @@ namespace Protocol
     static SoftwareSerial Serial3(Pins::RS485::CALL_RX, Pins::RS485::CALL_TX);
 
     struct RxBuffer {
-        char receivedChars[32]; 
+        char receivedChars[32];
         char tempChars[32];
         byte ndx;
         boolean recvInProgress;
         boolean newData;
-        int serialCheck;
+        unsigned long lastValidPacketMillis;  // ← NOU: timeout bazat pe timp
     };
 
     static RxBuffer rxLift1;
@@ -48,8 +50,8 @@ namespace Protocol
 
         memset(&rxLift1, 0, sizeof(RxBuffer));
         memset(&rxLift2, 0, sizeof(RxBuffer));
-        rxLift1.serialCheck = 10;
-        rxLift2.serialCheck = 10;
+        rxLift1.lastValidPacketMillis = millis();  // ← NOU
+        rxLift2.lastValidPacketMillis = millis();  // ← NOU
     }
 
     // NIVELUL: PARSER & VALIDATOR RIGID (V10.22 Securizat Aerospațial)
@@ -61,54 +63,54 @@ namespace Protocol
             if (*p == ',') commaCount++;
             p++;
         }
-        if (commaCount != 4) return false; 
+        if (commaCount != 4) return false;
 
         // --- 2. COPIERE SECURIZATĂ REZISTENTĂ LA BUFFER OVERFLOW ---
         char bufferLocal[32];
         strncpy(bufferLocal, sirBrut, sizeof(bufferLocal) - 1);
-        bufferLocal[sizeof(bufferLocal) - 1] = '\0'; 
-        
+        bufferLocal[sizeof(bufferLocal) - 1] = '\0';
+
         // --- 3. PARSARE ȘI VALIDARE STRICTĂ: POS (Etaj curent 0-17) ---
         char *token = strtok(bufferLocal, ",");
         if (token == NULL || !esteNumeric(token)) return false;
         int rawPos = atoi(token);
-        if (rawPos < 0 || rawPos >= Config::Hardware::FLOORS) return false; 
+        if (rawPos < 0 || rawPos >= Config::Hardware::FLOORS) return false;
         rezultat.pos = static_cast<uint8_t>(rawPos);
 
         // --- 4. PARSARE ȘI VALIDARE STRICTĂ: ETD (Etaj destinație 0-17) ---
         token = strtok(NULL, ",");
         if (token == NULL || !esteNumeric(token)) return false;
         int rawEtd = atoi(token);
-        if (rawEtd < 0 || rawEtd >= Config::Hardware::FLOORS) return false; 
+        if (rawEtd < 0 || rawEtd >= Config::Hardware::FLOORS) return false;
         rezultat.etd = static_cast<uint8_t>(rawEtd);
 
         // --- 5. PARSARE ȘI VALIDARE STRICTĂ: OCP (Occupancy Enum) ---
         token = strtok(NULL, ",");
         if (token == NULL || !esteNumeric(token)) return false;
         int rawOcp = atoi(token);
-        if (rawOcp != 0 && rawOcp != 1) return false; 
+        if (rawOcp != 0 && rawOcp != 1) return false;
         rezultat.ocp = (rawOcp == 1) ? Occupancy::Busy : Occupancy::Free;
 
         // --- 6. PARSARE ȘI VALIDARE STRICTĂ: SJ (Direction Enum) ---
         token = strtok(NULL, ",");
         if (token == NULL || !esteNumeric(token)) return false;
         int rawSj = atoi(token);
-        if (rawSj < 0 || rawSj > 2) return false; 
-        if (rawSj == 1)      rezultat.sj = Direction::Up;
+        if (rawSj < 0 || rawSj > 2) return false;
+        if (rawSj == 1) rezultat.sj = Direction::Up;
         else if (rawSj == 2) rezultat.sj = Direction::Down;
-        else                 rezultat.sj = Direction::Idle;
+        else rezultat.sj = Direction::Idle;
 
         // --- 7. PARSARE ȘI VALIDARE STRICTĂ: SVC (ServiceState Enum) ---
         token = strtok(NULL, ",");
         if (token == NULL || !esteNumeric(token)) return false;
         int rawSvc = atoi(token);
-        if (rawSvc != 1 && rawSvc != 2 && rawSvc != 3 && rawSvc != 5) return false; 
-        if (rawSvc == 1)      rezultat.svc = ServiceState::Fault;
+        if (rawSvc != 1 && rawSvc != 2 && rawSvc != 3 && rawSvc != 5) return false;
+        if (rawSvc == 1) rezultat.svc = ServiceState::Fault;
         else if (rawSvc == 2) rezultat.svc = ServiceState::Revision;
         else if (rawSvc == 3) rezultat.svc = ServiceState::Missing;
-        else                  rezultat.svc = ServiceState::Normal;
+        else rezultat.svc = ServiceState::Normal;
 
-        return true; 
+        return true;
     }
 
     static void eantioneazaUART(HardwareSerial &serial, RxBuffer &buffer) {
@@ -134,42 +136,36 @@ namespace Protocol
 
     void update(SharedPanel &localPanel) {
         // --- MONITORIZARE LIFT 1 ---
-        if (Serial2.available() > 0) { rxLift1.serialCheck++; } else { rxLift1.serialCheck--; }
-        if (rxLift1.serialCheck > 20)  { rxLift1.serialCheck = 10; }
-        if (rxLift1.serialCheck < -20) { rxLift1.serialCheck = -10; }
-
-        if (rxLift1.serialCheck > 0) {
-            eantioneazaUART(Serial2, rxLift1);
-            if (rxLift1.newData) {
-                LiftState tempState;
-                if (parseazaPachet(rxLift1.receivedChars, tempState)) {
-                    localPanel.lift1 = tempState; 
-                } else {
-                    localPanel.system.packetErrorsLift1++; 
-                }
-                rxLift1.newData = false;
+        eantioneazaUART(Serial2, rxLift1);
+        if (rxLift1.newData) {
+            LiftState tempState;
+            if (parseazaPachet(rxLift1.receivedChars, tempState)) {
+                localPanel.lift1 = tempState;
+                rxLift1.lastValidPacketMillis = millis();  // ← NOU: reset timeout
+            } else {
+                localPanel.system.packetErrorsLift1++;
             }
-        } else {
-            localPanel.lift1.svc = ServiceState::Missing; 
+            rxLift1.newData = false;
+        }
+        // ← NOU: timeout de 500ms fără pachet valid → Missing
+        if (millis() - rxLift1.lastValidPacketMillis > Config::Protocol::PACKET_TIMEOUT_MS) {
+            localPanel.lift1.svc = ServiceState::Missing;
         }
 
         // --- MONITORIZARE LIFT 2 ---
-        if (Serial1.available() > 0) { rxLift2.serialCheck++; } else { rxLift2.serialCheck--; }
-        if (rxLift2.serialCheck > 20)  { rxLift2.serialCheck = 10; }
-        if (rxLift2.serialCheck < -20) { rxLift2.serialCheck = -10; }
-
-        if (rxLift2.serialCheck > 0) {
-            eantioneazaUART(Serial1, rxLift2);
-            if (rxLift2.newData) {
-                LiftState tempState;
-                if (parseazaPachet(rxLift2.receivedChars, tempState)) {
-                    localPanel.lift2 = tempState;
-                } else {
-                    localPanel.system.packetErrorsLift2++;
-                }
-                rxLift2.newData = false;
+        eantioneazaUART(Serial1, rxLift2);
+        if (rxLift2.newData) {
+            LiftState tempState;
+            if (parseazaPachet(rxLift2.receivedChars, tempState)) {
+                localPanel.lift2 = tempState;
+                rxLift2.lastValidPacketMillis = millis();  // ← NOU: reset timeout
+            } else {
+                localPanel.system.packetErrorsLift2++;
             }
-        } else {
+            rxLift2.newData = false;
+        }
+        // ← NOU: timeout de 500ms fără pachet valid → Missing
+        if (millis() - rxLift2.lastValidPacketMillis > Config::Protocol::PACKET_TIMEOUT_MS) {
             localPanel.lift2.svc = ServiceState::Missing;
         }
     }
@@ -178,9 +174,9 @@ namespace Protocol
         if (ascAlocat == 0) return;
         Serial3.listen();
         delayMicroseconds(Config::Protocol::RS485_LISTEN_SETTLE_US);
-        
-        digitalWrite(Pins::RS485::TX_ENABLE, HIGH); 
-        delayMicroseconds(Config::Protocol::RS485_TX_SETTLE_US); 
+
+        digitalWrite(Pins::RS485::TX_ENABLE, HIGH);
+        delayMicroseconds(Config::Protocol::RS485_TX_SETTLE_US);
 
         Serial3.print(Config::Protocol::START_MARKER);
         Serial3.print(ascAlocat);
@@ -189,9 +185,9 @@ namespace Protocol
         Serial3.print(Config::Protocol::END_MARKER);
         Serial3.println();
 
-        Serial3.flush(); 
-        delayMicroseconds(Config::Protocol::RS485_TX_RELEASE_US); 
-        
-        digitalWrite(Pins::RS485::TX_ENABLE, LOW); 
+        Serial3.flush();
+        delayMicroseconds(Config::Protocol::RS485_TX_RELEASE_US);
+
+        digitalWrite(Pins::RS485::TX_ENABLE, LOW);
     }
 }

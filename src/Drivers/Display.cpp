@@ -9,7 +9,7 @@
 
 #include "Arduino.h"
 #include <Adafruit_GFX.h>
-#include <Adafruit_ST7735.h>
+#include "Custom_ST7735.h"
 #include <SPI.h>
 
 // 2. Custom hardware dashboard fonts loaded from src/Fonts/
@@ -23,16 +23,17 @@
 namespace Display
 {
     // Dual hardware display instances bound via Pins layout mappings
-static Adafruit_ST7735 tft1 =
-    Adafruit_ST7735(Pins::TFT1::CS,
-                    Pins::TFT1::DC,
-                    Pins::TFT1::RST);
+    // ← SCHIMBAT: Adafruit_ST7735 → Custom_ST7735
+    static Custom_ST7735 tft1(
+        Pins::TFT1::CS,
+        Pins::TFT1::DC,
+        Pins::TFT1::RST);
 
-static Adafruit_ST7735 tft2 =
-    Adafruit_ST7735(&SPI1,
-                    Pins::TFT2::CS,
-                    Pins::TFT2::DC,
-                    Pins::TFT2::RST);
+    static Custom_ST7735 tft2(
+        &SPI1,
+        Pins::TFT2::CS,
+        Pins::TFT2::DC,
+        Pins::TFT2::RST);
 
     // Isolated internal color constants mapped for 16-bit 565 format execution
     constexpr uint16_t COLOR_BLACK  = 0x0000;
@@ -60,8 +61,8 @@ void init()
     // =========================================================
     // SPI speeds - identical to known-good V9.01
     // =========================================================
-    tft1.setSPISpeed(8000000UL);
-    tft2.setSPISpeed(8000000UL);
+    tft1.setSPISpeed(Config::Display::SPI_CLOCK);
+    tft2.setSPISpeed(Config::Display::SPI_CLOCK);
 
     // =========================================================
     // CS idle state
@@ -79,10 +80,18 @@ void init()
     tft2.initR(INITR_BLACKTAB);
 
     // =========================================================
+    // Offset adjustments for ST7735 variants (chip + PCB dependent)
+    // =========================================================
+    tft1.setRowStart(Config::Display::ROW_START);
+    tft1.setColStart(Config::Display::COL_START);
+    tft2.setRowStart(Config::Display::ROW_START);
+    tft2.setColStart(Config::Display::COL_START);
+
+    // =========================================================
     // Orientation
     // =========================================================
-    tft1.setRotation(0);
-    tft2.setRotation(0);
+    tft1.setRotation(Config::Display::ROTATION);
+    tft2.setRotation(Config::Display::ROTATION);
 
     // =========================================================
     // Initial clear
