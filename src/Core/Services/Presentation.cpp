@@ -21,9 +21,10 @@ namespace Presentation
         Leds::init();
     }
 
-    void update(const SharedPanel &snapshot) {
-        Display::update(snapshot);
+    bool update(const SharedPanel &snapshot) {
+        const bool displayWoke = Display::update(snapshot);
         Sound::update(snapshot);
         Leds::update(snapshot);
+        return displayWoke;
     }
 }

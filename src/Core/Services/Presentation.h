@@ -8,7 +8,7 @@
 namespace Presentation
 {
     void init();
-    void update(const SharedPanel &snapshot);
+    bool update(const SharedPanel &snapshot);
 }
 
 #endif // PRESENTATION_H

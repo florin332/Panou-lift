@@ -44,8 +44,43 @@ namespace Display
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
     constexpr uint16_t COLOR_RED    = 0xF800;
 
+    static unsigned long lastActivityMillis = 0;
+    static bool backlightOn = true;
+    static bool standbyActive = false;
+
+    static void setBacklight(bool enabled) {
+        if (backlightOn == enabled) return;
+        digitalWrite(Pins::UI::BACKLIGHT, enabled ? HIGH : LOW);
+        backlightOn = enabled;
+    }
+
+    static void initializeControllers() {
+        tft1.initR(INITR_BLACKTAB);
+        tft2.initR(INITR_BLACKTAB);
+
+        tft1.setRowStart(Config::Display::ROW_START);
+        tft1.setColStart(Config::Display::COL_START);
+        tft2.setRowStart(Config::Display::ROW_START);
+        tft2.setColStart(Config::Display::COL_START);
+
+        tft1.setRotation(Config::Display::ROTATION);
+        tft2.setRotation(Config::Display::ROTATION);
+
+        tft1.setSPISpeed(Config::Display::SPI_CLOCK);
+        tft2.setSPISpeed(Config::Display::SPI_CLOCK);
+    }
+
 void init()
 {
+    pinMode(Pins::UI::BACKLIGHT, OUTPUT);
+    pinMode(Pins::UI::RCWL, INPUT);
+    pinMode(Pins::UI::BUTTON, INPUT_PULLUP);
+    pinMode(Pins::UI::BUTTON_SVC, INPUT_PULLUP);
+    pinMode(Pins::UI::BUTTON_DEV, INPUT_PULLUP);
+    digitalWrite(Pins::UI::BACKLIGHT, HIGH);
+    backlightOn = true;
+    lastActivityMillis = millis();
+
     // =========================================================
     // TFT1 -> SPI0
     // =========================================================
@@ -73,25 +108,7 @@ void init()
     digitalWrite(Pins::TFT1::CS, HIGH);
     digitalWrite(Pins::TFT2::CS, HIGH);
 
-    // =========================================================
-    // ST7735 initialization
-    // =========================================================
-    tft1.initR(INITR_BLACKTAB);
-    tft2.initR(INITR_BLACKTAB);
-
-    // =========================================================
-    // Offset adjustments for ST7735 variants (chip + PCB dependent)
-    // =========================================================
-    tft1.setRowStart(Config::Display::ROW_START);
-    tft1.setColStart(Config::Display::COL_START);
-    tft2.setRowStart(Config::Display::ROW_START);
-    tft2.setColStart(Config::Display::COL_START);
-
-    // =========================================================
-    // Orientation
-    // =========================================================
-    tft1.setRotation(Config::Display::ROTATION);
-    tft2.setRotation(Config::Display::ROTATION);
+    initializeControllers();
 
     // =========================================================
     // Initial clear
@@ -100,10 +117,40 @@ void init()
     tft2.fillScreen(COLOR_BLACK);
 }
 
-    void update(const SharedPanel &localPanel) {
-        // High-frequency passenger screen updates execute natively right here
-        // (This routine isolates standard floor arrows to eliminate active menu flickering)
+    bool update(const SharedPanel &localPanel) {
         (void)localPanel;
+
+        const bool motionDetected = digitalRead(Pins::UI::RCWL) == HIGH;
+        const bool buttonPressed = digitalRead(Pins::UI::BUTTON) == LOW;
+
+        if (motionDetected || buttonPressed) {
+            lastActivityMillis = millis();
+
+            if (standbyActive) {
+                setBacklight(false);
+                initializeControllers();
+                standbyActive = false;
+                return true;
+            }
+
+            setBacklight(true);
+            return false;
+        }
+
+        if (millis() - lastActivityMillis >= Config::Timing::SCREEN_TIMEOUT_MS) {
+            if (!standbyActive) {
+                tft1.fillScreen(COLOR_BLACK);
+                tft2.fillScreen(COLOR_BLACK);
+                setBacklight(false);
+                standbyActive = true;
+            }
+        }
+
+        return false;
+    }
+
+    void showBacklight() {
+        setBacklight(true);
     }
 
         // --- IMPLEMENTATION OF THE TECHNICAL DASHBOARD PRIMITIVES V10.26 ---

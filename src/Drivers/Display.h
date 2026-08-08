@@ -14,7 +14,8 @@ enum class DisplayTarget : uint8_t {
 namespace Display
 {
     void init();
-    void update(const SharedPanel &localPanel);
+    bool update(const SharedPanel &localPanel);
+    void showBacklight();
 
     void clearTargetScreen(DisplayTarget target);
     void printMenuHeader(DisplayTarget target, const char* titluPagina);

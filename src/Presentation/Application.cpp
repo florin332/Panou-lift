@@ -69,7 +69,12 @@ namespace Application
     static unsigned long lastDiagMillis = 0;
 
     if (shared_panel_read(gSharedMemory, localSnapshot)) {
-        Presentation::update(localSnapshot);
+        const bool displayWoke = Presentation::update(localSnapshot);
+
+        if (displayWoke) {
+            PanelRenderer::invalidate(DisplayTarget::Left);
+            PanelRenderer::invalidate(DisplayTarget::Right);
+        }
 
         const DiagnosticsNavigator::NavigatorState &nav = DiagnosticsNavigator::getState();
 
@@ -94,6 +99,10 @@ namespace Application
                 UIPresenter::buildPage(info, nav.currentProfile, pageIdx, logicalPage);
                 DisplayRenderer::render(DisplayTarget::Left, logicalPage);
             }
+        }
+
+        if (displayWoke) {
+            Display::showBacklight();
         }
     }
 }

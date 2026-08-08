@@ -23,7 +23,7 @@ namespace Config
     // =========================================================
     namespace Timing
     {
-        constexpr uint32_t SCREEN_TIMEOUT_MS = 120000;   // Timeout standby ecran
+        constexpr uint32_t SCREEN_TIMEOUT_MS = 15000;   // Timeout standby ecran
         constexpr uint32_t SHIFT_PERIOD_MS = 30000;      // Perioadă schimb standby
         constexpr uint32_t BUTTON_INHIBIT_MS = 5000;     // Inhibare buton după apel
         constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat
