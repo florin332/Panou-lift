@@ -128,7 +128,6 @@ void init()
 
             if (standbyActive) {
                 setBacklight(false);
-                initializeControllers();
                 standbyActive = false;
                 return true;
             }
@@ -139,9 +138,10 @@ void init()
 
         if (millis() - lastActivityMillis >= Config::Timing::SCREEN_TIMEOUT_MS) {
             if (!standbyActive) {
+                setBacklight(false);
                 tft1.fillScreen(COLOR_BLACK);
                 tft2.fillScreen(COLOR_BLACK);
-                setBacklight(false);
+                initializeControllers();
                 standbyActive = true;
             }
         }
