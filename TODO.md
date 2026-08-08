@@ -11,6 +11,7 @@
 - [x] Verificare `rowStart` / `colStart`
 - [ ] Monitorizare stabilitate TFT1 / TFT2 pe termen lung
 - [x] Timeout comunicație RS485 `500 ms` – OK pentru moment
+- [ ] Watchdog Hardware (Critic pentru un lift)
 
 ## 🟡 Funcționalități
 
@@ -28,6 +29,7 @@
 - [ ] Curățare cod experimental rămas din versiunile anterioare
 - [ ] Sistematizare / completare config
 - [ ] Row start si Col start independent pt fiecare lcd
+- [ ] Watchdog Hardware (Critic pentru un lift)
 
 ## ✅ Rezolvate
 
