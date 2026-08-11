@@ -36,7 +36,7 @@ ERR 03 NOT_IN_SERVICE
 ### Test pe TFT-uri
 
 ```text
-COMM TEST
+mb_com
 ```
 
 Citeste snapshot-ul comun si afiseaza datele liftului 1 pe TFT-ul stang si datele liftului 2 pe TFT-ul drept.
@@ -52,7 +52,7 @@ Afisarea include:
 Raspuns:
 
 ```text
-OK COMM TEST L1=DATA L2=DATA
+OK mb_com L1=DATA L2=DATA
 ```
 
 ### Status pe LCD-ul Magic Box
@@ -101,10 +101,10 @@ DISP TEST 1
 DISP TEST 2
 ```
 
-### Iesire din testul display
+### Iesire din testul display / mb_com
 
 ```text
-mb_test_out
+mb_com_out
 ```
 
 Comanda veche echivalenta:
@@ -116,7 +116,7 @@ TEST EXIT
 Raspuns:
 
 ```text
-ACK TEST EXIT
+ACK mb_com_out
 ```
 
 ### Reinitializare TFT
@@ -170,12 +170,12 @@ OK MCU STACK 0 USED=2048 FREE=4096 HW=8192
 mb_in
 mb_status
 mb_diag
-COMM TEST
-mb_test_out
+mb_com
+mb_com_out
 mb_display_test 1
-mb_test_out
+mb_com_out
 mb_display_test 2
-mb_test_out
+mb_com_out
 mb_runtime
 mb_resets
 mb_wdt

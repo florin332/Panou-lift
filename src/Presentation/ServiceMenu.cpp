@@ -1,6 +1,6 @@
 // Presentation/ServiceMenu.cpp
 // Service Mode: date reale + chenar overlay (portocaliu/roșu)
-// Testele display rămân pe ecran până la TEST EXIT (manual din Magic Box)
+// Testele display și mb_com rămân pe ecran până la mb_com_out (manual din Magic Box)
 
 #include "ServiceMenu.h"
 #include "ServiceProtocol.h"
@@ -22,7 +22,6 @@ static bool sDisplayTestActive = false;
 // Forward declarations
 static void handleCommand(const ServiceProtocol::Command &cmd);
 static uint16_t getOverlayColor(const SharedPanel &panel, bool haveData);
-static void drawServiceOverlays(uint16_t color);
 static void runCommTest();
 static void sendCommStatus();
 static void sendDiagnostics();
@@ -94,7 +93,7 @@ void update() {
         Display::drawServiceOverlay(DisplayTarget::Right, overlayColor);
     }
     // Dacă sDisplayTestActive == true, ecranul rămâne așa cum l-a lăsat ultima comandă
-    // (COMM TEST, DISP TEST, etc.) — NU suprascriem cu date reale.
+    // (mb_com, DISP TEST, etc.) — NU suprascriem cu date reale.
 
     // 3. Consumă comenzi de la Core 1 (Magic Box)
     ServiceProtocol::Command cmd;
@@ -248,7 +247,7 @@ static void runCommTest() {
     Display::printCommLine(right, 3, "Svc :", serviceText(panel.lift2.svc), 0xFFFF);
     Display::printCommLine(right, 4, "Ocp :", occupancyText(panel.lift2.ocp), 0xFFFF);
 
-    ServiceProtocol::sendResponse("OK COMM TEST L1=DATA L2=DATA");
+    ServiceProtocol::sendResponse("OK mb_com L1=DATA L2=DATA");
 }
 
 static void sendCommStatus() {
@@ -318,7 +317,7 @@ static void runDispReinit(uint8_t tftId) {
 static void exitDisplayTest() {
     sDisplayTestActive = false;
     // La următorul ciclu update(), datele reale + overlay vor fi randate automat
-    ServiceProtocol::sendResponse("ACK TEST EXIT");
+    ServiceProtocol::sendResponse("ACK mb_com_out");
 }
 
 // ==================== PICO / MCU (Serial only) ====================

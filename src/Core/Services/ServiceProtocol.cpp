@@ -38,8 +38,10 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::EnterService;
     } else if (strcmp(line, "SRV EXIT") == 0 || strcmp(line, "mb_out") == 0) {
         cmd.type = Command::Type::ExitService;
-    } else if (strcmp(line, "COMM TEST") == 0) {
+    } else if (strcmp(line, "COMM TEST") == 0 || strcmp(line, "mb_com") == 0) {
         cmd.type = Command::Type::CommTest;
+    } else if (strcmp(line, "mb_com_out") == 0) {
+        cmd.type = Command::Type::TestExit;
     } else if (strcmp(line, "mb_status") == 0) {
         cmd.type = Command::Type::CommStatus;
     } else if (strcmp(line, "mb_diag") == 0) {
