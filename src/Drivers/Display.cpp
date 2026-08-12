@@ -46,7 +46,7 @@ namespace Display
     static unsigned long lastActivityMillis = 0;
     static bool backlightOn = true;
     static bool standbyActive = false;
-    static bool serviceModeActive = false;  // ← NOU
+    static bool serviceModeActive = false;
 
     static void setBacklight(bool enabled) {
         if (backlightOn == enabled) return;
@@ -112,6 +112,8 @@ namespace Display
         if (active) {
             setBacklight(true);
             standbyActive = false;
+        } else {
+            lastActivityMillis = millis();
         }
     }
 
@@ -137,7 +139,6 @@ namespace Display
             return false;
         }
 
-        // ← MODIFICAT: ignoră standby când Service Mode este activ
         if (!serviceModeActive && (millis() - lastActivityMillis >= Config::Timing::SCREEN_TIMEOUT_MS)) {
             if (!standbyActive) {
                 setBacklight(false);
@@ -162,7 +163,9 @@ namespace Display
         else                               { tft2.fillScreen(COLOR_BLACK); }
     }
 
-    void printMenuHeader(DisplayTarget target, const char* titluPagina) {
+    // ← MODIFICAT: separator configurabil (culoare + grosime)
+    void printMenuHeader(DisplayTarget target, const char* titluPagina,
+                         uint16_t sepColor, uint8_t sepThickness) {
         Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
         tft.setFont(&universalis12);
         tft.setTextColor(COLOR_YELLOW);
@@ -175,7 +178,13 @@ namespace Display
         const int16_t centeredY = (24 - static_cast<int16_t>(textHeight)) / 2 - textY;
         tft.setCursor(centeredX, centeredY);
         tft.print(titluPagina);
-        tft.drawFastHLine(0, 24, 128, COLOR_GREY);
+
+        // Separator ancorat la y=24, deseneaza in sus
+        // sepThickness=3 → y=24,23,22 (compatibil cu versiunea anterioara)
+        // sepThickness=2 → y=24,23 (+1px spatiu liber la y=22)
+        for (uint8_t i = 0; i < sepThickness; i++) {
+            tft.drawFastHLine(0, 24 - i, 128, sepColor);
+        }
     }
 
     void printMenuLineExt(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare) {
@@ -219,7 +228,7 @@ namespace Display
     void printCommLine(DisplayTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare) {
         Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
         tft.setFont(&universalis12);
-        const uint8_t yPos = 49 + (linie * 20);
+        const uint8_t yPos = 53 + (linie * 21);
 
         tft.setTextColor(COLOR_WHITE);
         tft.setCursor(4, yPos);
@@ -233,7 +242,7 @@ namespace Display
     void printCommLine(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare) {
         Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
         tft.setFont(&universalis12);
-        const uint8_t yPos = 49 + (linie * 20);
+        const uint8_t yPos = 53 + (linie * 21);
 
         tft.setTextColor(COLOR_WHITE);
         tft.setCursor(4, yPos);
@@ -289,10 +298,14 @@ namespace Display
         tft.print(text);
     }
 
+    void drawHLine(DisplayTarget target, int16_t x, int16_t y, int16_t w, uint16_t color) {
+        Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
+        tft.drawFastHLine(x, y, w, color);
+    }
+
     // --- Service overlay: chenar 3px, FĂRĂ text ---
     void drawServiceOverlay(DisplayTarget target, uint16_t color) {
         Custom_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
-        // Chenar de 3px (ecran 128x160)
         tft.drawRect(0, 0, 128, 160, color);
         tft.drawRect(1, 1, 126, 158, color);
         tft.drawRect(2, 2, 124, 156, color);

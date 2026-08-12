@@ -33,7 +33,7 @@ ERR 03 NOT_IN_SERVICE
 
 ## Communication
 
-### Test pe TFT-uri
+### Afisare pe TFT-uri
 
 ```text
 mb_com

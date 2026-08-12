@@ -41,7 +41,7 @@ static void parseLine(const char* line) {
     } else if (strcmp(line, "COMM TEST") == 0 || strcmp(line, "mb_com") == 0) {
         cmd.type = Command::Type::CommTest;
     } else if (strcmp(line, "mb_com_out") == 0) {
-        cmd.type = Command::Type::TestExit;
+        cmd.type = Command::Type::CommTestOut;
     } else if (strcmp(line, "mb_status") == 0) {
         cmd.type = Command::Type::CommStatus;
     } else if (strcmp(line, "mb_diag") == 0) {
@@ -54,7 +54,7 @@ static void parseLine(const char* line) {
         const char* argument = line[1] == 'b' ? line + 19 : line + 12;
         cmd.param = strcmp(argument, "BOTH") == 0 ? 3 : static_cast<uint8_t>(atoi(argument));
     } else if (strcmp(line, "TEST EXIT") == 0 || strcmp(line, "mb_test_out") == 0) {
-        cmd.type = Command::Type::TestExit;
+        cmd.type = Command::Type::DispTestExit;
     } else if (strcmp(line, "MCU UPTIME") == 0 || strcmp(line, "mb_runtime") == 0) {
         cmd.type = Command::Type::McuUptime;
     } else if (strcmp(line, "MCU RESETS") == 0 || strcmp(line, "mb_resets") == 0) {

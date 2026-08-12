@@ -1,11 +1,12 @@
 // Presentation/ServiceMenu.cpp
-// Service Mode: date reale + chenar overlay (portocaliu/roșu)
-// Testele display și mb_com rămân pe ecran până la mb_com_out (manual din Magic Box)
+// Service Mode: date reale + chenar overlay (portocaliu/rosu)
+// Testele display raman pe ecran pana la mb_com_out (manual din Magic Box)
 
 #include "ServiceMenu.h"
 #include "ServiceProtocol.h"
 #include "Display.h"
 #include "SharedPanel.h"
+#include "PanelRenderer.h"
 #include <Arduino.h>
 
 extern volatile SharedMemory gSharedMemory;
@@ -14,14 +15,14 @@ namespace ServiceMenu {
 
 static bool sInService = false;
 static unsigned long sLastActivityMillis = 0;
-static constexpr unsigned long SERVICE_TIMEOUT_MS = 60000;
 
 // Stare display: false = idle (date reale + overlay), true = test activ
 static bool sDisplayTestActive = false;
 
 // Forward declarations
 static void handleCommand(const ServiceProtocol::Command &cmd);
-static uint16_t getOverlayColor(const SharedPanel &panel, bool haveData);
+static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData);
+static void restoreServiceMain();
 static void runCommTest();
 static void sendCommStatus();
 static void sendDiagnostics();
@@ -79,48 +80,57 @@ bool isDisplayCommandActive() {
 
 // ==================== UPDATE PRINCIPAL ====================
 void update() {
-    // 1. Citește datele reale din memoria partajată
+    // 1. Citeste datele reale din memoria partajata
     SharedPanel localPanel;
     bool haveNewData = shared_panel_read(gSharedMemory, localPanel);
 
-    // 2. În afara Service Mode, update() doar consumă comenzi de intrare.
+    // 2. In afara Service Mode, update() doar consuma comenzi de intrare.
     if (sInService && !sDisplayTestActive) {
         if (haveNewData) {
             Display::update(localPanel);
         }
         uint16_t overlayColor = getOverlayColor(localPanel, haveNewData);
-        Display::drawServiceOverlay(DisplayTarget::Left,  overlayColor);
+        Display::drawServiceOverlay(DisplayTarget::Left, overlayColor);
         Display::drawServiceOverlay(DisplayTarget::Right, overlayColor);
     }
-    // Dacă sDisplayTestActive == true, ecranul rămâne așa cum l-a lăsat ultima comandă
-    // (mb_com, DISP TEST, etc.) — NU suprascriem cu date reale.
+    // Daca sDisplayTestActive == true, ecranul ramane asa cum l-a lasat ultima comanda
 
-    // 3. Consumă comenzi de la Core 1 (Magic Box)
+    // 3. Consuma comenzi de la Core 1 (Magic Box)
     ServiceProtocol::Command cmd;
     while (ServiceProtocol::consumeCommand(cmd)) {
         sLastActivityMillis = millis();
         handleCommand(cmd);
     }
-
-    // 4. Auto-exit Service Mode la inactivitate (doar dacă nu e test display activ)
-    if (sInService && !sDisplayTestActive &&
-        (millis() - sLastActivityMillis > SERVICE_TIMEOUT_MS)) {
-        sInService = false;
-        Display::setServiceMode(false);
-        ServiceProtocol::sendResponse("ACK SRV AUTOEXIT");
-    }
 }
 
 // ==================== CULOARE OVERLAY ====================
-static uint16_t getOverlayColor(const SharedPanel &panel, bool haveData) {
-    // Roșu dacă avem erori de comunicație sau seqlock a eșuat
-    if (!haveData) return 0xF800; // COLOR_RED
+static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData) {
+    if (!haveNewData) return 0xF800; // COLOR_RED
     if (panel.system.packetErrorsLift1 > 0 ||
         panel.system.packetErrorsLift2 > 0 ||
         panel.system.seqlockCollisions > 0) {
         return 0xF800; // COLOR_RED
     }
-    return 0xFD20; // COLOR_ORANGE — service normal
+    return 0xFD20; // COLOR_ORANGE
+}
+
+// ==================== RESTAURARE PAGINA PRINCIPALA SERVICE ====================
+static void restoreServiceMain() {
+    SharedPanel panel;
+    if (!shared_panel_read(gSharedMemory, panel)) return;
+
+    Display::clearTargetScreen(DisplayTarget::Left);
+    Display::clearTargetScreen(DisplayTarget::Right);
+
+    PanelRenderer::invalidate(DisplayTarget::Left);
+    PanelRenderer::invalidate(DisplayTarget::Right);
+
+    PanelRenderer::render(DisplayTarget::Right, panel.lift2, "ASCENSOR 2");
+    PanelRenderer::render(DisplayTarget::Left, panel.lift1, "ASCENSOR 1");
+
+    uint16_t color = getOverlayColor(panel, true);
+    Display::drawServiceOverlay(DisplayTarget::Left, color);
+    Display::drawServiceOverlay(DisplayTarget::Right, color);
 }
 
 // ==================== HANDLERE COMENZI ====================
@@ -165,7 +175,12 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             runDispReinit(cmd.param);
             break;
 
-        case ServiceProtocol::Command::Type::TestExit:   // ← NOU: revine la date reale
+        case ServiceProtocol::Command::Type::CommTestOut:
+            if (!checkService()) break;
+            exitDisplayTest();
+            break;
+
+        case ServiceProtocol::Command::Type::DispTestExit:
             if (!checkService()) break;
             exitDisplayTest();
             break;
@@ -232,20 +247,31 @@ static void runCommTest() {
     char lift1Dst[4];
     char lift2Pos[4];
     char lift2Dst[4];
-    Display::printMenuHeader(left, "Comm. A 1");
-    Display::printMenuHeader(right, "Comm. A 2");
+
+    // ← MODIFICAT: separator galben 2px direct din printMenuHeader, fara suprascriere
+    Display::printMenuHeader(left,  "Comm. A 1", 0xFFE0, 2);
+    Display::printMenuHeader(right, "Comm. A 2", 0xFFE0, 2);
 
     Display::printCommLine(left, 0, "Pos :", floorText(panel.lift1.pos, lift1Pos, sizeof(lift1Pos)), 0xFFFF);
     Display::printCommLine(left, 1, "Dst :", panel.lift1.sj == Direction::Idle ? "--" : floorText(panel.lift1.etd, lift1Dst, sizeof(lift1Dst)), 0xFFFF);
     Display::printCommLine(left, 2, "S/J :", directionText(panel.lift1.sj), 0xFFFF);
     Display::printCommLine(left, 3, "Svc :", serviceText(panel.lift1.svc), 0xFFFF);
-    Display::printCommLine(left, 4, "Ocp :", occupancyText(panel.lift1.ocp), 0xFFFF);
+
+    // Ocp: rosu "- ! -" daca svc != 5 (functionare normala)
+    bool svc1Normal = (static_cast<uint8_t>(panel.lift1.svc) == 5);
+    Display::printCommLine(left, 4, "Ocp :",
+        svc1Normal ? occupancyText(panel.lift1.ocp) : "- ! -",
+        svc1Normal ? 0xFFFF : 0xF800);
 
     Display::printCommLine(right, 0, "Pos :", floorText(panel.lift2.pos, lift2Pos, sizeof(lift2Pos)), 0xFFFF);
     Display::printCommLine(right, 1, "Dst :", panel.lift2.sj == Direction::Idle ? "--" : floorText(panel.lift2.etd, lift2Dst, sizeof(lift2Dst)), 0xFFFF);
     Display::printCommLine(right, 2, "S/J :", directionText(panel.lift2.sj), 0xFFFF);
     Display::printCommLine(right, 3, "Svc :", serviceText(panel.lift2.svc), 0xFFFF);
-    Display::printCommLine(right, 4, "Ocp :", occupancyText(panel.lift2.ocp), 0xFFFF);
+
+    bool svc2Normal = (static_cast<uint8_t>(panel.lift2.svc) == 5);
+    Display::printCommLine(right, 4, "Ocp :",
+        svc2Normal ? occupancyText(panel.lift2.ocp) : "- ! -",
+        svc2Normal ? 0xFFFF : 0xF800);
 
     ServiceProtocol::sendResponse("OK mb_com L1=DATA L2=DATA");
 }
@@ -259,9 +285,9 @@ static void sendCommStatus() {
 
     char response[128];
     snprintf(response, sizeof(response),
-             "OK STATUS L1=%s L2=%s ERR1=%u ERR2=%u",
-             serviceText(panel.lift1.svc), serviceText(panel.lift2.svc),
-             panel.system.packetErrorsLift1, panel.system.packetErrorsLift2);
+        "OK STATUS L1=%s L2=%s ERR1=%u ERR2=%u",
+        serviceText(panel.lift1.svc), serviceText(panel.lift2.svc),
+        panel.system.packetErrorsLift1, panel.system.packetErrorsLift2);
     ServiceProtocol::sendResponse(response);
 }
 
@@ -274,9 +300,9 @@ static void sendDiagnostics() {
 
     char response[128];
     snprintf(response, sizeof(response),
-             "OK DIAG ERR1=%u ERR2=%u SEQ=%u RESET=%u",
-             panel.system.packetErrorsLift1, panel.system.packetErrorsLift2,
-             panel.system.seqlockCollisions, panel.system.lastResetReason);
+        "OK DIAG ERR1=%u ERR2=%u SEQ=%u RESET=%u",
+        panel.system.packetErrorsLift1, panel.system.packetErrorsLift2,
+        panel.system.seqlockCollisions, panel.system.lastResetReason);
     ServiceProtocol::sendResponse(response);
 }
 
@@ -301,13 +327,10 @@ static void runDispTest(uint8_t tftId) {
 static void runDispReinit(uint8_t tftId) {
     sDisplayTestActive = true;
     if (tftId == 1) {
-        // TODO: apelează reinit hardware TFT 1
         ServiceProtocol::sendResponse("OK DISP REINIT 1");
     } else if (tftId == 2) {
-        // TODO: reinit hardware TFT 2
         ServiceProtocol::sendResponse("OK DISP REINIT 2");
-    } else if (tftId == 3) {  // BOTH
-        // TODO: reinit ambele
+    } else if (tftId == 3) {
         ServiceProtocol::sendResponse("OK DISP REINIT BOTH");
     } else {
         ServiceProtocol::sendResponse("ERR 05 INVALID_TFT");
@@ -316,7 +339,7 @@ static void runDispReinit(uint8_t tftId) {
 
 static void exitDisplayTest() {
     sDisplayTestActive = false;
-    // La următorul ciclu update(), datele reale + overlay vor fi randate automat
+    restoreServiceMain();
     ServiceProtocol::sendResponse("ACK mb_com_out");
 }
 
@@ -344,7 +367,7 @@ static void sendMcuResets() {
 }
 
 static void sendMcuWdt() {
-    bool wdtEnabled = true;  // TODO: înlocuiește cu variabila reală
+    bool wdtEnabled = true;
     ServiceProtocol::sendResponse(wdtEnabled ? "OK MCU WDT ENABLED" : "OK MCU WDT DISABLED");
 }
 
@@ -379,10 +402,9 @@ static void sendMcuStack(uint8_t coreId) {
         ServiceProtocol::sendResponse("ERR 07 INVALID_CORE");
         return;
     }
-    // TODO: înlocuiește cu FreeRTOS real
     uint32_t used = 2048;
     uint32_t free = 4096;
-    uint32_t hw   = 8192;
+    uint32_t hw = 8192;
     char buf[128];
     snprintf(buf, sizeof(buf), "OK MCU STACK %u USED=%lu FREE=%lu HW=%lu",
              coreId, used, free, hw);

@@ -4,7 +4,7 @@
 #define DISPLAY_H
 
 #include "SharedPanel.h"
-#include <gfxfont.h>  // ← NOU: pentru GFXfont*
+#include <gfxfont.h>
 
 enum class DisplayTarget : uint8_t {
     Left,
@@ -22,7 +22,11 @@ namespace Display
     bool isServiceMode();
 
     void clearTargetScreen(DisplayTarget target);
-    void printMenuHeader(DisplayTarget target, const char* titluPagina);
+
+    // Separator configurabil: culoare (default gri) si grosime in px (default 3)
+    void printMenuHeader(DisplayTarget target, const char* titluPagina,
+                         uint16_t sepColor = 0x7BEF, uint8_t sepThickness = 3);
+
     void printMenuLine(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoare);
     void printMenuLine(DisplayTarget target, uint8_t linie, const char* eticheta, const char* valoareText);
 
@@ -37,6 +41,9 @@ namespace Display
     // Primitivă de bază pentru text. Presentation decide când e erase (BLACK) și când e draw.
     void drawText(DisplayTarget target, int16_t x, int16_t y,
         const GFXfont* font, const char* text, uint16_t color);
+
+    // Primitivă de linie orizontală
+    void drawHLine(DisplayTarget target, int16_t x, int16_t y, int16_t w, uint16_t color);
 
     // Service overlay: chenar subțire (2px) fără text
     void drawServiceOverlay(DisplayTarget target, uint16_t color);

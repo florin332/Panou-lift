@@ -11,11 +11,12 @@ struct Command {
         EnterService,
         ExitService,
         CommTest,
+        CommTestOut,      // exit COMM test
         CommStatus,
         Diagnostics,
         DispTest,
         DispReinit,
-        TestExit,
+        DispTestExit,     // exit LCD test (fostul TestExit)
         McuUptime,
         McuResets,
         McuWdt,
@@ -36,4 +37,4 @@ bool hasPendingCommand();
 
 } // namespace ServiceProtocol
 
-#endif // SERVICE_PROTOCOL_H
+#endif
