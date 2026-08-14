@@ -1,0 +1,13 @@
+{
+    "folders": [
+        {
+            "name": "panou_duplex",
+            "path": "panou_duplex"
+        },
+        {
+            "name": "encoder",
+            "path": "encoder"
+        }
+    ],
+    "settings": {}
+}

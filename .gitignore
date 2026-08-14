@@ -6,6 +6,12 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch/
+# VS Code generated files in subprojects
+
+**/.vscode/c_cpp_properties.json
+**/.vscode/launch.json
+**/.vscode/ipch/
+**/.vscode/.browse_c_cpp.db*
 
 # Build artifacts
 *.o
