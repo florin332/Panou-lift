@@ -257,21 +257,21 @@ static void runCommTest() {
     Display::printCommLine(left, 2, "S/J :", directionText(panel.lift1.sj), 0xFFFF);
     Display::printCommLine(left, 3, "Svc :", serviceText(panel.lift1.svc), 0xFFFF);
 
-    // Ocp: rosu "- ! -" daca svc != 5 (functionare normala)
-    bool svc1Normal = (static_cast<uint8_t>(panel.lift1.svc) == 5);
+    // Ocp: portocaliu "- ! -" daca svc != Normal (functionare normala)
+    bool svc1Normal = (panel.lift1.svc == ServiceState::Normal);
     Display::printCommLine(left, 4, "Ocp :",
         svc1Normal ? occupancyText(panel.lift1.ocp) : "- ! -",
-        svc1Normal ? 0xFFFF : 0xF800);
+        svc1Normal ? 0xFFFF : 0xFE60);
 
     Display::printCommLine(right, 0, "Pos :", floorText(panel.lift2.pos, lift2Pos, sizeof(lift2Pos)), 0xFFFF);
     Display::printCommLine(right, 1, "Dst :", panel.lift2.sj == Direction::Idle ? "--" : floorText(panel.lift2.etd, lift2Dst, sizeof(lift2Dst)), 0xFFFF);
     Display::printCommLine(right, 2, "S/J :", directionText(panel.lift2.sj), 0xFFFF);
     Display::printCommLine(right, 3, "Svc :", serviceText(panel.lift2.svc), 0xFFFF);
 
-    bool svc2Normal = (static_cast<uint8_t>(panel.lift2.svc) == 5);
+    bool svc2Normal = (panel.lift2.svc == ServiceState::Normal);
     Display::printCommLine(right, 4, "Ocp :",
         svc2Normal ? occupancyText(panel.lift2.ocp) : "- ! -",
-        svc2Normal ? 0xFFFF : 0xF800);
+        svc2Normal ? 0xFFFF : 0xFE60);
 
     ServiceProtocol::sendResponse("OK mb_com L1=DATA L2=DATA");
 }
