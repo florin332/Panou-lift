@@ -2,13 +2,15 @@
 #include "HardwareInterface.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
-#include <CSE_CST328.h>
+#include <Wire.h>
+#include <CSE_CST328.h> 
 
 class HardwareWaveshare : public HardwareInterface {
 private:
-    // Pinii fixati hardware pe cablajul Waveshare RP2350 pentru ecranul ST7789
-    Adafruit_ST7789 tft = Adafruit_ST7789(13, 14, 11, 10, 15); // CS, DC, MOSI, SCLK, RST
-    CSE_CST328 touch;
+    Adafruit_ST7789 tft = Adafruit_ST7789(13, 14, 11, 10, 15);
+    
+    // Configurare constructor: latime, inaltime, magistrala Wire, pin reset, pin intrerupere
+    CSE_CST328 touch = CSE_CST328(320, 240, &Wire, -1, 17); 
     
     bool touchedState = false;
     int lastX = 0;
@@ -16,29 +18,30 @@ private:
 
 public:
     void init() override {
-        // Inițializare ST7789 pentru placa Waveshare (Rezoluție 320x240)
-        tft.init(240, 320); 
+        tft.init(240, 320);
         tft.setRotation(1);
         tft.fillScreen(ST77XX_BLACK);
         
-        // Inițializare touch capacitiv CST328 pe magistrala I2C (GP6=SDA, GP7=SCL)
+        // Alocare pini I2C1 pentru Waveshare RP2350 (SDA=GP6, SCL=GP7)
         Wire.setSDA(6);
         Wire.setSCL(7);
         Wire.begin();
-        touch.begin(Wire, 6, 7); // Transmitem obiectul Wire și pinii de I2C
         
-        // Pornire UART0 implicit pe rpipico2 (Pini GP4/GP5)
+        // Initializare fara argumente
+        touch.begin(); 
+        
         Serial1.setTX(4);
         Serial1.setRX(5);
         Serial1.begin(115200);
     }
 
     void updateTouch() override {
-        // Verificare stare touch capacitiv CST328
-        if (touch.available()) {
+        // In biblioteca CSE_CST328, starea este interogata prin functia isTouched()
+        if (touch.isTouched()) {
             touchedState = true;
-            lastX = touch.getX();
-            lastY = touch.getY();
+            // Coordonatele se extrag direct din matricea publica touchPoints a obiectului
+            lastX = touch.touchPoints[0].x;
+            lastY = touch.touchPoints[0].y;
         } else {
             touchedState = false;
         }
@@ -56,3 +59,6 @@ public:
 HardwareWaveshare waveshareInstance;
 HardwareInterface& Hardware = waveshareInstance;
 #endif
+
+
+
