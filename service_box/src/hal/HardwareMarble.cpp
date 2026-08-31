@@ -68,4 +68,3 @@ public:
 HardwareMarble marbleInstance;
 HardwareInterface& Hardware = marbleInstance;
 #endif
-
