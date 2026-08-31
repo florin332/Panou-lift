@@ -2,13 +2,13 @@
 #include "HardwareInterface.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7789.h>
-#include <CST328_Touch.h>
+#include <CSE_CST328.h>
 
 class HardwareWaveshare : public HardwareInterface {
 private:
     // Pinii fixati hardware pe cablajul Waveshare RP2350 pentru ecranul ST7789
     Adafruit_ST7789 tft = Adafruit_ST7789(13, 14, 11, 10, 15); // CS, DC, MOSI, SCLK, RST
-    CST328_Touch touch;
+    CSE_CST328 touch;
     
     bool touchedState = false;
     int lastX = 0;
