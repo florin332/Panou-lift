@@ -1,41 +1,20 @@
-# TODO – Panou Lift
+# Panou-lift - Global Integration TODO List
 
-## 🔴 Prioritate mare
+## [ ] Sub-Module Stabilization
+- [ ] Complete and verify individual local codebases inside `service_box/`.
+- [ ] Complete and verify individual local codebases inside `panou_duplex/`.
+- [ ] Ensure both environments compile with zero errors under PlatformIO.
 
-- [ ] Monitorizare stabilitate TFT1 / TFT2 pe termen lung
+## [ ] System Integration & USB Interconnection
+- [ ] Perform direct physical USB Type-C linking between the Service Box (Host) and Duplex Panel (Client).
+- [ ] Validate the non-blocking ASCII handshake loop (`mb_in` -> `ACK SRV ENTER`) on live hardware.
+- [ ] Run continuous stress tests on the `mb_com` telemetry streaming pipeline to monitor virtual port stability.
 
-## 🟠 De urmărit în mediul real
+## [ ] Failure Mode & Edge Case Testing
+- [ ] Verify Host reaction times (150ms timeout) by simulating unexpected cable disconnects during runtime.
+- [ ] Validate the 3-retry arbitration budget and ensure error alerts pop up correctly on the Master screen.
+- [ ] Test system behavior during hot-plugging cables and unexpected power-loss fallbacks.
 
-- [x] V10.29 testat în mediu real
-- [x] Verificare `Custom_ST7735`
-- [x] Verificare `rowStart` / `colStart`
-- [ ] Monitorizare stabilitate TFT1 / TFT2 pe termen lung
-- [x] Timeout comunicație RS485 `500 ms` – OK pentru moment
-- [ ] Watchdog Hardware (Critic pentru un lift)
-
-## 🟡 Funcționalități
-
-- [ ] Meniu Service – intrare
-- [ ] Meniu Service – navigare
-- [ ] Meniu Service – revenire la ecranul principal
-- [ ] Meniu Developer – intrare
-- [ ] Meniu Developer – navigare
-- [ ] Meniu Developer – revenire la ecranul principal
-
-## 🟢 Îmbunătățiri ulterioare
-
-- [ ] Diagnostic mai bun pentru pierderile de pachete
-- [ ] Monitorizare / jurnalizare evenimente RS485
-- [ ] Curățare cod experimental rămas din versiunile anterioare
-- [ ] Sistematizare / completare config
-- [ ] Row start si Col start independent pt fiecare lcd
-- [ ] Watchdog Hardware (Critic pentru un lift)
-
-## ✅ Rezolvate
-
-- [x] Flicker NORMAL ↔ SVC=3 eliminat prin citirea continuă UART + timeout bazat pe `millis()`
-- [x] Upload PlatformIO / autodetect Pico
-- [x] Configurare pin RCWL
-- [x] Inițializare TFT la pornire
-- [x] `Custom_ST7735` verificat
-- [x] `rowStart` / `colStart` verificate
+## [ ] Final Deployment
+- [ ] Draft overall system electrical schematics and wire routing diagrams.
+- [ ] Complete assembly instructions and mechanical enclosure deployment guidelines.
