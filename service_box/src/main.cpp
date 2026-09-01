@@ -1,46 +1,112 @@
 #include <Arduino.h>
 #include "hal/HardwareInterface.h"
 
-unsigned long lastDebugTime = 0;
+// Removed old local UI class includes since rendering is now fully handled via unified HAL bridges
+// // #include "ui/StartupScreen.h"
+// // StartupScreen* startupScreen = nullptr;
+
+UiPage currentPage = PAGE_START;
+bool refreshPageNeeded = true;
+unsigned long sdCheckTimer = 0;
 
 void setup() {
-    // Pornește comunicarea serială pentru debug-ul pe PC
+    // Start local monitoring port for PC verification debugging
     Serial.begin(115200);
-    delay(1000); // Scurtă pauză pentru stabilizare terminal
+    delay(500);
 
-    // Inițializează hardware-ul selectat automat la compilare (Marble sau Waveshare)
+    // Initialize decoupled framework structures matching active compilation target (SPI, I2C, LCD, Touch)
     Hardware.init();
 
-    Serial.println("==========================================");
-    Serial.print("Sistem pornit cu succes pe: ");
-    Serial.println(MY_BOARD_NAME);
-    Serial.println("==========================================");
+    Serial.println("\n==============================================");
+    Serial.print("Host System Application Core Active On: ");
+    
+    // Using the native PlatformIO framework injected macro directly
+    #if defined(BOARD_NAME)
+        Serial.println(BOARD_NAME);
+    #else
+        Serial.println("RP2040/RP2350 Board");
+    #endif
+    
+    Serial.println("==============================================");
 }
 
 void loop() {
-    // Interoghează controlerul tactil (XPT2046 pe Marble sau CST328 pe Waveshare)
+    // Process background USB pipelines asynchronously (runs timeouts, serial parsing, and retransmission retries)
+    Hardware.updateCommEngine();
+    
+    // Poll hardware interface input wrappers (captures raw touches from XPT2046 or CST328 and scales coordinates)
     Hardware.updateTouch();
 
-    if (Hardware.isScreenTouched()) {
-        int touchX = Hardware.getTouchX();
-        int touchY = Hardware.getTouchY();
+    int currentX = Hardware.getTouchX();
+    int currentY = Hardware.getTouchY();
+    bool isScreenActive = Hardware.isScreenTouched();
+
+    // ========================================================================
+    // UI APPLICATION STATE MACHINE ROUTING
+    // ========================================================================
+    if (currentPage == PAGE_START) {
         
-        // Evităm inundarea portului serial: afișăm datele o dată la 100ms în caz de apăsare continuă
-        if (millis() - lastDebugTime > 100) {
-            Serial.print("[TOUCH DETECTAT] X = ");
-            Serial.print(touchX);
-            Serial.print(" | Y = ");
-            Serial.println(touchY);
+        // 1. Initial Frame Base Canvas Render
+        if (refreshPageNeeded) {
+            // Trigger base page outline rendering block inside the active HAL implementation
+            Hardware.renderStartPage(true, "SYSTEM STANDBY", 0xFCE0); // 0xFCE0 = Yellow
+            refreshPageNeeded = false;
+        }
 
-            // Generăm un pachet simplu de test pentru a verifica trimiterea prin UART1 (Serial2)
-            uint8_t pachetTest[4] = {0xAA, (uint8_t)(touchX >> 8), (uint8_t)(touchX & 0xFF), 0xBB};
-            
-            // Apelează funcția unică din HAL
-            Hardware.sendProtocolData(pachetTest, sizeof(pachetTest));
+        // 2. Direct Evaluation of Local Touch Grid Interaction Bounds
+        // Button bounds matching layout spec: X[50 to 190], Y[190 to 235]
+        if (isScreenActive && currentX >= 50 && currentX <= 190 && currentY >= 190 && currentY <= 235) {
+            if (Hardware.getCommState() == COMM_IDLE) {
+                Serial.println("[UI Touch Event] START Pressed. Sending mb_in initialization token...");
+                
+                // Update local status zone text directly without wiping the entire screen elements
+                Hardware.renderStartPage(false, "CONNECTING...", 0x07FF); // 0x07FF = Cyan
+                
+                // Dispatch raw master request string over virtual serial pipeline link
+                Hardware.sendCommand("mb_in");
+            }
+        }
 
-            lastDebugTime = millis();
+        // 3. Evaluate Asynchronous Protocol Communication States
+        switch (Hardware.getCommState()) {
+            case COMM_TRANSACTION_SUCCESS:
+                // Verify if client returned valid authorization response string
+                if (Hardware.getLastResponse() == "ACK SRV ENTER") {
+                    Serial.println("[Comm Handshake Success] Handshake confirmed by client panel.");
+                    Hardware.renderStartPage(false, "CONNECTED!", 0x07E0); // 0x07E0 = Bright Green
+                    delay(800); // Visual hold confirmation window for the technician
+                    
+                    // Route state machine execution context into the main diagnostics dashboard view
+                    currentPage = PAGE_DASHBOARD;
+                    refreshPageNeeded = true;
+                }
+                Hardware.clearCommState();
+                break;
+
+            case COMM_CRITICAL_FAILURE:
+                // 150ms transmission timeout reached or max retry budget exhausted
+                Serial.println("[Comm Handshake Error] Failed to establish communication link with panel.");
+                Hardware.renderStartPage(false, "COMM LINK FAULT!", 0xF800); // 0xF800 = Red
+                Hardware.clearCommState();
+                break;
+
+            default:
+                break;
+        }
+
+        // 4. Periodic Storage Updates (Poll metrics background loop every 5000ms)
+        if (millis() - sdCheckTimer > 5000) {
+            if (Hardware.getCommState() == COMM_IDLE) {
+                // Background runtime execution hooks can pull real hardware metrics here
+                Hardware.renderStartPage(false, "SYSTEM READY", 0xFFFF); // White
+            }
+            sdCheckTimer = millis();
+        }
+    } 
+    else if (currentPage == PAGE_DASHBOARD) {
+        if (refreshPageNeeded) {
+            Serial.println("[UI Navigation] Dashboard Screen Loaded Successfully.");
+            refreshPageNeeded = false;
         }
     }
 }
-
-
