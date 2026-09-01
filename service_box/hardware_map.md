@@ -1,39 +1,17 @@
-# ServiceBox - Architecture & Hardware Map
+## ServiceBox - Architecture & Hardware Map
 
-## Arhitectură Generală (HAL)
-Logica de business este complet separată de hardware prin interfața `HardwareInterface`. Se folosește directiva `#ifdef` pentru a compila codul specific fiecărei plăci.
-
----
+Arhitectura utilizează un strat Hardware Abstraction Layer (HAL) care separă logica de business prin `HardwareInterface`, folosind directive `#ifdef` pentru compilație condiționată în funcție de placă.
 
 ## 🟢 Varianta A: GroundStudio Marble Pico (`SERVICEBOX_MARBLE`)
-- **Microcontroler:** RP2040 (Modular)
-- **Display:** ILI9341 (sau ILI9340) - 320x240
-  - `TFT_CS` = 0
-  - `TFT_DC` = 1
-  - `TFT_RST` = 2
-  - `TFT_MOSI` = 3
-  - `TFT_SCK` = 6
-- **Touch:** Rezistiv XPT2046
-  - `TOUCH_CS` = 7
-  - `TOUCH_MISO` = 4
-- **Comunicație (UART1):** 
-  - `TX` = GP20
-  - `RX` = GP21 (Baud: 115200)
-
----
+- **Microcontroler:** RP2040
+- **Display:** ILI9341 (320x240, CS=0, DC=1, RST=2, MOSI=3, SCK=6)
+- **Touch:** Rezistiv XPT2046 (CS=7, MISO=4)
+- **UART1:** TX=GP20, RX=GP21 (115200 baud)
 
 ## 🔵 Varianta B: Waveshare RP2350 Touch LCD (`SERVICEBOX_WAVESHARE`)
-- **Microcontroler:** RP2350 (Integrat)
-- **Display:** ST7789T3 - 320x240 (Rotit Landscape)
-  - `TFT_CS` = 13
-  - `TFT_DC` = 14
-  - `TFT_RST` = 15
-  - `TFT_MOSI` = 11
-  - `TFT_SCLK` = 10
-- **Touch:** Capacitiv CST328 (Magistrală I2C)
-  - `SDA` = GP6
-  - `SCL` = GP7
-  - `INT/IRQ` = GP17
-- **Comunicație (UART1):** 
-  - `TX` = GP4
-  - `RX` = GP5 (Baud: 115200)
+- **Microcontroler:** RP2350
+- **Display:** ST7789T3 (320x240, CS=GP13, DC=GP14, RST=GP15, BL=GP22, MOSI=GP11, SCLK=GP10)
+- **Touch:** Capacitiv CST328 (I2C0: SDA=GP6, SCL=GP7, INT=GP17, RST=GP16)
+- **IMU:** QMI8658 (pe I2C0: SDA=GP6, SCL=GP7, INT1=GP23, INT2=GP24)
+- **MicroSD:** SPI1 (CS=GP8, MOSI=GP11, MISO=GP12, SCLK=GP10)
+- **UART1:** TX=GP4, RX=GP5 (115200 baud)
