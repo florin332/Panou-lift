@@ -1,197 +1,104 @@
-# Service and Magic Box Commands
+# USB CDC ASCII Communication Protocol Specification: Service Box ↔ Display Panels
 
-Documentatie de referinta pentru comenzile trimise prin USB Serial catre Pico.
+This document defines exclusively the text-based ASCII transport layer, syntax constraints, and command register for communication over USB. UI navigation states, screens, and localized menus are documented in each module's respective `service_menu.md` file.
 
-## Conectare
+## 1. Physical Layer & Topology
+* **Interface:** Native USB Type-C (USB CDC - Virtual COM Port).
+* **Configuration:** `115200` baud, 8 data bits, No parity, 1 stop bit (`115200 8N1`).
+* **Format:** Raw Human-Readable **ASCII Text**. This enables direct manual interfacing using any standard PC serial terminal emulator (e.g., PuTTY, Serial Monitor).
+* **Topology:** **Master-Slave (Host-Client)**.
+  * **HOST (Master):** `Service Box`. Automatically initiates and orchestrates all transaction loops.
+  * **CLIENT (Slave):** `Palier Panel`. Listens passively on the USB interface and responds only when directly queried by the Host.
 
-- Portul Pico: verifica portul USB detectat de Windows, de exemplu `COM23`
-- Baud rate: `115200`
-- Line ending: `Both NL & CR`
-- Trimite o singura comanda pe linie si asteapta raspunsul inaintea urmatoarei comenzi.
-- O comanda necunoscuta primeste `ERR 01 UNKNOWN_CMD`.
-- Daca exista deja o comanda in asteptare, se primeste `ERR 02 BUSY`.
+---
 
-## Service mode
+## 2. Framing Syntax & Serial Constraints
+To ensure predictable parsing by the embedded ASCII state-machines, all data packets must adhere to the following rules:
 
-| Comanda scurta | Comanda veche | Explicatie |
-|---|---|---|
-| `mb_in` | `SRV ENTER` | Intra in Service Mode si activeaza chenarul de service pe TFT-uri. |
-| `mb_out` | `SRV EXIT` | Iese din Service Mode si revine la randarea normala. |
+1. **Line Endings:** Every command string sent by the Host must terminate with **Both NL & CR** (`\r\n`).
+2. **Transaction Blocking:** The Host must dispatch exactly one command line at a time and await the explicit text response from the Client before streaming the next command.
+3. **Internal Parser Offset:** Commands use strict space-separated or exact-match parameters.
 
-Raspunsuri asteptate:
+### Global Error Responses (ASCII)
+If a transaction fails validation or constraint checking, the Client will immediately return one of the following standard strings:
+* `ERR 01 UNKNOWN_CMD` : The string sent does not match any register alias.
+* `ERR 02 BUSY`        : The hardware parser is processing a previous command.
+* `ERR 03 NOT_IN_SERVICE` : The command requires entering Service Mode first via `mb_in`.
 
-```text
-ACK SRV ENTER
-ACK SRV EXIT
-```
+---
 
-Comenzile de mai jos necesita mai intai `mb_in`. Altfel se primeste:
+## 3. Command Register Matrix (ASCII)
 
-```text
-ERR 03 NOT_IN_SERVICE
-```
+### 3.1 Service Mode Control
+Used to toggle the display layout between normal operation and the service diagnostic layout.
 
-## Communication
+* **`mb_in`**
+  * **Direction:** Host → Client
+  * **Description:** Requests entry into Service Mode. Activates the service layout border on the TFT panels.
+  * **Expected Response:** `ACK SRV ENTER`
 
-### Afisare pe TFT-uri
+* **`mb_out`**
+  * **Direction:** Host → Client
+  * **Description:** Exits Service Mode. Reverts the display panels to normal elevator runtime rendering.
+  * **Expected Response:** `ACK SRV EXIT`
 
-```text
-mb_com
-```
+---
 
-Citeste snapshot-ul comun si afiseaza datele liftului 1 pe TFT-ul stang si datele liftului 2 pe TFT-ul drept.
+### 3.2 Live Communication Data
+Commands in this section require the Client to be in Service Mode (`mb_in` must be called first).
 
-Afisarea include:
+* **`mb_com`**
+  * **Direction:** Host → Client
+  * **Description:** Commands the panel to extract lift telemetry data snapshots and output them.
+  * **Expected Response Format:** `OK mb_com L1=[DATA] L2=[DATA]`
+  * *Telemetry Fields:* `Pos` (Position/Floor), `Dst` (Target), `S/J` (Direction: UP/DWN/--), `Svc` (Status: OK/Def./Rev./No ser.), `Ocp` (Occupied: YES/NO).
 
-- `Pos :` - pozitia curenta, cu `P` pentru parter
-- `Dst :` - destinatia; devine `--` cand `S/J` este `--`
-- `S/J :` - `UP`, `DWN` sau `--`
-- `Svc :` - `OK`, `Def.`, `Rev.` sau `No ser.`
-- `Ocp :` - `YES` sau `NO`
+* **`mb_status`**
+  * **Direction:** Host → Client
+  * **Description:** Sends/Requests the operational status of both lifts and communication frame packet drops.
+  * **Expected Response Example:** `OK STATUS L1=OK L2=No ser. ERR1=0 ERR2=2`
 
-Raspuns:
+* **`mb_diag`**
+  * **Direction:** Host → Client
+  * **Description:** Requests the communication error summary, seqlock collision counts, and hardware boot codes.
+  * **Expected Response Example:** `OK DIAG ERR1=0 ERR2=0 SEQ=0 RESET=1`
 
-```text
-OK mb_com L1=DATA L2=DATA
-```
+---
 
-### Status pe LCD-ul Magic Box
+### 3.3 Display Output Diagnostics
 
-```text
-mb_status
-```
+* **`mb_display_test 1`** or **`mb_display_test 2`**
+  * **Direction:** Host → Client
+  * **Description:** Commands the targeted TFT panel (1 = Left, 2 = Right) to output a isolated "PASS" verification graphic.
+  * **Expected Response:** `ACK` (followed by layout swap)
 
-Trimite catre Magic Box starea celor doua lifturi si numarul erorilor de pachete.
+* **`mb_com_out`**
+  * **Direction:** Host → Client
+  * **Description:** Terminates the current active display test or telemetry screen overlay, returning to base service layer.
+  * **Expected Response:** `ACK mb_com_out`
 
-Exemplu:
+* **`mb_display_reinit 1`** | **`mb_display_reinit 2`** | **`mb_display_reinit BOTH`**
+  * **Direction:** Host → Client
+  * **Description:** Forces a hardware reinitialization sequence on the specified TFT controller.
+  * **Expected Response:** `OK`
 
-```text
-OK STATUS L1=OK L2=No ser. ERR1=0 ERR2=2
-```
+---
 
-### Diagnostic pe LCD-ul Magic Box
+### 3.4 Microcontroller (MCU) Performance Telemetry
 
-```text
-mb_diag
-```
+| Command | Description | Expected Response Example |
+| :--- | :--- | :--- |
+| **`mb_runtime`** | Requests the elapsed MCU uptime in seconds. | `OK MCU UPTIME 123` |
+| **`mb_resets`**  | Requests total boot/reset counts stored in NVRAM. | `OK MCU RESETS 4` |
+| **`mb_wdt`**     | Requests current Hardware Watchdog state. | `OK MCU WDT ENABLED` |
+| **`mb_lastreset`**| Requests the execution cause flag of the last reset. | `OK MCU LASTRESET POR` |
+| **`mb_temp`**    | Requests the internal MCU die temperature in °C. | `OK MCU TEMP 31.4` |
+| **`mb_stack 0`** | Requests Core 0 stack tracking (USED/FREE/HIGH WATER). | `OK MCU STACK 0 USED=2048 FREE=4096 HW=8192` |
+| **`mb_stack 1`** | Requests Core 1 stack tracking (USED/FREE/HIGH WATER). | `OK MCU STACK 1 USED=2048 FREE=4096 HW=8192` |
 
-Trimite sumarul de erori de comunicatie, coliziuni seqlock si motivul ultimei resetari.
+---
 
-Exemplu:
+## 4. Host Arbitration Timeout & Failure Recovery
+1. **Response Timeout Window:** Because USB CDC runs virtual pipelines at full native controller bus speed, the Host enforces a maximum waiting window of **150ms** per command string.
+2. **Retry Protocol Budget:** If an expected response header (`OK` or `ACK`) is missing or a timeout occurs, the Host will retransmit the exact ASCII sequence up to **3 consecutive times**. If all drop, the Host triggers an *"Error: Panel Comm Failure"* notification across the dashboard.
 
-```text
-OK DIAG ERR1=0 ERR2=0 SEQ=0 RESET=1
-```
-
-## Display
-
-### Test TFT
-
-```text
-mb_display_test 1
-mb_display_test 2
-```
-
-Afiseaza `PASS` pe TFT-ul selectat.
-
-Comenzi vechi echivalente:
-
-```text
-DISP TEST 1
-DISP TEST 2
-```
-
-### Iesire din testul display / mb_com
-
-```text
-mb_com_out
-```
-
-Comanda veche echivalenta:
-
-```text
-TEST EXIT
-```
-
-Raspuns:
-
-```text
-ACK mb_com_out
-```
-
-### Reinitializare TFT
-
-Forma intentionata:
-
-```text
-mb_display_reinit 1
-mb_display_reinit 2
-mb_display_reinit BOTH
-```
-
-Comenzi vechi echivalente:
-
-```text
-DISP REINIT 1
-DISP REINIT 2
-DISP REINIT BOTH
-```
-
-Observatie: in versiunea curenta, handler-ul `DISP REINIT` trimite raspunsul `OK`, dar reinitializarea hardware TFT este inca `TODO`. Aliasul `mb_display_reinit` necesita corectarea offsetului intern al parserului inainte de folosire sigura.
-
-## PICO / MCU
-
-Toate rezultatele sunt trimise pe serial catre LCD-ul Magic Box.
-
-| Comanda | Comanda veche | Explicatie |
-|---|---|---|
-| `mb_runtime` | `MCU UPTIME` | Afiseaza uptime-ul Pico in secunde. |
-| `mb_resets` | `MCU RESETS` | Afiseaza numarul de boot-uri/resetari memorate. |
-| `mb_wdt` | `MCU WDT` | Afiseaza starea WDT; valoarea este momentan simulata ca activata. |
-| `mb_lastreset` | `MCU LASTRESET` | Afiseaza motivul ultimei resetari. |
-| `mb_temp` | `MCU TEMP` | Afiseaza temperatura interna a MCU. |
-| `mb_stack 0` | `MCU STACK 0` | Afiseaza USED/FREE/HIGH WATER pentru Core 0; valorile sunt momentan simulate. |
-| `mb_stack 1` | `MCU STACK 1` | Afiseaza USED/FREE/HIGH WATER pentru Core 1; valorile sunt momentan simulate. |
-
-Exemple de raspunsuri:
-
-```text
-OK MCU UPTIME 123
-OK MCU RESETS 4
-OK MCU WDT ENABLED
-OK MCU LASTRESET POR
-OK MCU TEMP 31.4
-OK MCU STACK 0 USED=2048 FREE=4096 HW=8192
-```
-
-## Secventa de test recomandata
-
-```text
-mb_in
-mb_status
-mb_diag
-mb_com
-mb_com_out
-mb_display_test 1
-mb_com_out
-mb_display_test 2
-mb_com_out
-mb_runtime
-mb_resets
-mb_wdt
-mb_lastreset
-mb_temp
-mb_stack 0
-mb_stack 1
-mb_out
-```
-
-## Protocolul RS485 al lifturilor
-
-Comenzile Magic Box de mai sus folosesc USB Serial si nu modifica parserul RS485.
-
-Parserul pentru lifturi este in `src/Core/Services/Protocol.cpp`:
-
-- `Serial2` receptioneaza datele liftului 1.
-- `Serial1` receptioneaza datele liftului 2.
-- `parseazaPachet()` valideaza si transforma pachetul in `LiftState`.
