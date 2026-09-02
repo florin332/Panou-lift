@@ -248,17 +248,15 @@ public:
         uint16_t rawX = (static_cast<uint16_t>(xHigh) << 4) | (xyLow >> 4);
         uint16_t rawY = (static_cast<uint16_t>(yHigh) << 4) | (xyLow & 0x0F);
 
-        // CST328 native coordinates are ~0..4095. Map to 240x320 portrait panel.
-        // Empirical orientation for the Waveshare 2.8" Touch LCD: swap and invert
-        // so the USB edge is at the bottom.
-        int mappedX = 239 - static_cast<int>((rawY * 240UL) / 4096UL);
-        int mappedY = static_cast<int>((rawX * 320UL) / 4096UL);
+        // CST328 native coordinates are ~0..4095. Map to the horizontal 320x240 panel.
+        int mappedX = static_cast<int>((rawX * 320UL) / 4096UL);
+        int mappedY = static_cast<int>((rawY * 240UL) / 4096UL);
 
         // Clamp
         if (mappedX < 0) mappedX = 0;
-        if (mappedX > 239) mappedX = 239;
+        if (mappedX > 319) mappedX = 319;
         if (mappedY < 0) mappedY = 0;
-        if (mappedY > 319) mappedY = 319;
+        if (mappedY > 239) mappedY = 239;
 
         _touchX = mappedX;
         _touchY = mappedY;
@@ -276,7 +274,7 @@ public:
     void clearCommState() override {}
     
     // ========================================================================
-    // NATIVE DIRECT REGISTER RENDERING (PORTRAIT 240x320)
+    // NATIVE DIRECT REGISTER RENDERING (HORIZONTAL 320x240)
     // ========================================================================
     // Fast status text rendered as simple colored bars (8x16 monospace-ish).
     // This is only intended for status messages; full UI should use a real font.
@@ -294,20 +292,20 @@ public:
     }
 
     void drawStatusText(const char* text, uint16_t color) {
-        // Center a status message roughly in the lower third of the 240x320 screen
+        // Center a status message in the lower portion of the 320x240 screen
         int len = strlen(text);
-        if (len > 20) len = 20;
+        if (len > 28) len = 28;
         int charW = 8;
         int charH = 16;
         int totalW = len * (charW + 2);
-        int xStart = (240 - totalW) / 2;
-        int yStart = 250;
+        int xStart = (320 - totalW) / 2;
+        int yStart = 200;
 
         // Clear previous background strip
-        lcdSetWindow(10, yStart, 230, yStart + charH);
+        lcdSetWindow(10, yStart, 310, yStart + charH);
         digitalWrite(TFT_DC, HIGH);
         digitalWrite(TFT_CS, LOW);
-        for (int i = 0; i < 220 * charH; i++) {
+        for (int i = 0; i < 300 * charH; i++) {
             SPI1.transfer(0x00); SPI1.transfer(0x00); // black
         }
         digitalWrite(TFT_CS, HIGH);
@@ -324,10 +322,10 @@ public:
             // Quick drawing checkpoints to trace compilation without full font loaders layers overhead
             // We will hook your font16/font24 arrays or render direct graphics blocks
             // For immediate testing, we clear layout and draw an outer frame box anchor
-            lcdSetWindow(10, 10, 230, 310);
+            lcdSetWindow(10, 10, 310, 230);
             digitalWrite(TFT_DC, HIGH);
             digitalWrite(TFT_CS, LOW);
-            for(uint32_t i=0; i < 220*300; i++) {
+            for(uint32_t i=0; i < 300*220; i++) {
                 SPI1.transfer(0x19); // Draw deep blue base testing canvas structure
                 SPI1.transfer(0x67);
             }
