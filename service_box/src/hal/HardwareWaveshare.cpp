@@ -359,12 +359,15 @@ static void lcdFill(uint16_t color)
         LCD_WIDTH * LCD_HEIGHT * 2
     ];
 
+    // This panel expects LSB first per pixel
+    // (verified on hardware: MSB-first produced
+    // a full byte swap, e.g. RED -> BLUE).
     const uint8_t hi = color >> 8;
     const uint8_t lo = color & 0xFF;
 
     // Build RGB565 framebuffer.
     //
-    // MSB, LSB, MSB, LSB...
+    // LSB, MSB, LSB, MSB...
     //
     for (
         uint32_t i = 0;
@@ -372,8 +375,8 @@ static void lcdFill(uint16_t color)
         ++i
     )
     {
-        framebuffer[i * 2]     = hi;
-        framebuffer[i * 2 + 1] = lo;
+        framebuffer[i * 2]     = lo;
+        framebuffer[i * 2 + 1] = hi;
     }
 
     // Full-screen window.
@@ -393,6 +396,65 @@ static void lcdFill(uint16_t color)
 
 
 // ============================================================
+// Fill rectangle
+//
+// Same transfer discipline as lcdFill():
+// CS LOW and DC HIGH for the entire pixel stream,
+// sent through spi_write_blocking() in chunks.
+// ============================================================
+
+static void lcdFillRect(
+    uint16_t x0,
+    uint16_t y0,
+    uint16_t x1,
+    uint16_t y1,
+    uint16_t color
+)
+{
+    static uint8_t chunk[512];
+
+    // LSB first per pixel (same as lcdFill).
+    const uint8_t hi = color >> 8;
+    const uint8_t lo = color & 0xFF;
+
+    for (size_t i = 0; i < sizeof(chunk); i += 2)
+    {
+        chunk[i]     = lo;
+        chunk[i + 1] = hi;
+    }
+
+    uint32_t pixels =
+        (uint32_t)(x1 - x0 + 1) *
+        (uint32_t)(y1 - y0 + 1);
+
+    lcdSetWindow(x0, y0, x1, y1);
+
+    gpio_put(TFT_CS, 0);
+    gpio_put(TFT_DC, 1);
+
+    while (pixels > 0)
+    {
+        uint32_t batch = pixels;
+
+        if (batch > sizeof(chunk) / 2)
+        {
+            batch = sizeof(chunk) / 2;
+        }
+
+        spi_write_blocking(
+            spi1,
+            chunk,
+            batch * 2
+        );
+
+        pixels -= batch;
+    }
+
+    gpio_put(TFT_CS, 1);
+}
+
+
+// ============================================================
 // Hardware implementation
 // ============================================================
 
@@ -408,12 +470,11 @@ public:
     {
         Serial.begin(115200);
 
-        // Give time to open USB serial monitor.
-        delay(10000);
+        delay(500);
 
         Serial.println();
         Serial.println("========================================");
-        Serial.println(" WAVESHARE LCD TEST GREEN");
+        Serial.println(" WAVESHARE SERVICE BOX");
         Serial.println(" ST7789T3 / SPI1");
         Serial.println(" Pico SDK spi_write_blocking()");
         Serial.println("========================================");
@@ -497,31 +558,18 @@ public:
         );
 
         // ----------------------------------------------------
-        // GREEN TEST
+        // Boot visual test
+        //
+        // Brief GREEN fill proves the LCD path works.
+        // init() MUST return so setup()/loop() can run
+        // and renderStartPage() can update the display.
         // ----------------------------------------------------
-
-        Serial.println(
-            "WAVESHARE LCD TEST GREEN"
-        );
 
         lcdFill(0x07E0);
 
         Serial.println(
-            "FILL GREEN DONE"
+            "[LCD] Boot fill GREEN done"
         );
-
-        // ----------------------------------------------------
-        // Stay here.
-        // ----------------------------------------------------
-
-        while (true)
-        {
-            Serial.println(
-                "FILL GREEN DONE"
-            );
-
-            delay(1000);
-        }
     }
 
 
@@ -598,9 +646,33 @@ public:
         uint16_t statusColor
     ) override
     {
-        (void)forceRedraw;
-        (void)statusMsg;
-        (void)statusColor;
+        // Full repaint of the base canvas.
+        //
+        // TEST MODE: forceRedraw fills the ENTIRE screen
+        // with statusColor so full-screen R/G/B color
+        // changes are visible on the physical LCD.
+        if (forceRedraw)
+        {
+            lcdFill(statusColor);
+            Serial.print("[LCD] Full fill: ");
+            Serial.println(statusMsg);
+            return;
+        }
+
+        // Status band at the bottom of the screen.
+        //
+        // Every status change in main.cpp produces a
+        // visible color update on the physical LCD.
+        lcdFillRect(
+            0,
+            LCD_HEIGHT - 40,
+            LCD_WIDTH - 1,
+            LCD_HEIGHT - 1,
+            statusColor
+        );
+
+        Serial.print("[LCD] Status: ");
+        Serial.println(statusMsg);
     }
 };
 
