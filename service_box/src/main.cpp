@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "hal/HardwareInterface.h"
 
+
 // Removed old local UI class includes since rendering is now fully handled via unified HAL bridges
 // // #include "ui/StartupScreen.h"
 // // StartupScreen* startupScreen = nullptr;
