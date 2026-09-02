@@ -558,17 +558,18 @@ public:
         );
 
         // ----------------------------------------------------
-        // Boot visual test
+        // Boot visual self-test
         //
-        // Brief GREEN fill proves the LCD path works.
-        // init() MUST return so setup()/loop() can run
-        // and renderStartPage() can update the display.
+        // Brief GREEN flash proves the LCD path works,
+        // then control returns so loop() can render UI.
         // ----------------------------------------------------
 
-        lcdFill(0x07E0);
+        lcdFill(0x07E0); // Green
+
+        delay(300);
 
         Serial.println(
-            "[LCD] Boot fill GREEN done"
+            "[LCD] Boot self-test done"
         );
     }
 
@@ -647,16 +648,9 @@ public:
     ) override
     {
         // Full repaint of the base canvas.
-        //
-        // TEST MODE: forceRedraw fills the ENTIRE screen
-        // with statusColor so full-screen R/G/B color
-        // changes are visible on the physical LCD.
         if (forceRedraw)
         {
-            lcdFill(statusColor);
-            Serial.print("[LCD] Full fill: ");
-            Serial.println(statusMsg);
-            return;
+            lcdFill(0x0000); // Black background
         }
 
         // Status band at the bottom of the screen.

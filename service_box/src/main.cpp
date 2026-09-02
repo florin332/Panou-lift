@@ -9,7 +9,6 @@
 UiPage currentPage = PAGE_START;
 bool refreshPageNeeded = true;
 unsigned long sdCheckTimer = 0;
-uint8_t rgbTestIndex = 0;
 
 void setup() {
     // Start local monitoring port for PC verification debugging
@@ -42,6 +41,8 @@ void loop() {
     int currentX = Hardware.getTouchX();
     int currentY = Hardware.getTouchY();
     bool isScreenActive = Hardware.isScreenTouched();
+
+   
 
     // ========================================================================
     // UI APPLICATION STATE MACHINE ROUTING
@@ -96,32 +97,12 @@ void loop() {
                 break;
         }
 
-        // 4. Periodic full-screen RGB color test (every 4000ms)
-        //
-        // TEMPORARY TEST: cycles RED -> GREEN -> BLUE -> YELLOW
-        // -> CYAN on the physical LCD and prints the displayed
-        // color on Serial.
-        if (millis() - sdCheckTimer > 4000) {
-            static const struct {
-                const char* name;
-                uint16_t color;
-            } rgbTest[] = {
-                { "RED",    0xF800 },
-                { "GREEN",  0x07E0 },
-                { "BLUE",   0x001F },
-                { "YELLOW", 0xFFE0 },
-                { "CYAN",   0x07FF },
-            };
-
-            const char* name  = rgbTest[rgbTestIndex].name;
-            uint16_t    color = rgbTest[rgbTestIndex].color;
-
-            Serial.print("[RGB TEST] Displaying: ");
-            Serial.println(name);
-
-            Hardware.renderStartPage(true, name, color);
-
-            rgbTestIndex = (rgbTestIndex + 1) % 5;
+        // 4. Periodic Storage Updates (Poll metrics background loop every 5000ms)
+        if (millis() - sdCheckTimer > 5000) {
+            if (Hardware.getCommState() == COMM_IDLE) {
+                // Background runtime execution hooks can pull real hardware metrics here
+                Hardware.renderStartPage(false, "SYSTEM READY", 0xFFFF); // White
+            }
             sdCheckTimer = millis();
         }
     } 
