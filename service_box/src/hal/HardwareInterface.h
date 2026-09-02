@@ -47,11 +47,12 @@ enum CommState {
     #define TFT_RST     15
     #define TFT_BL      16
     #define TFT_MOSI    11
+    #define TFT_MISO    12
     #define TFT_SCLK    10
     #define TOUCH_SDA   6
     #define TOUCH_SCL   7
-    #define TOUCH_INT   17
-    #define TOUCH_RST   16
+    #define TOUCH_INT   18
+    #define TOUCH_RST   17
     #define IMU_SDA     6
     #define IMU_SCL     7
     #define IMU_INT1    23

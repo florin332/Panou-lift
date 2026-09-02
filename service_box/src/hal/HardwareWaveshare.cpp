@@ -42,79 +42,77 @@ private:
     // Fast inline byte transmission for SPI register selection blocks
     void lcdWriteCmd(uint8_t cmd) {
         digitalWrite(TFT_DC, LOW);
-        delayMicroseconds(10);
         digitalWrite(TFT_CS, LOW);
-        delayMicroseconds(10);
         SPI1.transfer(cmd);
-        delayMicroseconds(10);
         digitalWrite(TFT_CS, HIGH);
-        delayMicroseconds(10);
     }
 
     void lcdWriteData(uint8_t data) {
         digitalWrite(TFT_DC, HIGH);
-        delayMicroseconds(10);
         digitalWrite(TFT_CS, LOW);
-        delayMicroseconds(10);
         SPI1.transfer(data);
-        delayMicroseconds(10);
         digitalWrite(TFT_CS, HIGH);
-        delayMicroseconds(10);
     }
 
-    // Official native hardware register wakeup sequence sequence extracted from demo-rp2030
+    // ST7789 register initialization extracted from the working demo-rp2030 reference
     void initWaveshareRegisters() {
-        DISPLAY_SERIAL.println("[INIT] Starting ST7789T3 reset sequence...");
-        
+        DISPLAY_SERIAL.println("[INIT] Starting ST7789 reset sequence...");
+
         digitalWrite(TFT_RST, HIGH);
-        delay(20);
+        delay(100);
         digitalWrite(TFT_RST, LOW);
-        delay(20);
+        delay(100);
         digitalWrite(TFT_RST, HIGH);
-        delay(50);
+        delay(100);
 
-        DISPLAY_SERIAL.println("[INIT] Reset complete, sending Sleep Out...");
-        
-        // Extended driver power tuning commands (Required to turn on ST7789T3 matrices)
-        lcdWriteCmd(0x11); // Sleep Out sequence command
-        delay(150);
+        DISPLAY_SERIAL.println("[INIT] Reset complete, configuring horizontal orientation...");
 
-        lcdWriteCmd(0x36); // Memory Data Access Control
-        lcdWriteData(0x08); // Portrait orientation (MY=0, MX=0, MV=0, ML=1)
+        // Horizontal orientation sequence
+        lcdWriteCmd(0x11);
+        delay(120);
+        lcdWriteCmd(0x36);
+        lcdWriteData(0x00);
 
-        lcdWriteCmd(0x3A); // Interface Pixel Format setup register
-        lcdWriteData(0x05); // Standard 16-bit color selection (RGB565 matrix structure)
+        DISPLAY_SERIAL.println("[INIT] Sending ST7789 register sequence...");
 
-        // Gamma curves tuning tables matching vendor factory profile configuration
-        lcdWriteCmd(0xB2); lcdWriteData(0x0C); lcdWriteData(0x0C); lcdWriteData(0x00); lcdWriteData(0x33); lcdWriteData(0x33);
-        lcdWriteCmd(0xB7); lcdWriteData(0x35);
-        lcdWriteCmd(0xBB); lcdWriteData(0x19);
+        lcdWriteCmd(0x29);
+        delay(10);
+        lcdWriteCmd(0x11);
+        delay(10);
+
+        lcdWriteCmd(0x3A);
+        lcdWriteData(0x05);
+
+        lcdWriteCmd(0xB2);
+        lcdWriteData(0x0C); lcdWriteData(0x0C); lcdWriteData(0x00); lcdWriteData(0x33); lcdWriteData(0x33);
+
+        lcdWriteCmd(0xB7); lcdWriteData(0x75);
+        lcdWriteCmd(0xBB); lcdWriteData(0x1A);
         lcdWriteCmd(0xC0); lcdWriteData(0x2C);
-        lcdWriteCmd(0xC2); lcdWriteData(0x01);
-        lcdWriteCmd(0xC3); lcdWriteData(0x12);
+        lcdWriteCmd(0xC2); lcdWriteData(0x01); lcdWriteData(0xFF);
+        lcdWriteCmd(0xC3); lcdWriteData(0x13);
         lcdWriteCmd(0xC4); lcdWriteData(0x20);
         lcdWriteCmd(0xC6); lcdWriteData(0x0F);
         lcdWriteCmd(0xD0); lcdWriteData(0xA4); lcdWriteData(0xA1);
+        lcdWriteCmd(0xD6); lcdWriteData(0xA1);
 
-        // Positive and Negative Gamma control arrays
         lcdWriteCmd(0xE0);
-        lcdWriteData(0xD0); lcdWriteData(0x04); lcdWriteData(0x0D); lcdWriteData(0x11);
-        lcdWriteData(0x13); lcdWriteData(0x2B); lcdWriteData(0x3F); lcdWriteData(0x54);
-        lcdWriteData(0x4C); lcdWriteData(0x18); lcdWriteData(0x0D); lcdWriteData(0x0B);
-        lcdWriteData(0x1F); lcdWriteData(0x23);
+        lcdWriteData(0xD0); lcdWriteData(0x0D); lcdWriteData(0x14); lcdWriteData(0x0D);
+        lcdWriteData(0x0D); lcdWriteData(0x09); lcdWriteData(0x38); lcdWriteData(0x44);
+        lcdWriteData(0x4E); lcdWriteData(0x3A); lcdWriteData(0x17); lcdWriteData(0x18);
+        lcdWriteData(0x2F); lcdWriteData(0x30);
 
         lcdWriteCmd(0xE1);
-        lcdWriteData(0xD0); lcdWriteData(0x04); lcdWriteData(0x0C); lcdWriteData(0x11);
-        lcdWriteData(0x13); lcdWriteData(0x2C); lcdWriteData(0x3F); lcdWriteData(0x44);
-        lcdWriteData(0x51); lcdWriteData(0x2F); lcdWriteData(0x1F); lcdWriteData(0x1F);
-        lcdWriteData(0x20); lcdWriteData(0x23);
+        lcdWriteData(0xD0); lcdWriteData(0x09); lcdWriteData(0x0F); lcdWriteData(0x08);
+        lcdWriteData(0x07); lcdWriteData(0x14); lcdWriteData(0x37); lcdWriteData(0x44);
+        lcdWriteData(0x4D); lcdWriteData(0x38); lcdWriteData(0x15); lcdWriteData(0x16);
+        lcdWriteData(0x2C); lcdWriteData(0x2E);
 
-        lcdWriteCmd(0x21); // Display Inversion On configuration register (Waveshare standard match)
-        delay(10);
-        lcdWriteCmd(0x29); // Turn Display Main Gate ON
-        delay(10);
-        
-        DISPLAY_SERIAL.println("[INIT] ST7789T3 initialization complete!");
+        lcdWriteCmd(0x21);
+        lcdWriteCmd(0x29);
+        lcdWriteCmd(0x2C);
+
+        DISPLAY_SERIAL.println("[INIT] ST7789 initialization complete!");
     }
 
     void lcdSetWindow(uint16_t xStart, uint16_t yStart, uint16_t xEnd, uint16_t yEnd) {
@@ -130,22 +128,17 @@ private:
     }
 
     void clearCanvasColor(uint16_t color) {
-        lcdSetWindow(0, 0, 240, 320);
-        delayMicroseconds(100);
+        lcdSetWindow(0, 0, 320, 240);
         digitalWrite(TFT_DC, HIGH);
-        delayMicroseconds(10);
         digitalWrite(TFT_CS, LOW);
-        delayMicroseconds(10);
-        
+
         // Fast streaming fill sequence loop avoiding local RAM buffers pressure bottlenecks
-        for (uint32_t i = 0; i < 240 * 320; i++) {
+        for (uint32_t i = 0; i < 320UL * 240UL; i++) {
             SPI1.transfer(color >> 8);
             SPI1.transfer(color & 0xFF);
         }
-        
-        delayMicroseconds(10);
+
         digitalWrite(TFT_CS, HIGH);
-        delayMicroseconds(10);
     }
 
 public:
@@ -155,13 +148,17 @@ public:
         DISPLAY_SERIAL.setRX(WAVESHARE_UART_RX);
         DISPLAY_SERIAL.begin(115200);
 
-        // Touch controller I2C0 on GP6/GP7
+        // Enable Waveshare board power (BAT_EN on GP26)
+        pinMode(26, OUTPUT);
+        digitalWrite(26, HIGH);
+
+        // Touch controller I2C on GP6/GP7
         Wire.setSDA(TOUCH_SDA);
         Wire.setSCL(TOUCH_SCL);
         Wire.begin();
         Wire.setClock(100000);
 
-        // CST328 hardware reset on GP16 (active-low), INT on GP17
+        // CST328 hardware reset on GP17 (active-low), INT on GP18
         pinMode(TOUCH_RST, OUTPUT);
         digitalWrite(TOUCH_RST, HIGH);
         delay(10);
@@ -186,26 +183,29 @@ public:
             digitalWrite(TFT_BL, LOW); // Hold off backlight to prevent white flash glitch patterns
         #endif
 
-        // Run SPI1 bus core mapping (display/SD are wired to SPI1 pins: SCK=GP10, MOSI=GP11)
-        SPI1.setTX(TFT_MOSI);
+        // Run SPI1 bus core mapping (display/SD are wired to SPI1 pins)
+        SPI1.setRX(TFT_MISO);
+        SPI1.setCS(TFT_CS);
         SPI1.setSCK(TFT_SCLK);
+        SPI1.setTX(TFT_MOSI);
         SPI1.begin();
+        SPI1.beginTransaction(SPISettings(66500000, MSBFIRST, SPI_MODE0));
 
         DISPLAY_SERIAL.println("[INIT] SPI1 initialized, calling display init...");
-        
+
         // Fire native low-level startup routine sequence
         initWaveshareRegisters();
-        
+
         DISPLAY_SERIAL.println("[INIT] Clearing canvas to black...");
         clearCanvasColor(0x0000); // Black
 
         DISPLAY_SERIAL.println("[INIT] Turning backlight ON...");
-        // Stabilize charging lines and assert backlight to HIGH
+        // Stabilize charging lines and assert backlight to full brightness
         delay(50);
         #if defined(TFT_BL) && (TFT_BL >= 0)
-            digitalWrite(TFT_BL, HIGH);
+            analogWrite(TFT_BL, 255);
         #endif
-        
+
         DISPLAY_SERIAL.println("[INIT] Hardware initialization complete!");
     }
 
