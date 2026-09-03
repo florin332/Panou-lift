@@ -1,0 +1,132 @@
+Actualizează implementarea UI a proiectului Service Box conform fișierului:
+
+service_box/src/ui_requirements.md
+
+IMPORTANT:
+- `ui_requirements.md` este specificația autoritativă.
+- Nu inventa funcționalități, pagini, controale sau informații care nu sunt cerute în specificație.
+- Analizează mai întâi codul UI existent și reutilizează arhitectura/interfețele deja existente.
+- Nu rescrie inutil codul existent.
+- Nu modifica HAL-ul decât dacă este strict necesar pentru furnizarea datelor cerute de UI.
+- Nu introduce logică specifică hardware în UI.
+- Nu introduce `#ifdef` pentru platforme hardware în logica UI decât dacă este absolut necesar.
+
+CERINȚA PRINCIPALĂ:
+
+Modifică secvența de pornire astfel încât să devină:
+
+    BOOT
+      ↓
+    BATTERY CHECK
+      ↓
+    START SCREEN
+      ↓
+    MAIN MENU
+
+Battery Check trebuie să fie prima pagină afișată după boot.
+
+În regim normal:
+- afișează `BATTERY LEVEL`
+- afișează procentul bateriei sub forma `XX %`
+- procentul trebuie să fie vizibil și ușor de citit
+- culoarea procentului trebuie să indice nivelul:
+  - roșu = nivel scăzut
+  - galben = nivel mediu
+  - verde = nivel bun
+- NU fixa încă pragurile procentuale; acestea vor fi stabilite ulterior
+- pagina se afișează timp de 5 secunde
+- după 5 secunde trece automat la actualul START SCREEN
+
+În timpul încărcării:
+- afișează `CHARGING`
+- NU afișa procentul bateriei
+- NU porni temporizarea de 5 secunde
+- NU trece automat la START SCREEN
+- Battery Check trebuie să rămână afișată permanent cât timp încărcarea este activă
+
+Când încărcarea se termină:
+- revino la comportamentul normal Battery Check
+- efectuează afișarea/temporizarea normală de 5 secunde
+- apoi treci la START SCREEN
+
+Battery Check este informativă:
+- fără butoane
+- fără controale touchscreen
+- fără gesturi
+- fără interacțiune necesară din partea utilizatorului
+
+
+DATELE DESPRE BATERIE:
+
+Nu implementa conversia tensiune → procent în UI.
+
+UI trebuie să primească o stare abstractă de forma conceptuală:
+
+    battery percentage
+    charging state
+
+Măsurarea bateriei și detectarea încărcării trebuie să rămână în layer-ul
+hardware/application/HAL corespunzător.
+
+IMPORTANT:
+- verifică implementarea hardware existentă înainte de a modifica interfețele
+- nu presupune că un GPIO existent reprezintă automat `charging`
+- dacă detectarea `charging` nu este încă disponibilă în HAL, identifică exact
+  ce lipsește și propune modificarea minimă necesară
+- nu inventa o metodă de detectare a încărcării
+
+
+START SCREEN:
+
+Păstrează actualul START SCREEN și comportamentul lui existent.
+
+Trebuie să rămână:
+- `SERVICE BOX`
+- `PANOURI ASCENSOARE`
+- versiunea firmware
+- butonul `START`
+- informațiile SD existente, dacă sunt deja implementate
+
+Nu adăuga:
+- diagnostice
+- CPU
+- display
+- touch
+- RS485
+- WDT
+- packet counters
+- progress bars
+- `Starting...`
+
+După apăsarea butonului START trebuie să se ajungă la actualul MAIN MENU.
+
+
+PAGINI VIITOARE:
+
+Nu implementa acum alte pagini.
+
+Paginile ulterioare ale Service Box vor fi definite și adăugate incremental,
+pe măsură ce proiectul avansează.
+
+
+OBLIGATORIU:
+
+1. Citește `service_box/src/ui_requirements.md`.
+2. Examinează implementarea UI existentă.
+3. Identifică exact unde este gestionată secvența actuală BOOT → START.
+4. Identifică mecanismul existent pentru schimbarea paginilor/screens.
+5. Implementează Battery Check folosind arhitectura existentă.
+6. Reutilizează rendererul și primitivele grafice existente.
+7. Nu duplica logica UI pentru diferitele display-uri.
+8. Păstrează separarea UI / renderer / HAL.
+9. Modifică doar fișierele necesare.
+10. La final, raportează:
+   - fișierele modificate;
+   - ce ai modificat în fiecare;
+   - orice modificare necesară în HAL;
+   - orice problemă rămasă privind detectarea `charging`;
+   - rezultatul build-ului.
+
+NU începe prin a rescrie arhitectura.
+Mai întâi înțelege implementarea existentă și aplică modificarea minimă
+necesară pentru a respecta `ui_requirements.md`.
