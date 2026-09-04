@@ -2,32 +2,34 @@
 
 ## 1. Scop
 
-Definirea interfeței grafice pentru Service Box.
+Definirea interfeței grafice și a fluxului de navigare pentru Service Box.
 
-Interfața trebuie să fie simplă, profesională și potrivită pentru utilizarea
-în activități de service pe teren.
+Specificația UI urmărește structura definită în:
 
-Nu se adaugă funcționalități, pagini sau informații care nu sunt specificate
-explicit în acest document.
+`service_box/svcbox_menu.drawio`
 
-Paginile și funcțiile suplimentare ale Service Box vor fi definite și
-adăugate ulterior, pe măsură ce proiectul este dezvoltat.
+Diagrama `svcbox_menu.drawio` este referința pentru:
 
-Specificația UI este documentul de referință pentru deciziile privind
-aspectul vizual și interacțiunea cu utilizatorul.
+- structura meniului;
+- paginile UI;
+- acțiunile utilizatorului;
+- tranzițiile dintre pagini;
+- operațiile de service reprezentate în UI.
 
+În această etapă se implementează mai întâi interfața grafică și navigarea.
 
----
+Comenzile seriale către panouri și răspunsurile panourilor vor fi integrate ulterior printr-un nivel separat de service/protocol.
+
+Nu se adaugă funcționalități, pagini, butoane sau informații care nu sunt definite în specificație sau în `svcbox_menu.drawio`.
 
 ## 2. Display
 
-- Rezoluție țintă: 240x320 pixeli.
+- Rezoluție logică țintă: 240x320 pixeli.
 - Orientare: portret.
 - Toate platformele hardware utilizează aceeași interfață logică.
 - Codul specific display-ului aparține HAL.
 - Codul specific touchscreen-ului aparține HAL.
-- Codul UI nu trebuie să conțină tratare specifică hardware pentru display
-  sau touchscreen.
+- Codul UI nu trebuie să conțină tratare specifică hardware pentru display sau touchscreen.
 
 Platforme hardware:
 
@@ -36,120 +38,108 @@ Platforme hardware:
 
 Ambele platforme trebuie să ofere aceeași experiență de utilizare.
 
+Logica meniului nu trebuie duplicată pentru diferite platforme hardware.
 
----
+# 3. Structura generală a meniului
 
-## 3. Secvența de pornire
+Fluxul principal este:
 
-Secvența de pornire a Service Box este:
+POWER ON
+   ↓
+BOOT SEQUENCE
+   ↓
+BATTERY CHECK
+   ↓
+START
+   ↓
+HANDSHAKE / PANEL IDENTIFICATION
+   ↓
+MODE SELECTION
 
-    PORNIRE
-       ↓
-    VERIFICARE BATERIE
-       ↓
-    ECRAN START
-       ↓
-    utilizatorul apasă START
-       ↓
-    MENIUL PRINCIPAL
+`BOOT SEQUENCE` este o secvență internă de inițializare și nu este o pagină reală.
 
-Ordinea de mai sus este obligatorie.
+`BATTERY CHECK` este o pagină reală.
 
-Ecranul existent de START se păstrează și nu se modifică prin introducerea
-ecranului de verificare a bateriei.
+`START` este o pagină reală.
 
+`MODE SELECTION` este meniul principal de service.
 
----
+# 4. Boot Sequence
 
-## 4. Pagina Battery Check – Verificare baterie
+Boot Sequence reprezintă inițializarea sistemului.
 
-Pagina Battery Check este afișată imediat după pornirea dispozitivului și
-înaintea ecranului START.
+Nu este o pagină navigabilă.
 
-Scopul acestei pagini este afișarea stării bateriei înainte ca utilizatorul
-să poată accesa interfața Service Box.
+Nu trebuie să introducă interacțiune cu utilizatorul.
 
-### 4.1. Stare normală
+După finalizarea inițializării se trece la:
 
-Atunci când dispozitivul NU este în curs de încărcare, pagina afișează:
+Battery Check
 
-    BATTERY LEVEL
+# 5. Battery Check
 
-         XX %
+Pagina `Battery Check` este afișată după pornirea sistemului și înainte de pagina `Start`.
 
-Valoarea procentuală trebuie afișată clar și vizibil, în zona centrală
-a ecranului.
+Scop:
 
-Exemplu:
+- citirea nivelului bateriei;
+- afișarea nivelului bateriei;
+- detectarea stării de încărcare.
 
-    BATTERY LEVEL
+## 5.1 Stare normală
 
-          87 %
+Când Service Box nu este în încărcare, pagina afișează:
 
+BATTERY LEVEL
 
-### 4.2. Indicarea nivelului bateriei
+     XX %
 
-Valoarea procentuală este reprezentată vizual prin culoarea valorii afișate.
+Procentul trebuie să fie afișat clar și vizibil în zona centrală a ecranului.
 
-Stările sunt:
+## 5.2 Indicarea nivelului bateriei
 
-- nivel scăzut → ROȘU
-- nivel mediu → GALBEN
-- nivel bun → VERDE
+Nivelul bateriei este indicat și prin culoarea valorii:
 
-Pragurile numerice exacte pentru cele trei niveluri vor fi stabilite
-ulterior.
+- nivel scăzut → ROȘU;
+- nivel mediu → GALBEN;
+- nivel bun → VERDE.
+
+Pragurile numerice exacte pentru cele trei niveluri vor fi stabilite separat.
 
 Conversia tensiunii bateriei în procent nu aparține UI-ului.
 
-UI-ul trebuie să primească de la nivelul hardware/aplicație:
+UI-ul primește de la nivelul hardware/application:
 
-- starea de încărcare;
-- procentul bateriei.
+- procentul bateriei;
+- starea de încărcare.
 
-Metoda efectivă de măsurare și conversia tensiune → procent sunt
-dependente de hardware și nu trebuie implementate în codul UI.
+## 5.3 Charging
 
+Dacă Service Box este în încărcare, pagina afișează:
 
-### 4.3. Starea Charging
+CHARGING
 
-Dacă dispozitivul este în curs de încărcare, pagina nu afișează procentul
-bateriei.
+În această stare:
 
-Se afișează:
+- nu se afișează procentul bateriei;
+- nu se face trecerea automată la Start;
+- nu se aplică temporizarea normală de 5 secunde;
+- pagina rămâne afișată cât timp `CHARGING` este activ.
 
-    CHARGING
+Când încărcarea se termină, pagina revine la comportamentul normal.
 
-Pagina rămâne afișată în această stare.
-
-În timpul încărcării:
-
-- nu se execută trecerea automată către ecranul START;
-- nu se aplică temporizarea de 5 secunde;
-- pagina rămâne permanent afișată cât timp starea `CHARGING` este activă;
-- nu este necesară interacțiunea utilizatorului.
-
-Atunci când încărcarea se încheie, dispozitivul revine la comportamentul
-normal al paginii Battery Check.
-
-
-### 4.4. Temporizarea Battery Check
+## 5.4 Temporizare
 
 Dacă dispozitivul NU este în stare `CHARGING`:
 
 1. se citește starea bateriei;
-2. se afișează nivelul bateriei în procente;
-3. pagina rămâne afișată timp de 5 secunde;
-4. după expirarea celor 5 secunde se trece automat la ecranul START
-   existent.
+2. se afișează procentul;
+3. pagina rămâne afișată 5 secunde;
+4. după 5 secunde se trece automat la `Start`.
 
-Cele 5 secunde reprezintă timpul minim de afișare a paginii Battery Check
-în regim normal.
+## 5.5 Interacțiune
 
-
-### 4.5. Interacțiunea utilizatorului
-
-Pagina Battery Check este o pagină informativă.
+Battery Check este o pagină informativă.
 
 Nu conține:
 
@@ -159,234 +149,79 @@ Nu conține:
 - gesturi;
 - controale touchscreen.
 
-Utilizatorul nu trebuie să efectueze nicio acțiune pentru trecerea la
-ecranul START în regim normal.
+# 6. Start
 
+Pagina `Start` este prima pagină principală a Service Box.
 
-### 4.6. Informații care NU trebuie afișate
+Ea afișează informațiile disponibile despre:
 
-Pagina Battery Check nu trebuie să afișeze:
-
-- informații CPU;
-- informații display;
-- informații touchscreen;
-- informații RS485;
-- informații WDT;
-- contoare de pachete;
-- informații de diagnostic;
-- informații SD;
-- bare de progres;
-- informații suplimentare care nu au legătură cu bateria.
-
-
----
-
-## 5. Ecranul START
-
-Ecranul START este ecranul principal de prezentare al produsului și
-reprezintă pagina existentă înainte de introducerea Battery Check.
-
-Conținut:
-
-- SERVICE BOX
-- PANOURI ASCENSOARE
-- versiunea firmware;
-- buton START.
-
-Informații SD opționale:
-
-- starea cardului SD;
-- spațiul liber / spațiul total.
-
-Exemplu:
-
-    SERVICE BOX
-
-    PANOURI ASCENSOARE
-
-         v1.0.0
-
-        [ START ]
-
-    SD  ● 742 MB / 1.8 GB FREE
-
-
-Nu se afișează pe ecranul START:
-
-- starea CPU;
-- starea display-ului;
-- starea touchscreen-ului;
-- starea RS485;
-- starea WDT;
-- contoare de pachete;
-- informații de diagnostic;
-- „Starting...”;
-- bare de progres.
-
-Service Box trebuie să rămână utilizabil și în absența cardului SD.
-
-
----
-
-## 6. Touchscreen
-
-- Se utilizează zone tactile mari și clar separate.
-- Zona tactilă poate fi puțin mai mare decât butonul vizibil.
-- Se evită controalele mici.
-- Se evită gesturile inutile.
-- Se preferă interacțiunea simplă prin apăsare (tap).
-- Coordonatele touchscreen-ului sunt furnizate de HAL.
-
-Pagina Battery Check nu utilizează interacțiune touchscreen.
-
-
----
-
-## 7. Stil vizual
-
-Stilul interfeței:
-
-- industrial;
-- curat;
-- tehnic;
-- profesional;
-- sobru.
-
-Se evită:
-
-- elementele decorative inutile;
-- utilizarea excesivă a culorilor;
-- aspectul de interfață pentru smartphone;
-- animațiile complexe;
-- cantitatea excesivă de informații;
-- pictogramele inutile.
-
-Ierarhia vizuală trebuie obținută prin:
-
-- dimensiune;
-- spațiere;
-- chenare;
-- contrast;
-- indicatori simpli de stare.
-
-Culorile pot fi utilizate pentru indicarea unor stări importante, cum este
-nivelul bateriei.
-
-
----
-
-## 8. Branding
-
-Numele principal:
-
-    SERVICE BOX
-
-Descrierea produsului:
-
-    PANOURI ASCENSOARE
-
-
----
-
-## 9. Arhitectura UI
-
-UI-ul trebuie să fie independent de hardware.
-
-Structura recomandată:
-
-    Aplicație / Logică Service
-              ↓
-           Logică UI
-              ↓
-        UI Renderer
-              ↓
-             HAL
-           ↙     ↘
-       Display    Touch
-
-
-Logica UI nu trebuie duplicată pentru diferite platforme hardware.
-
-Nu se introduc blocuri `#ifdef` specifice hardware-ului în codul UI decât
-dacă acest lucru este absolut necesar.
-
-Citirea bateriei și identificarea stării `CHARGING` aparțin nivelului
-hardware/aplicație, nu rendererului UI.
-
-UI-ul primește datele necesare și decide doar modul în care acestea sunt
-afișate.
-
-
----
-
-## 10. Reguli pentru dezvoltare
-
-Înainte de implementarea unei pagini noi:
-
-1. Se verifică mai întâi codul existent al Service Box.
-2. Se reutilizează funcționalitatea și interfețele existente.
-3. Nu se inventează funcționalități noi fără specificarea lor.
-4. Nu se modifică funcționalitatea HAL decât dacă este necesar.
-5. UI-ul trebuie păstrat modular.
-6. Definițiile paginilor și tratarea touchscreen-ului trebuie să rămână
-   ușor de modificat.
-7. Funcționalitatea specifică hardware trebuie menținută în HAL sau în
-   nivelul hardware/application layer.
-8. Paginile suplimentare se implementează numai după ce cerințele lor sunt
-   definite în acest document.
-
-
----
-
-## 11. Extinderea ulterioară a interfeței
-
-În această etapă sunt definite explicit:
-
-1. secvența de pornire;
-2. pagina Battery Check;
-3. ecranul START;
-4. trecerea către MENIUL PRINCIPAL.
-
-Paginile care urmează după MENIUL PRINCIPAL NU sunt încă definite în acest
-document.
-
-Acestea vor fi specificate și adăugate ulterior.
-
-Nu se implementează anticipat pagini de:
-
-- diagnostic;
-- configurare;
-- programare;
-- SD;
-- RS485;
-- panouri;
+- Service Box;
 - firmware;
-- alte funcții de service,
+- card SD;
+- panoul conectat;
+- etajul curent.
 
-decât după definirea explicită a cerințelor acestora.
+Pagina trebuie să conțină butonul:
 
-Structura UI trebuie să permită adăugarea ulterioară a acestor pagini fără
-modificarea inutilă a paginilor deja implementate.
+START
 
+## 6.1 Handshake
 
----
+Acțiunea `START` lansează handshake-ul cu panoul conectat.
 
-## 12. Principiu general
+Handshake-ul trebuie să permită identificarea:
 
-Implementarea UI trebuie să urmeze principiul:
+- tipului de panou;
+- valorii curente a etajului.
 
-    SPECIFICAȚIE
-         ↓
-    LOGICĂ UI
-         ↓
-    RENDERER
-         ↓
-       HAL
-         ↓
-      HARDWARE
+Dacă nu există răspuns de la panou:
 
-Specificația acestui document este autoritativă pentru aspectul vizual,
-fluxul paginilor și interacțiunea cu utilizatorul.
+unknown panel
 
-Orice funcționalitate sau pagină nouă trebuie definită în acest document
-înainte de implementare.
+Dacă etajul nu este configurat:
+
+floor: ?
+
+Pagina trebuie să poată reprezenta cel puțin:
+
+panel type: unknown
+floor: ?
+
+sau informațiile identificate corespunzător.
+
+Detaliile comenzilor seriale folosite pentru handshake nu aparțin rendererului UI.
+
+# 7. Mode Selection
+
+După acțiunea `START` și procesarea handshake-ului, Service Box intră în:
+
+MODE SELECTION
+
+Aceasta este pagina principală de service.
+
+Meniul trebuie să permită accesul la funcțiile definite în diagrama `svcbox_menu.drawio`.
+
+Funcțiile definite sunt:
+
+- Exit Service Mode;
+- Flash;
+- Floor Set;
+- Communication;
+- Display;
+- MCU INFO.
+
+Nu se adaugă alte funcții până când acestea nu sunt definite în `svcbox_menu.drawio`.
+
+# 8. Exit Service Mode
+
+Acțiunea `Exit Service Mode` revine la pagina `Start`.
+
+Flux:
+
+MODE SELECTION
+      ↓
+EXIT SERVICE MODE
+      ↓
+START
+
+Nu este necesară o pagină intermediară.
