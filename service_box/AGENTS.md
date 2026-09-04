@@ -19,17 +19,20 @@ Before modifying code:
 
 1. Inspect the current repository state.
 2. Inspect the relevant existing implementation.
-3. Inspect the corresponding hardware documentation.
+3. Inspect the corresponding project documentation.
 4. Check `platformio.ini` and identify the affected PlatformIO environment.
-5. Reuse existing abstractions and implementations whenever possible.
+5. Inspect the relevant project specification and TODO section.
+6. Reuse existing abstractions and implementations whenever possible.
 
 Do not assume that an older implementation, previous prompt, or previous
 analysis still represents the current state of the project.
 
 The current repository is the source of truth for software structure.
 
-Confirmed hardware information is the source of truth for hardware
-mapping.
+Hardware configuration must be taken from `hardware_map.md`.
+
+Functional UI requirements must be taken from the current UI specification
+and approved project documentation.
 
 ---
 
@@ -42,137 +45,101 @@ In particular:
 - Marble Pico
 - Waveshare RP2350 Touch LCD 2.8"
 
-Do NOT modify the Marble Pico implementation when working on the
-Waveshare RP2350 target.
+Do NOT modify one hardware target when working on another target unless
+the task explicitly requires it.
 
-Do NOT modify the Waveshare implementation when working on Marble Pico.
-
-Only modify another target when the task explicitly requires it.
-
----
-
-## 4. WAVESHARE RP2350 HARDWARE
-
-Current Waveshare target:
-
-    waveshare_rp2350
-
-Board/display:
-
-    Waveshare RP2350 Touch LCD 2.8"
-
-Display:
-
-    ST7789-based
-    320 x 240 physical display
-    current UI orientation must follow the project UI specification
-
-The LCD and touch are separate peripherals.
+A task concerning one target must remain isolated to that target whenever
+possible.
 
 ---
 
-## 5. WAVESHARE LCD PINOUT
+## 4. HARDWARE CONFIGURATION
 
-The confirmed LCD mapping is:
+`hardware_map.md` is the authoritative document for hardware
+configuration.
 
-    TFT_CS   = GP13
-    TFT_DC   = GP14
-    TFT_RST  = GP15
-    TFT_BL   = GP16
-    TFT_MOSI = GP11
-    TFT_MISO = GP12
-    TFT_SCLK = GP10
+This includes, but is not limited to:
 
-LCD bus:
+- GPIO assignments;
+- peripheral buses;
+- display connections;
+- touch connections;
+- SD connections;
+- RS485 connections;
+- power and control signals;
+- board-specific hardware information.
 
-    SPI1
+The agent MUST inspect `hardware_map.md` before making hardware-related
+changes.
 
-These pins are confirmed hardware assignments.
+The agent MUST NOT duplicate the hardware mapping in `AGENTS.md`.
 
-Do not change them without explicit instruction.
+The agent MUST NOT invent hardware assignments based on generic examples,
+library defaults, or convenience.
 
-Important:
+If the current implementation conflicts with `hardware_map.md`, the agent
+must report the discrepancy and create a proposal in:
 
-    GP16 = LCD backlight
+    todo.md → Agent Proposals
 
-Therefore GP16 must never be used as a touch reset pin or for another
-unrelated hardware function.
-
----
-
-## 6. WAVESHARE TOUCH
-
-Touch controller:
-
-    CST328
-
-Interface:
-
-    I2C
-
-Confirmed touch mapping:
-
-    TOUCH_SDA = GP6
-    TOUCH_SCL = GP7
-    TOUCH_RST = GP17
-    TOUCH_INT = GP18
-
-These touch pins have been physically verified.
-
-Treat these pins as CONFIRMED HARDWARE INFORMATION.
-
-Do not autodetect them.
-
-Do not replace them with pins taken from a generic Waveshare example.
-
-Do not invent alternative mappings.
-
-Important:
-
-    GP17 = touch reset
-    GP18 = touch interrupt
-
-The touch is NOT an XPT2046/SPI touchscreen on the Waveshare target.
-
-Do not convert the CST328 interface to SPI.
-
-Do not create a second SPI bus for the touch.
-
-Use the CST328 implementation/library already used by the project.
-
-The local `XPT2046_Touchscreen` library must not be used for the
-Waveshare CST328 hardware.
+The agent must not silently change either the code or the hardware
+documentation to resolve the conflict.
 
 ---
 
-## 7. LCD AND TOUCH BUS SEPARATION
+## 5. HARDWARE TARGET ISOLATION
 
-The Waveshare LCD uses:
+When working on a hardware-specific task:
 
-    SPI1
+1. identify the target;
+2. inspect the corresponding hardware documentation;
+3. inspect the corresponding implementation;
+4. modify only the required target.
 
-The Waveshare touch uses:
+Do not change another hardware implementation merely because it uses a
+different or apparently simpler configuration.
 
-    I2C
-
-Do not assume that LCD and touch share the same bus.
-
-Do not introduce SPI chip-select handling for the CST328.
-
-Do not change the LCD bus in order to implement touch.
-
-Do not move `Wire`, `Wire1`, SPI1, or another peripheral to a different
-bus without first establishing that the current hardware architecture
-requires it.
-
-If a bus change appears necessary, stop and report the conflict before
-making an architectural change.
+If a shared change is genuinely required, identify it explicitly in the
+final report.
 
 ---
 
-## 8. EXISTING HARDWARE ABSTRACTION
+## 6. BUS AND PERIPHERAL SAFETY
 
-The project already contains a hardware abstraction.
+Bus and peripheral configuration must be taken from the current project
+implementation and `hardware_map.md`.
+
+Do not change:
+
+- SPI configuration;
+- I2C configuration;
+- UART configuration;
+- peripheral instances;
+- bus ownership;
+- chip-select handling;
+
+merely because a library example uses a different configuration.
+
+Before changing a bus or peripheral assignment:
+
+1. inspect `hardware_map.md`;
+2. inspect the existing implementation;
+3. inspect the relevant HAL;
+4. check for other users of the peripheral.
+
+If a bus or peripheral change appears necessary but is not explicitly
+defined by the current requirements, do not make the architectural
+decision autonomously.
+
+Report the discrepancy and create a proposal in:
+
+    todo.md → Agent Proposals
+
+---
+
+## 7. EXISTING HARDWARE ABSTRACTION
+
+The project contains a hardware abstraction layer.
 
 Before adding new hardware code, inspect:
 
@@ -180,64 +147,62 @@ Before adding new hardware code, inspect:
 
 and the corresponding hardware implementations.
 
-For touch, the existing interface includes the concepts:
+Reuse existing abstractions whenever they can support the requested
+functionality.
 
-    updateTouch()
-    isScreenTouched()
-    getTouchX()
-    getTouchY()
+Do not create parallel hardware APIs without a concrete reason.
 
-Reuse the existing abstraction.
-
-Do not create a parallel touch API if the existing abstraction can support
-the requested functionality.
-
-UI code must not directly access the CST328 hardware when the HAL already
-provides the required interface.
+UI code should not directly access hardware when the HAL already provides
+the required interface.
 
 ---
 
-## 9. LCD STATUS
+## 8. EXISTING WORKING HARDWARE IMPLEMENTATION
 
-The Waveshare LCD initialization is an already-developed part of the
-project.
+When working on another feature, preserve existing hardware functionality.
 
-When working on another feature:
+Do not unnecessarily:
 
-- preserve the working LCD implementation;
-- do not rewrite the LCD driver unnecessarily;
-- do not replace the LCD library;
-- do not move the LCD away from SPI1;
-- do not change confirmed LCD GPIO assignments;
-- do not alter the LCD initialization sequence unless the task explicitly
-  requires it.
+- rewrite working drivers;
+- replace working libraries;
+- change working initialization sequences;
+- change hardware mappings;
+- change bus assignments.
 
-A task concerning touch, UI, battery, RS485, SD, or another subsystem
-must not become an excuse to rewrite the LCD implementation.
+A task concerning one subsystem must not become an excuse to rewrite
+another working subsystem.
+
+Any required change to existing hardware behaviour must be justified by:
+
+- an explicit requirement;
+- a confirmed hardware issue;
+- a functional bug;
+- or an approved project decision.
 
 ---
 
-## 10. UI ARCHITECTURE
+## 9. UI ARCHITECTURE
 
-The Service Box UI is defined by the project's UI documentation and
+The Service Box UI is defined by the current UI specification and menu
 diagram.
 
-Relevant files include:
+Primary UI references:
 
-    src/ui_requirements.md
+    ui_requirements.md
     svcbox_menu.drawio
-    menu.md
-    service_menu.md
+
+These documents define the required UI behaviour and intended menu
+structure.
 
 The UI implementation must follow these documents.
 
-Do not invent a different menu hierarchy when implementing UI features.
+Do not invent a different menu hierarchy.
 
 Do not redesign the UI unless explicitly requested.
 
 Hardware input handling and UI behaviour should remain separated.
 
-For example:
+The preferred architecture is:
 
     hardware
         ↓
@@ -253,82 +218,256 @@ Do not bypass these layers without a concrete reason.
 
 ---
 
-## 11. HARDWARE DOCUMENTATION
+## 10. UI REQUIREMENTS VS TODO
 
-The hardware documentation is:
+`ui_requirements.md` defines the required UI behaviour.
 
-    hardware_map.md
+`svcbox_menu.drawio` defines the intended menu structure and navigation
+flow.
 
-When hardware assignments change as a result of an approved hardware
-decision, update the documentation so that it reflects the real hardware.
+`todo.md` is used to track:
 
-Do not modify hardware documentation merely to make it agree with an
-incorrect software assumption.
+- implementation;
+- verification;
+- outstanding work;
+- Agent Proposals.
 
-Never silently resolve a hardware conflict by guessing.
+`todo.md` is NOT the source of truth for functional requirements.
 
-If software, documentation and confirmed hardware disagree:
+Do not change `ui_requirements.md` merely to make an implementation
+easier.
 
-1. identify the conflict;
-2. report it;
-3. use confirmed hardware information as the priority;
-4. update documentation only when appropriate.
+Do not change the menu structure merely because a different flow is
+easier to implement.
+
+When implementing a UI task, inspect the corresponding requirements and
+the corresponding menu flow before modifying code.
 
 ---
 
-## 12. PIN SAFETY
+## 11. TODO STRUCTURE AND TASK BOUNDARIES
+
+When a task is provided using a TODO path such as:
+
+    Hardware bring-up — Waveshare / Touchscreen
+
+the agent must work only within that requested scope unless the task
+explicitly requires changes elsewhere.
+
+The hierarchical structure of `todo.md` is intentional.
+
+A parent section identifies the work area.
+
+A subsection identifies the specific component or function.
+
+Individual checklist items identify concrete implementation or validation
+tasks.
+
+Do not expand a focused task into unrelated work.
+
+Do not mark a task `DONE` merely because the code compiles.
+
+Hardware tasks require physical verification before being considered
+hardware-complete.
+
+---
+
+## 12. AGENT PROPOSALS
+
+`todo.md` contains a dedicated section:
+
+    ## Agent Proposals
+
+This is the ONLY area of `todo.md` that the agent may modify autonomously
+for reporting new findings, ambiguities, discrepancies, or proposed
+decisions.
+
+If the agent encounters:
+
+- a missing requirement;
+- an ambiguity;
+- conflicting documentation;
+- an implementation decision not defined by the project;
+- a hardware conflict;
+- a missing prerequisite;
+- a potentially necessary architectural change;
+- a discrepancy between code and protected documentation;
+
+the agent must NOT invent a solution.
+
+Instead, the agent must add a proposal to:
+
+    todo.md → Agent Proposals
+
+A proposal should contain:
+
+- proposal ID;
+- affected area;
+- status;
+- finding or problem;
+- reason;
+- suggested action, if applicable;
+- human decision.
+
+Example:
+
+    ### AP-001 — Waveshare / Touchscreen
+
+    Status: OPEN
+
+    Finding:
+    ...
+
+    Reason:
+    ...
+
+    Suggested action:
+    ...
+
+    Human decision:
+    PENDING
+
+The agent must not modify existing TODO tasks, completed tasks,
+requirements, or specification sections in order to silently resolve an
+ambiguity.
+
+The agent may continue with the requested task only when the existing
+requirements provide an unambiguous implementation path.
+
+If the unresolved issue blocks the requested task, stop and report the
+proposal.
+
+A proposal is NOT an approval.
+
+The human project owner decides whether the code, documentation, or
+requirement must change.
+
+---
+
+## 13. PROTECTED DOCUMENTATION
+
+The following files are protected project documents:
+
+    svcbox_menu.drawio
+    hardware_map.md
+    AGENTS.md
+
+The agent MUST NOT modify these files autonomously.
+
+These files are controlled project documents and must not be changed as a
+side effect of code implementation.
+
+The agent may inspect them when relevant.
+
+The agent must not modify a protected document merely because the current
+implementation differs from it.
+
+---
+
+## 14. DOCUMENTATION CHANGE REQUESTS
+
+During implementation, the agent may discover that a code change would
+require a change to a protected document.
+
+Examples include:
+
+- a changed hardware mapping;
+- a changed GPIO assignment;
+- a changed peripheral bus;
+- a changed UI flow;
+- a new menu item;
+- a changed startup sequence;
+- a changed reconnect sequence;
+- a changed architectural rule;
+- a requirement that no longer matches the implementation.
+
+The agent MUST NOT modify the protected document.
+
+Instead, the agent must:
+
+1. immediately report the discrepancy to the user;
+2. add a proposal to `todo.md → Agent Proposals`;
+3. identify the affected protected document;
+4. identify the affected section or information;
+5. describe the discrepancy;
+6. identify the code change or observation that caused it;
+7. propose the possible resolution(s);
+8. state whether the issue blocks the current task.
+
+The agent must not decide autonomously whether:
+
+- the code should change;
+- the documentation should change;
+- the requirement should change.
+
+That decision belongs to the human project owner.
+
+---
+
+## 15. DOCUMENTATION VS IMPLEMENTATION CONFLICTS
+
+When the current implementation conflicts with a protected reference
+document, the agent MUST NOT decide autonomously which one is correct.
+
+The agent must:
+
+1. immediately report the discrepancy to the user;
+2. record it in `todo.md → Agent Proposals`;
+3. describe the affected code and documentation;
+4. explain the nature and impact of the discrepancy;
+5. propose the possible resolution(s);
+6. clearly state whether the discrepancy blocks the current task.
+
+Possible proposals may include:
+
+- changing the code to comply with the existing documentation;
+- changing the documentation to reflect an intentional implementation
+  change;
+- clarifying or changing the requirement before implementation continues.
+
+The agent must not silently resolve the conflict.
+
+The existence of working code is not sufficient justification for changing
+protected documentation.
+
+The existence of documentation is not sufficient justification for
+assuming that the implementation is correct.
+
+The human project owner decides the resolution.
+
+Until that decision is made, the protected documentation remains
+unchanged.
+
+---
+
+## 16. PIN SAFETY
 
 Never invent GPIO assignments.
 
-Before assigning a GPIO:
+Before assigning, changing, or reusing a GPIO:
 
 1. inspect `hardware_map.md`;
 2. inspect the existing HAL implementation;
-3. inspect `HardwareInterface.h`;
-4. inspect `platformio.ini` if relevant;
-5. check for existing peripheral use.
+3. inspect the relevant hardware initialization code;
+4. check for existing peripheral use.
 
-Never reuse a GPIO simply because it is convenient.
+The GPIO mapping must be taken from `hardware_map.md`.
 
-Particular confirmed Waveshare assignments:
+Do not duplicate GPIO assignments in `AGENTS.md`.
 
-    GP6  = touch SDA
-    GP7  = touch SCL
-    GP10 = LCD SCLK
-    GP11 = LCD MOSI
-    GP12 = LCD MISO
-    GP13 = LCD CS
-    GP14 = LCD DC
-    GP15 = LCD reset
-    GP16 = LCD backlight
-    GP17 = touch reset
-    GP18 = touch interrupt
+If a requested implementation conflicts with the documented hardware
+mapping, do not resolve the conflict autonomously.
 
-Do not change these assignments without explicit approval.
+Immediately report the discrepancy and create or update an entry under:
+
+    todo.md → Agent Proposals
+
+The human project owner decides whether the code or hardware
+documentation must change.
 
 ---
 
-## 13. SPI / I2C RULES
-
-Do not change bus architecture based on library defaults.
-
-Always inspect how the project currently initializes:
-
-    SPI1
-    Wire
-    Wire1
-
-before modifying peripheral communication.
-
-A library using a global `SPI` or `Wire` object does not automatically
-mean that the project should be moved to that bus.
-
-The physical hardware mapping and existing working implementation take
-priority.
-
----
-
-## 14. PLATFORMIO
+## 17. PLATFORMIO
 
 Always inspect:
 
@@ -336,25 +475,20 @@ Always inspect:
 
 before changing dependencies or build configuration.
 
-Build only the affected environment unless the task explicitly requires
-testing multiple environments.
+Identify the affected PlatformIO environment before making target-specific
+changes.
 
 Do not introduce arbitrary library versions.
 
-Do not reintroduce known-invalid PlatformIO dependency specifications.
-
-In particular, avoid dependency specifications that produce errors such
-as:
-
-    SemanticVersionError:
-    Invalid simple spec:
-    ^0.0.0-alpha+sha...
+Do not reintroduce known-invalid dependency specifications.
 
 Use the existing project dependency arrangement whenever possible.
 
+Do not modify build configuration for unrelated targets.
+
 ---
 
-## 15. LIBRARIES
+## 18. LIBRARIES
 
 Before adding a library:
 
@@ -367,13 +501,12 @@ Do not add duplicate libraries.
 
 Do not replace a working library without a concrete requirement.
 
-For Waveshare touch, use the project's CST328 implementation.
-
-Do not substitute XPT2046 for CST328.
+Do not select a library based solely on a generic example when the
+project already has a working implementation.
 
 ---
 
-## 16. MINIMAL CHANGES
+## 19. MINIMAL CHANGES
 
 Make the smallest change required to complete the requested task.
 
@@ -384,20 +517,16 @@ Do not:
 - rename unrelated files;
 - reorganize directories unnecessarily;
 - rewrite working drivers;
-- change unrelated GPIOs;
-- change RS485 behaviour;
-- change Ethernet behaviour;
-- change SD behaviour;
-- change battery behaviour;
-- change UF2 behaviour;
-- change the menu architecture;
-- change another hardware target.
+- change unrelated hardware;
+- change unrelated communication behaviour;
+- change another hardware target;
+- redesign the menu architecture.
 
 Working code has priority over stylistic cleanup.
 
 ---
 
-## 17. EXISTING CODE TAKES PRIORITY OVER ASSUMPTIONS
+## 20. EXISTING CODE TAKES PRIORITY OVER ASSUMPTIONS
 
 If an existing implementation looks unusual but works with the current
 hardware, do not replace it merely because another implementation appears
@@ -415,24 +544,22 @@ Do not "improve" working code without justification.
 
 ---
 
-## 18. TASK BOUNDARIES
+## 21. TASK BOUNDARIES
 
 Implement ONLY the requested task.
 
-Example:
+For example, if the task is:
 
-If the task is:
+    Implement touchscreen input.
 
-    Implement CST328 touch reading.
-
-Then the task does NOT automatically include:
+the task does NOT automatically include:
 
 - final menu navigation;
 - gestures;
 - animations;
-- button widgets;
+- button redesign;
 - UI redesign;
-- calibration screens;
+- calibration redesign;
 - battery changes;
 - RS485 changes.
 
@@ -440,13 +567,15 @@ Implement the requested layer first.
 
 Validate it.
 
-Only then proceed to the next layer.
+Only then proceed to another layer when explicitly requested or when it is
+clearly part of the same task.
 
 ---
 
-## 19. DEBUGGING
+## 22. DEBUGGING
 
-Temporary diagnostic output is allowed when it helps validate hardware.
+Temporary diagnostic output is allowed when it helps validate hardware or
+software behaviour.
 
 Diagnostic code should:
 
@@ -459,37 +588,31 @@ Diagnostic code should:
 Do not leave continuous debug output in normal operation unless explicitly
 required.
 
-When testing touch, useful diagnostic information may include:
-
-    TOUCH: X=... Y=...
-
-Only report touch events when appropriate; do not continuously flood the
-serial port when the screen is untouched.
+Temporary diagnostics must not silently become permanent architecture.
 
 ---
 
-## 20. TIMING AND BLOCKING
+## 23. TIMING AND BLOCKING
 
 Avoid unnecessary `delay()` calls in application and input handling.
 
 Hardware initialization may require delays when dictated by the device
-datasheet or a verified working implementation.
+requirements or a verified working implementation.
 
 Runtime UI and input processing should remain responsive.
 
-Do not introduce long blocking waits into the main loop merely to simplify
-a test.
+Do not introduce long blocking waits merely to simplify a test.
 
 ---
 
-## 21. UI INPUT
+## 24. UI INPUT
 
 Touch input should be handled as an input source, not mixed directly into
 menu rendering code.
 
 The preferred separation is:
 
-    CST328
+    hardware
        ↓
     Hardware HAL
        ↓
@@ -502,12 +625,68 @@ The preferred separation is:
 Raw hardware coordinates and UI/screen coordinates should remain
 conceptually separate.
 
-Do not introduce arbitrary calibration or coordinate transformations
-without verifying the physical display orientation and touch behaviour.
+Hardware-specific touch implementation must follow the current hardware
+mapping and HAL.
+
+Do not introduce arbitrary calibration or coordinate transformations.
+
+If required calibration behaviour is not defined by the current project
+requirements, do not invent it.
+
+Report the missing requirement through:
+
+    todo.md → Agent Proposals
 
 ---
 
-## 22. DOCUMENTATION VS TEMPORARY TESTS
+## 25. SERVICE BOX STARTUP AND RECONNECT
+
+Startup, panel identification, handshake and reconnect behaviour must
+follow the current UI specification.
+
+When the specification requires current panel information before showing
+`Start`, do not display stale information.
+
+After operations that can change panel state, follow the specified
+reconnect and handshake sequence before returning to `Start`.
+
+Do not bypass required reconnect or handshake stages by reusing stale
+panel information.
+
+Do not invent alternative startup or reconnect flows.
+
+---
+
+## 26. COMMUNICATION TEST VS HANDSHAKE
+
+The `Communication` UI function is NOT automatically a test of the
+Service Box ↔ panel handshake.
+
+The Service Box ↔ panel handshake is a separate function when used for
+panel identification and reconnect.
+
+`Communication Test` must follow the current UI requirements and the
+actual panel communication architecture.
+
+Do not implement Communication Test as a duplicate of the handshake
+unless explicitly required.
+
+---
+
+## 27. DISPLAY TEST
+
+The meaning of the `Display` function must follow the current UI
+requirements and menu specification.
+
+Do not reinterpret an external panel display test as a test of the
+Service Box display.
+
+Do not invent additional display-test functionality that is not defined
+by the project requirements.
+
+---
+
+## 28. TEMPORARY TESTS
 
 Temporary hardware test code is not automatically part of the final UI.
 
@@ -516,30 +695,76 @@ If a task requires a temporary test:
 - clearly isolate it;
 - keep it minimal;
 - do not let it become permanent architecture;
-- remove or disable it when the validation phase is complete, unless the
-  task explicitly requires retaining it.
+- remove or disable it when validation is complete unless explicitly
+  required to retain it.
+
+Do not modify protected documentation merely because a temporary test
+requires a different configuration.
 
 ---
 
-## 23. BUILD VALIDATION
+## 29. BUILD VALIDATION
 
-After modifying code:
+The build must NOT be executed automatically by the agent after every
+code modification.
 
-1. Build the affected PlatformIO environment.
-2. Check compiler errors and warnings relevant to the change.
-3. Check for GPIO conflicts.
-4. Check that existing buses remain unchanged unless explicitly required.
-5. Check that unrelated targets were not modified.
-6. Report the build result.
+Builds are run manually by the user when considered necessary.
 
-If the build fails:
+After modifying code, the agent should:
 
-- fix errors caused by the current task;
-- do not perform unrelated refactoring to hide the problem.
+1. perform a static review of the changes;
+2. check for obvious syntax or structural problems;
+3. check for relevant hardware conflicts;
+4. check that existing buses have not been changed without justification;
+5. check that unrelated targets have not been modified;
+6. clearly report what should be verified by a build.
+
+### 29.1 Build Log
+
+The result of a manually executed build may be provided to the agent
+through a build log.
+
+When a build log is provided, the agent must analyze it before proposing
+additional changes.
+
+The agent must NOT assume that the build should be executed again
+automatically.
+
+### 29.2 Build Errors
+
+If the provided build log contains errors:
+
+- identify the actual cause of the error;
+- distinguish real build errors from warnings, configuration issues, or
+  already-known problems;
+- propose or apply only the changes necessary to address the identified
+  error;
+- do not repeatedly modify and rebuild the code merely to obtain a
+  successful build;
+- do not perform unrelated refactoring;
+- do not automatically start multiple consecutive build attempts for the
+  same problem.
+
+If an error can be corrected manually by the user, clearly identify the
+manual correction instead of forcing an automated rebuild cycle.
+
+### 29.3 Build Status
+
+The agent must clearly distinguish between:
+
+    BUILD NOT RUN
+    BUILD RESULT PROVIDED BY USER
+    BUILD VERIFIED
+    HARDWARE VERIFIED
+
+The agent must NOT report `BUILD VERIFIED` unless the build has actually
+been executed and its result has been verified.
+
+Build validation and hardware validation are separate stages.
 
 ---
 
-## 24. HARDWARE VALIDATION
+## 30. HARDWARE VALIDATION
 
 Compilation is not sufficient for hardware changes.
 
@@ -554,15 +779,23 @@ and:
 Do not claim hardware functionality has been verified merely because the
 code compiles.
 
+Physical test results supplied by the user are considered confirmed
+hardware information.
+
 If physical verification is still required, state that explicitly.
 
 ---
 
-## 25. FILE MODIFICATION RULES
+## 31. FILE MODIFICATION RULES
 
 Before modifying a file, inspect its current contents.
 
 Do not replace an entire file when a small modification is sufficient.
+
+Do not modify files outside the requested scope unless required by the
+task.
+
+Protected files are governed by the protected-documentation rules above.
 
 After modification, report:
 
@@ -570,76 +803,116 @@ After modification, report:
 2. what was changed;
 3. why it was changed;
 4. which existing functionality was preserved;
-5. any hardware pins or buses affected.
+5. any hardware or architectural impact;
+6. any TODO / Agent Proposal changes.
+
+Every autonomous modification to `todo.md` must be explicitly reported.
 
 ---
 
-## 26. IMPORTANT PROJECT FILES
+## 32. IMPORTANT PROJECT FILES
 
-When working on Service Box, relevant files may include:
+Relevant Service Box files may include:
 
     AGENTS.md
     hardware_map.md
     platformio.ini
     svcbox_menu.drawio
-    menu.md
-    service_menu.md
     todo.md
+    ui_requirements.md
 
-and:
+and implementation files such as:
 
     src/main.cpp
     src/hal/HardwareInterface.h
     src/hal/HardwareWaveshare.cpp
     src/hal/HardwareMarble.cpp
-    src/ui_requirements.md
 
-Inspect only the files relevant to the current task, but always check the
-existing architecture before creating new code.
+Other files may exist and should be inspected when relevant.
+
+The list above is a navigation aid, not a second source of technical
+requirements.
 
 ---
 
-## 27. SOURCE OF TRUTH PRIORITY
+## 33. SOURCE OF TRUTH PRIORITY
 
 When information conflicts, use this priority:
 
 1. Confirmed physical hardware information
 2. Current working implementation
 3. Current hardware documentation
-4. Current UI specification / project documentation
-5. Historical prompts, analyses or temporary test instructions
-6. Generic assumptions or library examples
+4. Current UI specification and approved project documentation
+5. Current TODO and implementation status
+6. Historical prompts, analyses or temporary test instructions
+7. Generic assumptions or library examples
 
-Historical prompts and analysis files must NOT override the current
-repository state.
+This priority does NOT give the agent permission to modify protected
+documentation.
+
+When a conflict involves protected documentation, the conflict must be
+reported and proposed through:
+
+    todo.md → Agent Proposals
+
+Historical prompts and analyses must NOT override the current repository
+state.
+
+`todo.md` must not override confirmed requirements or hardware
+information.
 
 ---
 
-## 28. NO GUESSING RULE
+## 34. NO GUESSING RULE
 
 If an important technical detail cannot be established from:
 
 - the current code;
 - the current documentation;
 - confirmed hardware information;
-- or an explicitly supplied requirement,
+- or an explicitly supplied requirement;
 
 do not guess.
 
-Report what is missing and identify the decision that must be made.
+If the issue affects implementation, add an entry to:
 
-This is especially important for:
+    todo.md → Agent Proposals
 
-- GPIO mappings;
-- buses;
-- display orientation;
-- touch coordinate transformations;
-- library selection;
-- protocol behaviour.
+and identify the decision that must be made.
+
+The agent's role is to identify and explain the missing information, not
+to invent the missing requirement.
 
 ---
 
-## 29. FINAL REPORT
+## 35. TASK GRANULARITY
+
+The agent must normally work within the task boundaries defined in `todo.md`.
+
+If a task is too complex, contains multiple independent implementation or
+verification stages, or cannot be reliably completed and validated as a
+single unit, the agent may propose temporary task granularization.
+
+The agent must NOT autonomously modify the task structure in `todo.md`.
+
+Instead, the agent must:
+1. explain why the task is too complex to track as a single unit;
+2. propose a temporary breakdown into clear, independently verifiable steps;
+3. wait for human approval before changing the task structure.
+
+Temporary granularization must remain limited to the affected task and must
+not duplicate information already defined in authoritative project
+documentation.
+
+The agent should propose granularization only when it provides a real benefit
+for implementation, verification, debugging, or identifying blockers.
+
+After the task is completed, temporary subtasks should be consolidated back
+into the normal task-level representation by the human.
+
+---
+
+## 36. FINAL REPORT
 
 At the end of every implementation task, provide a concise report:
 
@@ -647,6 +920,9 @@ At the end of every implementation task, provide a concise report:
     - ...
 
     Changes:
+    - ...
+
+    TODO / Agent Proposals modified:
     - ...
 
     Hardware affected:
@@ -661,11 +937,20 @@ At the end of every implementation task, provide a concise report:
     Remaining issues:
     - ...
 
+    Proposals requiring human decision:
+    - ...
+
+The report must explicitly mention any discrepancy discovered between
+implementation and protected documentation.
+
 Do not claim successful hardware operation unless it was actually tested.
+
+Do not claim `BUILD VERIFIED` unless an actual build result has been
+verified.
 
 ---
 
-## 30. FINAL PRINCIPLE
+## 37. FINAL PRINCIPLE
 
 Preserve what already works.
 
@@ -673,11 +958,34 @@ Make the smallest correct change.
 
 Do not guess hardware.
 
-Do not mix hardware targets.
+Take hardware configuration from `hardware_map.md`.
 
+Do not duplicate hardware configuration in `AGENTS.md`.
+
+Do not invent missing requirements.
+
+Do not silently resolve ambiguities or documentation conflicts.
+
+Use `todo.md → Agent Proposals` for unresolved technical decisions.
+
+Immediately report every discrepancy that requires a human decision.
+
+Do not modify protected documentation autonomously.
+
+The human project owner decides whether code, documentation, or
+requirements must change.
+
+The agent identifies, explains and proposes.
+
+The human decides.
+
+The agent implements the approved decision.
+
+Do not mix hardware targets.
+410
 Do not turn a focused task into a refactoring project.
 
-Validate every change.
+Do not enter automated build/rebuild cycles.
 
-Keep the Service Box architecture deterministic, documented and
+Keep the Service Box architecture deterministic, controlled and
 incremental.
