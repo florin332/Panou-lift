@@ -84,9 +84,9 @@ Status: **TESTED / OK**
 - [x] TFT_MISO = GP12
 - [x] TFT_SCLK = GP10
 
-> Only the Waveshare LCD has been physically tested and confirmed functional.
->
-> The `[x]` status applies only to the LCD/display interface itself.
+//> Only the Waveshare LCD has been physically tested and confirmed functional.
+//>
+//> The `[x]` status applies only to the LCD/display interface itself.
 
 ## 2.2 Touch — CST328
 
@@ -94,12 +94,12 @@ Type:
 
 `Capacitive`
 
-Status: **NOT TESTED**
+Status: **TESTED/ OK**
 
-- [ ] TOUCH_SDA = GP6
-- [ ] TOUCH_SCL = GP7
-- [ ] TOUCH_INT = GP18
-- [ ] TOUCH_RST = GP17
+- [x] TOUCH_SDA = GP6
+- [x] TOUCH_SCL = GP7
+- [x] TOUCH_INT = GP18
+- [x] TOUCH_RST = GP17
 
 ## 2.3 IMU — QMI8658
 
