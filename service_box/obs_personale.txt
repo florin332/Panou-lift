@@ -1,0 +1,1 @@
+1 comunicatia intre svc box si panouri va fi un format ascii pur, fara crc. ain felul aceta se poate dezvolta mai usor si poate fi folosit pc pe post de svc box/ panou.

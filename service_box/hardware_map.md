@@ -18,14 +18,14 @@ MCU:
 
 ## 1.1 LCD — ILI9341
 
-Status: **NOT TESTED**
+Status: **TESTED - OK**
 
-- [ ] TFT_CS  = GP9
-- [ ] TFT_DC  = GP1
-- [ ] TFT_RST = GP2
-- [ ] TFT_BL  = GP13
-- [ ] TFT_MOSI = GP11
-- [ ] TFT_SCK  = GP10
+- [X] TFT_CS  = GP13
+- [X] TFT_DC  = GP6
+- [X] TFT_RST = GP14
+- [X] TFT_BL  = GP4
+- [X] TFT_MOSI = GP11
+- [X] TFT_SCK  = GP10
 
 ## 1.2 Touch — XPT2046
 
@@ -33,10 +33,11 @@ Type:
 
 `Resistive`
 
-Status: **NOT TESTED**
+Status: **TESTED - OK**
 
-- [ ] TOUCH_CS   = GP8
-- [ ] TOUCH_MISO = GP12
+- [X] TOUCH_CS   = GP9
+- [X] TOUCH_MISO = GP12
+- [X] TOUCH_IRQ = GP8
 
 ## 1.3 SD Card
 
