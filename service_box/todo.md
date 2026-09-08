@@ -680,7 +680,96 @@ The agent must NOT modify protected documentation merely to resolve a proposal.
 
 ---
 
-# 17. Status Rules
+### AP-001 — Waveshare / Buton recalibrare GP29 nedefinit in hardware_map.md
+
+- **Status:** OPEN
+- **Affected area:** src/main.cpp (branch graphic_ui) / hardware_map.md §2
+- **Finding:**
+  Portarea din wv_2350_lcd / tester_port foloseste GP29 ca buton hardware de
+  recalibrare touch (tinut apasat 2s -> flux calibrare axe). GP29 NU apare in
+  hardware_map.md si nu este atribuit niciunei alte functii documentate.
+- **Why it matters:**
+  hardware_map.md este documentul autoritar pentru asignari GPIO. Orice pin
+  folosit de cod trebuie sa fie documentat acolo.
+- **Affected documentation:** hardware_map.md (document protejat - nemodificat)
+- **Possible resolution:**
+  1. Se adauga GP29 (buton recalibrare, activ LOW, INPUT_PULLUP) in
+     hardware_map.md §2 Waveshare;
+  2. Sau se renunta la butonul hardware si recalibrarea se face doar din meniu.
+- **Does it block the current task:** NO (codul compileaza; pinul nu intra in
+  conflict cu nicio asignare documentata)
+- **Decision:** human decision required
+
+---
+
+### AP-002 — Waveshare / Discrepanta denumire bus I2C (I2C0 vs i2c1)
+
+- **Status:** OPEN
+- **Affected area:** hardware_map.md §3.2 vs src/bsp/bsp_i2c.h
+- **Finding:**
+  hardware_map.md §3.2 denumeste busul Touch+IMU "I2C0" (SDA=GP6, SCL=GP7),
+  insa BSP-ul portat (bsp_i2c.h) foloseste instanta `i2c1` pe aceiasi pini.
+  Functionalitatea touch este validata pe hardware cu i2c1 (tester_port,
+  commit "tested-ok").
+- **Why it matters:**
+  Denumirea instantei I2C din documentatia protejata nu corespunde
+  implementarii validate fizic.
+- **Affected documentation:** hardware_map.md (document protejat - nemodificat)
+- **Possible resolution:**
+  1. Se corecteaza hardware_map.md: "I2C0" -> "I2C1" in §3.2 (si §2.2/§2.3);
+  2. Sau se schimba BSP-ul pe i2c0 (nerecomandat - contrazice testul fizic).
+- **Does it block the current task:** NO
+- **Decision:** human decision required
+
+---
+
+### AP-003 — Marble / Simulator temporar pe branch-ul graphic_ui
+
+- **Status:** OPEN
+- **Affected area:** src/sim/, src/main.cpp (environment marble_pico)
+- **Finding:**
+  Dupa eliminarea HAL-ului, environment-ul marble_pico nu mai are drivere
+  reale (ILI9341 + XPT2046) pe acest branch. Pentru a putea compila si testa
+  navigarea meniului, marble_pico foloseste temporar simulatorul Serial din
+  src/sim/ (marcat PROVIZORIU).
+- **Why it matters:**
+  Simulatorul NU este hardware real; functionalitatea Marble nu poate fi
+  considerata verificata pe acest branch. Driverele reale trebuie portate
+  ulterior de pe branch-ul hardware Marble.
+- **Affected documentation:** niciuna
+- **Possible resolution:**
+  1. La reintegrarea branch-urilor, src/sim/ se elimina si marble_pico primeste
+     driverele reale ILI9341/XPT2046;
+  2. Sau se pastreaza simulatorul doar pentru teste PC.
+- **Does it block the current task:** NO
+- **Decision:** human decision required
+
+---
+
+### AP-004 — Marble / Board ID 'groundstudio_marble_pico' necunoscut
+
+- **Status:** OPEN
+- **Affected area:** platformio.ini [env:marble_pico] / instalare PlatformIO locala
+- **Finding:**
+  La build-ul pe environment-ul marble_pico (branch graphic_ui), PlatformIO
+  raporteaza: `UnknownBoard: Unknown board ID 'groundstudio_marble_pico'`.
+  Eroarea apare INAINTE de compilarea codului - nu este cauzata de modificarile
+  din acest branch. Definitia board-ului lipseste din platforma instalata local.
+- **Why it matters:**
+  Cerinta pe branch-ul graphic_ui este ca ambele environment-uri sa compileze.
+  Fara definitia board-ului, marble_pico nu poate fi validat nici macar la
+  nivel de build.
+- **Affected documentation:** platformio.ini (nemodificat - decizie de build config)
+- **Possible resolution:**
+  1. Se adauga definitia board-ului in proiect: boards/groundstudio_marble_pico.json;
+  2. Sau se instaleaza platforma GroundStudio care include board-ul;
+  3. Sau se schimba board-ul pe un ID generic RP2040 (ex. pico) - necesita
+     verificare hardware (flash size, pini USB).
+- **Does it block the current task:** NO pentru Waveshare; DA pentru validarea
+  build-ului marble_pico
+- **Decision:** human decision required
+
+---
 
 - `[x]` means the task has actually been completed.
 - Code compilation alone does not make a task complete.

@@ -3,7 +3,9 @@
 
 #include <Arduino.h>
 #include <Adafruit_GFX.h>
-#include "hal/HardwareInterface.h"
+
+// Decuplat de HAL pe branch-ul graphic_ui: primeste doar o instanta
+// Adafruit_GFX (display real ST7789 pe Waveshare / simulator pe Marble).
 
 class StartupScreen {
 private:
