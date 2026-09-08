@@ -508,11 +508,16 @@ static const int8_t PIN_TCH_IRQ  = 8;
 #define LCD_WIDTH  240
 #define LCD_HEIGHT 320
 
-// ---------------- Buton recalibrare [PRELUARE - modificat la GP29] ---------
-// NOTA: GP29 nu figureaza in hardware_map.md - vezi todo.md / Agent Proposals
-#define RECALIB_BUTTON 29
+// ---------------- Buton recalibrare [PRELUARE] -----------------------------
+// Marble: GP5 (ca in tester-touch-lcd; input de pe placa, INPUT_PULLUP,
+// activ LOW). NOTA: GP5 nu figureaza in hardware_map.md §1 - vezi
+// todo.md / Agent Proposals (AP-001)
+#define RECALIB_BUTTON 5
 
 // ---------------- Praguri touch si calibrare [PRELUARE] --------------------
+// NOTA: biblioteca upstream calculeaza z = z1 + 4095 - z2 (unitati ADC raw)
+// si aplica intern Z_THRESHOLD=300 in touched(); tester-touch-lcd (validat
+// hardware) folosea aceleasi praguri 200/300 cu upstream.
 #define Z_TOUCH_MIN   200
 #define Z_SAMPLE_MIN  300
 #define CALIB_MAGIC   0x544C4344  // calibrare proprie acestui model
@@ -554,11 +559,10 @@ int32_t swipeEndX[2], swipeEndY[2];
 int swipeCount = 0;
 
 // ---------------- Instante drivere (specifice acestui model) ----------------
-// NOTA: biblioteca locala lib/XPT2046_Touchscreen primeste magistrala SPI
-// prin constructor (modificare locala existenta) - patternul validat in
-// vechiul HardwareMarble: XPT2046_Touchscreen ts(CS, IRQ, &SPI1)
+// Biblioteca upstream PaulStoffregen/XPT2046_Touchscreen (din platformio.ini):
+// magistrala SPI se aloca la begin() - begin(SPI1), nu prin constructor.
 static Adafruit_ILI9341 tft(&SPI1, PIN_TFT_DC, PIN_TFT_CS, PIN_TFT_RST);
-static XPT2046_Touchscreen ts(PIN_TCH_CS, PIN_TCH_IRQ, &SPI1);
+static XPT2046_Touchscreen ts(PIN_TCH_CS, PIN_TCH_IRQ);
 
 Adafruit_GFX &display = tft;
 
@@ -595,9 +599,7 @@ void halTouchInit() {
     pinMode(PIN_TCH_CS, OUTPUT);
     digitalWrite(PIN_TCH_CS, HIGH);
 
-    pinMode(PIN_TCH_IRQ, INPUT_PULLUP);
-
-    ts.begin();          // magistrala SPI1 configurata din constructor
+    ts.begin(SPI1);    // upstream: aloca magistrala SPI1 (validat in tester)
     ts.setRotation(0);
 }
 
@@ -975,7 +977,7 @@ void setup() {
     // MARBLE: initializare hardware real (Model 1 BlueTab) [PRELUARE]
     // --------------------------------------------------------
 
-    // Buton recalibrare (GP29, INPUT_PULLUP, activ LOW)
+    // Buton recalibrare (GP5, INPUT_PULLUP, activ LOW)
     pinMode(RECALIB_BUTTON, INPUT_PULLUP);
 
     // Incarcare calibrare din EEPROM
@@ -1262,7 +1264,7 @@ void loop() {
     }
 
     // --------------------------------------------------------
-    // MARBLE stage==3: buton recalibrare GP29 (2s hold) [PRELUARE]
+    // MARBLE stage==3: buton recalibrare GP5 (2s hold) [PRELUARE]
     // Masina non-blocanta cu 3 faze: repaus -> cronometrare -> eliberare
     // --------------------------------------------------------
     if (calib.stage == 3) {

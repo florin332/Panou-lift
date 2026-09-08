@@ -1,8 +1,9 @@
 # ServiceBox - Architecture & Hardware Map
 
-Arhitectura utilizează un Hardware Abstraction Layer (HAL) prin `HardwareInterface`, cu
-compilație condiționată pentru variantele hardware `SERVICEBOX_MARBLE` și
-`SERVICEBOX_WAVESHARE`.
+Arhitectura utilizează compilare condiționată pentru variantele hardware
+`SERVICEBOX_MARBLE` și `SERVICEBOX_WAVESHARE`. Accesul la hardware este
+implementat per-target direct în `service_box/src/main.cpp` (HAL-ul abstract
+a fost eliminat pe branch-ul `graphic_ui`).
 
 ---
 
@@ -41,14 +42,28 @@ Status: **TESTED - OK**
 
 ## 1.3 SD Card
 
+Bus:
+
+`SPI0`
+
 Status: **NOT TESTED**
 
-- [ ] SD_CS   = GP5
-- [ ] SD_MOSI = GP3
-- [ ] SD_MISO = GP4
-- [ ] SD_SCLK = GP6
+Pinii sunt conectați fizic pe placă (conform documentației Marble Pico):
 
-## 1.4 USB / UF2
+- [ ] SD_CS   = GP17  (DAT3/CD, chip select)
+- [ ] SD_MOSI = GP19  (CMD, SPI0 TX)
+- [ ] SD_MISO = GP16  (DAT0, SPI0 RX)
+- [ ] SD_SCLK = GP18  (CLK, SPI0 SCK)
+- [ ] SD_DETECT = GP22 (SD switch / card detect; se separă LED-ul onboard)
+- DAT1, DAT2 = liberi (nefolosiți în modul SPI)
+
+## 1.4 Buton recalibrare touch
+
+Status: **TESTED - OK**
+
+- [X] RECALIB_BUTTON = GP5  (INPUT_PULLUP, activ LOW; ținut 2s -> recalibrare)
+
+## 1.5 USB / UF2
 
 Status: **NOT TESTED**
 
@@ -106,7 +121,7 @@ Status: **TESTED/ OK**
 
 Bus:
 
-`I2C0`
+`I2C1`
 
 Status: **NOT TESTED**
 
@@ -128,12 +143,18 @@ Status: **NOT TESTED**
 - [ ] SD_MISO = GP12
 - [ ] SD_SCLK = GP10
 
-## 2.5 UART / RS485
+## 2.5 Buton recalibrare touch
+
+Status: **TESTED - OK**
+
+- [X] RECALIB_BUTTON = GP29  (INPUT_PULLUP, activ LOW; ținut 2s -> recalibrare)
+
+## 2.6 UART / RS485
 
 Status: **NOT TESTED**
 
-> UART pin mapping is not currently defined in `HardwareInterface.h`.
-> Do not assume a pin mapping here until it is explicitly defined in the HAL.
+> UART pin mapping is not currently defined in the implementation.
+> Do not assume a pin mapping here until it is explicitly defined.
 
 - [ ] TX = TBD
 - [ ] RX = TBD
@@ -170,7 +191,7 @@ Status:
 
 Touch and IMU share the same I2C bus.
 
-### I2C0 signals
+### I2C1 signals
 
 - SDA = GP6
 - SCL = GP7
@@ -187,7 +208,7 @@ Touch and IMU share the same I2C bus.
 
 Status:
 
-- [ ] Touch tested
+- [x] Touch tested
 - [ ] IMU tested
 - [ ] Touch + IMU simultaneous operation tested
 
@@ -198,21 +219,21 @@ Status:
 ## Waveshare
 
 - [x] LCD / Display
-- [ ] Touch
+- [x] Touch
 - [ ] SD Card
 - [ ] Battery measurement
 - [ ] Charging detection
 - [ ] RS485
 - [ ] IMU
-- [ ] LCD + Touch
+- [x] LCD + Touch
 - [ ] LCD + SD
 - [ ] LCD + Touch + SD
 - [ ] Full peripheral integration
 
 ## Marble Pico
 
-- [ ] LCD / Display
-- [ ] Touch
+- [x] LCD / Display
+- [x] Touch
 - [ ] SD Card
 - [ ] Battery measurement
 - [ ] Charging detection
@@ -225,11 +246,12 @@ Status:
 
 # 5. Source of Truth
 
-The GPIO definitions in this document must remain synchronized with:
+The GPIO definitions in this document must remain synchronized with the
+implementation in:
 
-`service_box/src/hal/HardwareInterface.h`
+`service_box/src/main.cpp`
 
-Current GPIO definitions are taken directly from the HAL header.
+(sections `#if defined(SERVICEBOX_MARBLE)` / `#if defined(SERVICEBOX_WAVESHARE)`).
 
 Do not mark a hardware function as tested merely because its GPIO mapping,
 driver or initialization code exists.
@@ -239,4 +261,5 @@ target hardware.
 
 Current confirmed hardware:
 
-**Waveshare LCD only.**
+**Waveshare: LCD + Touch (incl. recalibration button GP29).**
+**Marble: LCD + Touch (incl. recalibration button GP5).**

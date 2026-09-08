@@ -680,48 +680,34 @@ The agent must NOT modify protected documentation merely to resolve a proposal.
 
 ---
 
-### AP-001 — Waveshare / Buton recalibrare GP29 nedefinit in hardware_map.md
+### AP-001 — Butoane recalibrare touch (GP29 Waveshare / GP5 Marble)
 
-- **Status:** OPEN
-- **Affected area:** src/main.cpp (branch graphic_ui) / hardware_map.md §2
-- **Finding:**
-  Portarile din wv_2350_lcd / tester_port (Waveshare) si tester-touch-lcd /
-  corectii_cod (Marble) folosesc GP29 ca buton hardware de recalibrare touch
-  (tinut apasat 2s -> flux calibrare axe). GP29 NU apare in hardware_map.md
-  (nici la §2 Waveshare, nici la §1 Marble) si nu este atribuit niciunei
-  alte functii documentate.
-- **Why it matters:**
-  hardware_map.md este documentul autoritar pentru asignari GPIO. Orice pin
-  folosit de cod trebuie sa fie documentat acolo.
-- **Affected documentation:** hardware_map.md (document protejat - nemodificat)
-- **Possible resolution:**
-  1. Se adauga GP29 (buton recalibrare, activ LOW, INPUT_PULLUP) in
-     hardware_map.md §2 Waveshare;
-  2. Sau se renunta la butonul hardware si recalibrarea se face doar din meniu.
-- **Does it block the current task:** NO (codul compileaza; pinul nu intra in
-  conflict cu nicio asignare documentata)
-- **Decision:** human decision required
+- **Status:** IMPLEMENTED
+- **Affected area:** src/main.cpp / hardware_map.md §1.4 si §2.5
+- **Resolution applied:**
+  hardware_map.md a fost actualizat (cu acordul proprietarului): butonul
+  de recalibrare este documentat la §1.4 (Marble, GP5) si §2.5 (Waveshare,
+  GP29), ambele TESTED-OK. Ambele sunt INPUT_PULLUP, activ LOW, 2s hold.
+- **Finding (istoric):**
+  Pinii GP29 (Waveshare) si GP5 (Marble) folositi pentru butonul de
+  recalibrare nu apareaau in hardware_map.md si nu erau atribuiti altei
+  functii documentate.
+- **Decision:** rezolvat - documentatie actualizata si validata hardware
 
 ---
 
 ### AP-002 — Waveshare / Discrepanta denumire bus I2C (I2C0 vs i2c1)
 
-- **Status:** OPEN
-- **Affected area:** hardware_map.md §3.2 vs src/bsp/bsp_i2c.h
-- **Finding:**
-  hardware_map.md §3.2 denumeste busul Touch+IMU "I2C0" (SDA=GP6, SCL=GP7),
-  insa BSP-ul portat (bsp_i2c.h) foloseste instanta `i2c1` pe aceiasi pini.
-  Functionalitatea touch este validata pe hardware cu i2c1 (tester_port,
-  commit "tested-ok").
-- **Why it matters:**
-  Denumirea instantei I2C din documentatia protejata nu corespunde
-  implementarii validate fizic.
-- **Affected documentation:** hardware_map.md (document protejat - nemodificat)
-- **Possible resolution:**
-  1. Se corecteaza hardware_map.md: "I2C0" -> "I2C1" in §3.2 (si §2.2/§2.3);
-  2. Sau se schimba BSP-ul pe i2c0 (nerecomandat - contrazice testul fizic).
-- **Does it block the current task:** NO
-- **Decision:** human decision required
+- **Status:** IMPLEMENTED
+- **Affected area:** hardware_map.md §2.3 si §3.2
+- **Resolution applied:**
+  hardware_map.md corectat: "I2C0" -> "I2C1" in §2.3 (IMU) si §3.2
+  (Touch+IMU), conform implementarii validate fizic (bsp_i2c.h, i2c1,
+  GP6/GP7). Solutia 1 din variantele de mai jos.
+- **Finding (istoric):**
+  hardware_map.md §3.2 denumea busul Touch+IMU "I2C0", insa BSP-ul portat
+  (bsp_i2c.h) foloseste instanta `i2c1` pe aceiasi pini, validata hardware.
+- **Decision:** rezolvat - documentatie corectata conform validarii hardware
 
 ---
 
@@ -773,23 +759,18 @@ The agent must NOT modify protected documentation merely to resolve a proposal.
 
 ### AP-005 — Marble / Conflict intern hardware_map.md: GP6 = TFT_DC si SD_SCLK
 
-- **Status:** OPEN
-- **Affected area:** hardware_map.md §1.1 vs §1.3
-- **Finding:**
-  hardware_map.md §1.1 asigneaza GP6 pentru LCD TFT_DC, iar §1.3 asigneaza
-  acelasi GP6 pentru SD_SCLK. Cele doua functii nu pot coexista pe acelasi
-  pin. Implementarea LCD/touch Marble (validata hardware, atat in vechiul
-  HAL cat si in tester-touch-lcd) foloseste GP6 ca TFT_DC. SD pe Marble
-  este NOT TESTED si nu este folosit pe acest branch.
-- **Why it matters:**
-  La viitoarea integrare SD pe Marble, asignarea documentata intra in
-  conflict direct cu LCD-ul functional.
-- **Affected documentation:** hardware_map.md (document protejat - nemodificat)
-- **Possible resolution:**
-  1. Se corecteaza §1.3 cu un pin SD_SCLK liber (de verificat pe placa);
-  2. Sau se confirma ca SD nu va fi folosit pe Marble si se marcheaza ca atare.
-- **Does it block the current task:** NO (SD nu este in scopul acestui branch)
-- **Decision:** human decision required
+- **Status:** IMPLEMENTED
+- **Affected area:** hardware_map.md §1.3
+- **Resolution applied:**
+  hardware_map.md §1.3 rescris cu pinii fizici reali ai slotului SD de pe
+  placa Marble Pico (conform documentatiei placi): CS=GP17, MOSI=GP19,
+  MISO=GP16, SCK=GP18 (toti pe SPI0), card detect=GP22. Conflictul cu GP6
+  (TFT_DC) a disparut; GP5 a ramas liber pentru butonul de recalibrare.
+  SD ramane NOT TESTED.
+- **Finding (istoric):**
+  Vechea asignare §1.3 (SD_SCLK=GP6) intra in conflict direct cu TFT_DC=GP6
+  si cu butonul de recalibrare (GP5). Pinii erau generici, nu cei fizici.
+- **Decision:** rezolvat - documentatie actualizata cu pinii fizici reali
 
 ---
 
