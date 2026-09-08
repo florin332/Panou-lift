@@ -10,8 +10,10 @@
 //     portate din wv_2350_lcd / branch tester_port (secțiuni [PORTABLE],
 //     validate pe hardware: "tested-ok").
 //
-//   SERVICEBOX_MARBLE = PROVIZORIU simulator Serial (src/sim/)
-//     pana la integrarea driverelor Marble de pe branch-ul hardware dedicat.
+//   SERVICEBOX_MARBLE = hardware REAL
+//     LCD ILI9341 (SPI1) + touch XPT2046 (SPI1, magistrala comuna) +
+//     calibrare touch in EEPROM, portate din tester-touch-lcd /
+//     branch corectii_cod (doar Model 1 BlueTab, sectiuni [PRELUARE]).
 //
 // Structura paginilor implementate:
 //   PAGE_START      - ecranul de pornire (titlu + buton START + status SD)
@@ -474,25 +476,365 @@ void inputUpdate()
 #elif defined(SERVICEBOX_MARBLE)
 
 // ============================================================
-// MARBLE PICO - PROVIZORIU simulator Serial
-// Driverele reale Marble (ILI9341 + XPT2046) se integreaza
-// de pe branch-ul hardware dedicat. Vezi src/sim/.
+// MARBLE PICO - HARDWARE REAL (Model 1 - Blue Tab)
+// Port din tester-touch-lcd / corectii_cod, sectiunile [PRELUARE].
+// HAL-ul testerului (lib/TesterHAL) NU este preluat - doar logica
+// Model 1 BlueTab, inline aici. Pinii coincid cu hardware_map.md §1.1/§1.2.
 // ============================================================
 
-#include "sim/MenuSimulator.h"
+#include <SPI.h>
+#include <EEPROM.h>
+#include <string.h>
 
-#define LCD_WIDTH  SIM_SCREEN_WIDTH   // PROVIZORIU
-#define LCD_HEIGHT SIM_SCREEN_HEIGHT  // PROVIZORIU
+#include <Adafruit_GFX.h>
+#include <Adafruit_ILI9341.h>
+#include <XPT2046_Touchscreen.h>
 
-// Input unificat - Marble (PROVIZORIU: touch simulat prin Serial)
-void inputUpdate()
-{
-    simTouch.update(); // PROVIZORIU
+// ---------------- LCD pins [PRELUARE - Model 1 BlueTab] ----------------
+// Coincid cu hardware_map.md §1.1 (LCD ILI9341)
+static const int8_t PIN_TFT_CS   = 13;
+static const int8_t PIN_TFT_RST  = 14;
+static const int8_t PIN_TFT_DC   = 6;
+static const int8_t PIN_TFT_MOSI = 11;
+static const int8_t PIN_TFT_LED  = 4;
+static const int8_t PIN_TFT_SCK  = 10;
+static const int8_t PIN_TFT_MISO = 12;
+
+// Touch XPT2046 - coincid cu hardware_map.md §1.2
+static const int8_t PIN_TCH_CS   = 9;
+static const int8_t PIN_TCH_IRQ  = 8;
+
+// ---------------- LCD geometry ----------------
+#define LCD_WIDTH  240
+#define LCD_HEIGHT 320
+
+// ---------------- Buton recalibrare [PRELUARE - modificat la GP29] ---------
+// NOTA: GP29 nu figureaza in hardware_map.md - vezi todo.md / Agent Proposals
+#define RECALIB_BUTTON 29
+
+// ---------------- Praguri touch si calibrare [PRELUARE] --------------------
+#define Z_TOUCH_MIN   200
+#define Z_SAMPLE_MIN  300
+#define CALIB_MAGIC   0x544C4344  // calibrare proprie acestui model
+#define CALIB_VER     6
+
+// ---------------- Structura calibrare [PRELUARE] ---------------------------
+// Impachetata: layout determinist in EEPROM, fara padding
+struct __attribute__((packed)) CalibData {
+    uint32_t magic;
+    uint16_t version;
+    int32_t xmin, xmax, ymin, ymax;
+    uint8_t swapXY, invX, invY, stage;
+};
+
+CalibData calib;
+
+// Masina de stari calibrare: stage 1=orientare X, 4=orientare Y,
+// 2=4 puncte, 3=calibrat complet
+int calibPointIndex = 0;
+int32_t calibX[4], calibY[4];
+
+// Poarta non-blocanta: ignora touch pana la eliberare completa
+bool awaitingRelease = false;
+unsigned long releaseSince = 0;
+
+// Stare non-blocanta colectare esantioane calibrare
+enum CollectState { COLLECT_IDLE, COLLECT_SAMPLING };
+CollectState collectState = COLLECT_IDLE;
+int32_t calibSamplesX[12], calibSamplesY[12];
+int sampleCount = 0;
+
+// Timeout asteptare atingere punct calibrare
+unsigned long calibIdleSince = 0;
+const unsigned long CALIB_POINT_TIMEOUT_MS = 10000;
+
+// Esantioane detectie directie swipe (etapele de orientare)
+int32_t swipeStartX[2], swipeStartY[2];
+int32_t swipeEndX[2], swipeEndY[2];
+int swipeCount = 0;
+
+// ---------------- Instante drivere (specifice acestui model) ----------------
+// NOTA: biblioteca locala lib/XPT2046_Touchscreen primeste magistrala SPI
+// prin constructor (modificare locala existenta) - patternul validat in
+// vechiul HardwareMarble: XPT2046_Touchscreen ts(CS, IRQ, &SPI1)
+static Adafruit_ILI9341 tft(&SPI1, PIN_TFT_DC, PIN_TFT_CS, PIN_TFT_RST);
+static XPT2046_Touchscreen ts(PIN_TCH_CS, PIN_TCH_IRQ, &SPI1);
+
+Adafruit_GFX &display = tft;
+
+// Valori brute default de calibrare (pana la prima calibrare)
+#define DEF_XMIN 3700
+#define DEF_XMAX 370
+#define DEF_YMIN 300
+#define DEF_YMAX 3700
+
+// ============================================================
+// Init hardware [PRELUARE - din LcdModel1_BlueTab.cpp]
+// ============================================================
+void halDisplayInit() {
+    pinMode(PIN_TFT_CS, OUTPUT);
+    digitalWrite(PIN_TFT_CS, HIGH);
+
+    pinMode(PIN_TFT_LED, OUTPUT);
+    digitalWrite(PIN_TFT_LED, HIGH);   // backlight ON
+
+    SPI1.setTX(PIN_TFT_MOSI);
+    SPI1.setSCK(PIN_TFT_SCK);
+    SPI1.setRX(PIN_TFT_MISO);
+    SPI1.begin();
+
+    SPI1.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+    SPI1.endTransaction();
+
+    tft.begin();
+    tft.invertDisplay(true);   // Model 1 Blue Tab
+    tft.setRotation(0);
 }
 
-// PROVIZORIU - no-op pe Marble; pe Waveshare asteapta eliberarea degetului
+void halTouchInit() {
+    pinMode(PIN_TCH_CS, OUTPUT);
+    digitalWrite(PIN_TCH_CS, HIGH);
+
+    pinMode(PIN_TCH_IRQ, INPUT_PULLUP);
+
+    ts.begin();          // magistrala SPI1 configurata din constructor
+    ts.setRotation(0);
+}
+
+// Selectie/deselectie chip display (izolare pe magistrala comuna)
+void halDisplaySelect()   { digitalWrite(PIN_TFT_CS, LOW); }
+void halDisplayDeselect() { digitalWrite(PIN_TFT_CS, HIGH); }
+
+// Citire punct touch, cu izolarea display-ului gestionata intern
+struct HalTouchPoint {
+    int32_t x, y, z;
+    bool pressed;
+};
+
+HalTouchPoint halTouchRead() {
+    HalTouchPoint hp;
+
+    digitalWrite(PIN_TFT_CS, HIGH);   // izoleaza display-ul
+    digitalWrite(PIN_TCH_CS, LOW);
+
+    TS_Point p = ts.getPoint();
+
+    digitalWrite(PIN_TCH_CS, HIGH);
+
+    hp.x = p.x;
+    hp.y = p.y;
+    hp.z = p.z;
+    hp.pressed = (p.z > Z_TOUCH_MIN);
+    return hp;
+}
+
+bool halTouchIrqActive() {
+    return digitalRead(PIN_TCH_IRQ) == LOW;
+}
+
+// ============================================================
+// Functii de baza touch si mapare [PRELUARE]
+// ============================================================
+int safeMap(int v, int fl, int fh, int tl, int th) {
+    if (fh == fl) {
+        return tl;  // Protectie la diviziune cu zero (calibrare corupta)
+    }
+    return tl + (v - fl) * (th - tl) / (fh - fl);
+}
+
+void loadCalib() {
+    EEPROM.begin(64);
+    EEPROM.get(0, calib);
+
+    if (calib.magic != CALIB_MAGIC || calib.version != CALIB_VER) {
+        calib.magic   = 0;
+        calib.xmin    = DEF_XMIN;
+        calib.xmax    = DEF_XMAX;
+        calib.ymin    = DEF_YMIN;
+        calib.ymax    = DEF_YMAX;
+        calib.swapXY  = 0;
+        calib.invX    = 0;
+        calib.invY    = 0;
+        calib.stage   = 3;
+    }
+}
+
+bool saveCalib() {
+    calib.magic   = CALIB_MAGIC;
+    calib.version = CALIB_VER;
+    EEPROM.put(0, calib);
+    return EEPROM.commit();
+}
+
+void forceReboot() {
+    delay(500);
+    rp2040.reboot();
+}
+
+void processRawTouch(int32_t rx, int32_t ry, int32_t &cx, int32_t &cy, bool useConfig) {
+    cx = rx;
+    cy = ry;
+
+    if (useConfig && calib.swapXY) {
+        int32_t t = cx;
+        cx = cy;
+        cy = t;
+    }
+
+    if (useConfig && calib.invX) {
+        cx = 4095 - cx;
+    }
+
+    if (useConfig && calib.invY) {
+        cy = 4095 - cy;
+    }
+}
+
+void mapTouch(int32_t rx, int32_t ry, int &ox, int &oy) {
+    int32_t cx, cy;
+    processRawTouch(rx, ry, cx, cy, true);
+
+    ox = constrain(safeMap(cx, calib.xmin, calib.xmax, 0, LCD_WIDTH - 1), 0, LCD_WIDTH - 1);
+    oy = constrain(safeMap(cy, calib.ymin, calib.ymax, 0, LCD_HEIGHT - 1), 0, LCD_HEIGHT - 1);
+}
+
+// ============================================================
+// Functii desenare [PRELUARE - doar drawCrosshair]
+// ============================================================
+void drawCrosshair(int cx, int cy, uint16_t clr) {
+    halDisplaySelect();
+
+    display.drawCircle(cx, cy, 10, clr);
+    display.drawLine(cx - 16, cy, cx - 6, cy, clr);
+    display.drawLine(cx + 6, cy, cx + 16, cy, clr);
+    display.drawLine(cx, cy - 16, cx, cy - 6, clr);
+    display.drawLine(cx, cy + 6, cx, cy + 16, clr);
+    display.fillCircle(cx, cy, 2, clr);
+
+    halDisplayDeselect();
+}
+
+// ============================================================
+// Ecrane calibrare [PRELUARE]
+// Pozitii crosshair-uri (25/215 X, 85/300 Y) legate de formula
+// de extrapolare din finalul etapei 2 - NU se schimba.
+// ============================================================
+void renderPageOrientX() {
+    halDisplaySelect();
+
+    display.fillScreen(0x0000); // BLACK
+
+    display.setCursor(10, 12);
+    display.setTextColor(0x07FF); // CYAN
+    display.setTextSize(2);
+    display.println("LINIA 1/2: ORIZONTALA");
+
+    display.setTextSize(1);
+    display.setTextColor(0xFFFF); // WHITE
+    display.setCursor(10, 45);
+    display.println("Trageti o linie dreapta continuu");
+    display.setCursor(10, 58);
+    display.println("de la STANGA la DREAPTA pe ecran.");
+
+    display.setTextSize(2);
+    display.setTextColor(0xFFE0); // YELLOW
+
+    // Sageata orizontala (dublu contur)
+    display.drawLine(40,  150, 180, 150, 0xFFE0);
+    display.drawLine(40,  151, 180, 151, 0xFFE0);
+    display.drawLine(160, 130, 180, 151, 0xFFE0);
+    display.drawLine(160, 131, 180, 152, 0xFFE0);
+    display.drawLine(160, 171, 180, 151, 0xFFE0);
+    display.drawLine(160, 170, 180, 150, 0xFFE0);
+
+    halDisplayDeselect();
+}
+
+void renderPageOrientY() {
+    halDisplaySelect();
+
+    display.fillScreen(0x0000);
+
+    display.setCursor(10, 12);
+    display.setTextColor(0x07FF);
+    display.setTextSize(2);
+    display.println("LINIA 2/2: VERTICALA");
+
+    display.setTextSize(1);
+    display.setTextColor(0xFFFF);
+    display.setCursor(10, 45);
+    display.println("Trageti o linie dreapta continuu");
+    display.setCursor(10, 58);
+    display.println("de SUS in JOS pe ecran.");
+
+    // Sageata verticala (dublu contur)
+    display.drawLine(120, 100, 120, 220, 0xFFE0);
+    display.drawLine(121, 100, 121, 220, 0xFFE0);
+    display.drawLine(100, 200, 120, 220, 0xFFE0);
+    display.drawLine(101, 200, 121, 220, 0xFFE0);
+    display.drawLine(140, 200, 120, 220, 0xFFE0);
+    display.drawLine(139, 200, 119, 220, 0xFFE0);
+
+    halDisplayDeselect();
+}
+
+void renderCalibPointScreen(int idx) {
+    halDisplaySelect();
+
+    display.fillScreen(0x0000);
+
+    display.setCursor(10, 10);
+    display.setTextColor(0x07FF);
+    display.setTextSize(2);
+    display.print("PAS 2: COORDONATE ");
+    display.print(idx + 1);
+    display.println("/4");
+
+    halDisplayDeselect();
+
+    const int TX[] = {25, 215, 215, 25};
+    const int TY[] = {85, 85, 300, 300};
+
+    for (int i = 0; i < idx; i++) {
+        drawCrosshair(TX[i], TY[i], 0x7BEF); // DARKGREY
+    }
+
+    drawCrosshair(TX[idx], TY[idx], 0xFFE0); // YELLOW
+}
+
+// ============================================================
+// Input unificat - Marble (touch real XPT2046)
+// ============================================================
+// Variabile touch expuse codului comun
+// O singura citire SPI per iteratie de loop; valorile brute (raw) sunt
+// refolosite de etapele de calibrare, cele mapate (pixeli) de UI.
+static int32_t marbleRawX = 0, marbleRawY = 0, marbleRawZ = 0;
+static bool    marblePressed = false;
+static int     marbleTouchX = 0;
+static int     marbleTouchY = 0;
+
+void inputUpdate()
+{
+    HalTouchPoint pt = halTouchRead();
+
+    marbleRawX    = pt.x;
+    marbleRawY    = pt.y;
+    marbleRawZ    = pt.z;
+    marblePressed = pt.pressed;
+
+    // Mapare in pixeli doar cand calibrarea este completa
+    if (marblePressed && calib.stage == 3) {
+        mapTouch(pt.x, pt.y, marbleTouchX, marbleTouchY);
+    }
+}
+
+// Asteapta eliberarea degetului (echivalent functional cu varianta
+// Waveshare; folosit de handler-ele de butoane din UI)
 void waitTouchRelease()
 {
+    while (halTouchRead().pressed) {
+        delay(10);
+    }
 }
 
 #endif // target selection
@@ -513,7 +855,7 @@ enum UiPage {
 #if defined(SERVICEBOX_WAVESHARE)
 Adafruit_GFX& activeDisplay = display;
 #else
-Adafruit_GFX& activeDisplay = simDisplay; // PROVIZORIU - simulator pe Marble
+Adafruit_GFX& activeDisplay = display; // Marble: ILI9341 real (tft)
 #endif
 
 // Pagina START (implementata anterior, decuplata de HAL)
@@ -630,18 +972,56 @@ void setup() {
 #elif defined(SERVICEBOX_MARBLE)
 
     // --------------------------------------------------------
-    // MARBLE: PROVIZORIU simulator (pana la integrarea driverelor reale)
+    // MARBLE: initializare hardware real (Model 1 BlueTab) [PRELUARE]
     // --------------------------------------------------------
+
+    // Buton recalibrare (GP29, INPUT_PULLUP, activ LOW)
+    pinMode(RECALIB_BUTTON, INPUT_PULLUP);
+
+    // Incarcare calibrare din EEPROM
+    loadCalib();
+
+    // Init hardware (pini, SPI1, display, touch)
+    halDisplayInit();
+    halTouchInit();
+    delay(50);
+
+    // CRITIC: Curatarea fortata (flush) a bufferului tactil rezidual
+    // inainte de a evalua stadiul - fara asta, la pornire pot aparea
+    // atingeri fantoma care declanseaza etape gresite
+    for (int i = 0; i < 5; i++) {
+        halTouchRead();
+        delay(20);
+    }
+
     Serial.println();
     Serial.println("==============================================");
-    Serial.println("Service Box - graphic_ui / MARBLE PICO");
-    Serial.println("Display/touch SIMULATE - PROVIZORIU");
-    Serial.println("Touch simulat prin Serial:");
-    Serial.println("  t <x> <y>  = apasare la coordonate");
-    Serial.println("  up         = eliberare");
+    Serial.println("Service Box - graphic_ui / MARBLE PICO (real)");
+    Serial.print("Calibrare: stage=");
+    Serial.print(calib.stage);
+    Serial.print(" swapXY=");
+    Serial.print(calib.swapXY);
+    Serial.print(" invX=");
+    Serial.print(calib.invX);
+    Serial.print(" invY=");
+    Serial.println(calib.invY);
     Serial.println("==============================================");
 
-    startupScreen.init();
+    // Reluarea etapei de calibrare dupa reboot
+    // (procedura trece prin reboot-uri intre etape)
+    if (calib.stage == 1) {
+        renderPageOrientX();
+    }
+    else if (calib.stage == 4) {
+        renderPageOrientY();
+    }
+    else if (calib.stage == 2) {
+        calibPointIndex = 0;
+        renderCalibPointScreen(0);
+    }
+    else {
+        startupScreen.init();
+    }
 
 #endif
 }
@@ -650,6 +1030,9 @@ void setup() {
 // Loop principal
 // ============================================================================
 void loop() {
+
+    // Citire input - o singura data per iteratie de loop
+    inputUpdate();
 
 #if defined(SERVICEBOX_WAVESHARE)
 
@@ -711,21 +1094,239 @@ void loop() {
     // stage == 3: mod normal - buton recalibrare are prioritate
     checkRecalibButton();
 
-#endif // SERVICEBOX_WAVESHARE
+#elif defined(SERVICEBOX_MARBLE)
 
     // --------------------------------------------------------
-    // Input unificat (touch real pe Waveshare / simulat pe Marble)
+    // MARBLE: flux calibrare (stage 1/4/2) - are prioritate [PRELUARE]
+    // Foloseste ultima citire touch (facuta de inputUpdate() la inceput
+    // de loop) - evitam dubla citire SPI per iteratie.
     // --------------------------------------------------------
-    inputUpdate();
+    HalTouchPoint pt;
+    pt.x = marbleRawX;
+    pt.y = marbleRawY;
+    pt.z = marbleRawZ;
+    bool pressed = marblePressed;
 
+    if (calib.stage == 1) {
+        // PAS 1: swipe orizontal STANGA -> DREAPTA (swapXY + invX)
+        if (pressed) {
+            if (swipeCount < 2) {
+                swipeStartX[swipeCount] = pt.x;
+                swipeStartY[swipeCount] = pt.y;
+            }
+            swipeEndX[0] = swipeEndX[1];
+            swipeEndX[1] = pt.x;
+            swipeEndY[0] = swipeEndY[1];
+            swipeEndY[1] = pt.y;
+            swipeCount++;
+        }
+        else if (swipeCount > 0) {
+            if (swipeCount >= 3) {
+                long diffX = (long)((swipeEndX[0] + swipeEndX[1]) / 2)
+                           - (long)((swipeStartX[0] + swipeStartX[1]) / 2);
+                long diffY = (long)((swipeEndY[0] + swipeEndY[1]) / 2)
+                           - (long)((swipeStartY[0] + swipeStartY[1]) / 2);
+
+                calib.swapXY = (abs(diffX) > abs(diffY)) ? 0 : 1;
+
+                long dominantX = calib.swapXY ? diffY : diffX;
+                calib.invX = (dominantX > 0) ? 0 : 1;
+
+                calib.stage = 4;
+                saveCalib();
+                forceReboot();
+            }
+            swipeCount = 0;
+        }
+        delay(10);
+        return;
+    }
+    else if (calib.stage == 4) {
+        // PAS 4: swipe vertical SUS -> JOS (invY)
+        if (pressed) {
+            if (swipeCount < 2) {
+                swipeStartX[swipeCount] = pt.x;
+                swipeStartY[swipeCount] = pt.y;
+            }
+            swipeEndX[0] = swipeEndX[1];
+            swipeEndX[1] = pt.x;
+            swipeEndY[0] = swipeEndY[1];
+            swipeEndY[1] = pt.y;
+            swipeCount++;
+        }
+        else if (swipeCount > 0) {
+            if (swipeCount >= 3) {
+                long diffX = (long)((swipeEndX[0] + swipeEndX[1]) / 2)
+                           - (long)((swipeStartX[0] + swipeStartX[1]) / 2);
+                long diffY = (long)((swipeEndY[0] + swipeEndY[1]) / 2)
+                           - (long)((swipeStartY[0] + swipeStartY[1]) / 2);
+
+                long dominantY = calib.swapXY ? diffX : diffY;
+                calib.invY = (dominantY > 0) ? 0 : 1;
+
+                calib.stage = 2;
+                saveCalib();
+                forceReboot();
+            }
+            swipeCount = 0;
+        }
+        delay(10);
+        return;
+    }
+    else if (calib.stage == 2) {
+        // PAS 2: atingerea a 4 puncte in colturi (xmin/xmax/ymin/ymax)
+        if (collectState == COLLECT_IDLE) {
+            if (pt.z >= Z_SAMPLE_MIN) {
+                collectState = COLLECT_SAMPLING;
+                sampleCount = 0;
+                calibIdleSince = 0;
+            }
+            else {
+                if (calibIdleSince == 0) {
+                    calibIdleSince = millis();
+                }
+                else if (millis() - calibIdleSince >= CALIB_POINT_TIMEOUT_MS) {
+                    renderCalibPointScreen(calibPointIndex);
+
+                    halDisplaySelect();
+                    display.setCursor(10, 250);
+                    display.setTextSize(1);
+                    display.setTextColor(0xF800, 0x0000); // RED on BLACK
+                    display.print("Timeout! Atingeti din nou punctul. ");
+                    halDisplayDeselect();
+
+                    calibIdleSince = millis();
+                }
+            }
+        }
+        else if (pt.z >= Z_SAMPLE_MIN) {
+            // Colecteaza cate un esantion pe iteratia loop-ului (~10 ms)
+            if (sampleCount < 12) {
+                calibSamplesX[sampleCount] = pt.x;
+                calibSamplesY[sampleCount] = pt.y;
+                sampleCount++;
+            }
+        }
+        else {
+            // Degetul a fost ridicat: finalizeaza punctul curent
+            if (sampleCount >= 5) {
+                int32_t sumX = 0;
+                int32_t sumY = 0;
+                // Media esantioanelor, fara primele/ultimele 2 (margi zgomotoase)
+                for (int i = 2; i < sampleCount - 2; i++) {
+                    sumX += calibSamplesX[i];
+                    sumY += calibSamplesY[i];
+                }
+
+                int32_t mx, my;
+                processRawTouch(sumX / (sampleCount - 4), sumY / (sampleCount - 4), mx, my, true);
+
+                calibX[calibPointIndex] = mx;
+                calibY[calibPointIndex] = my;
+                calibPointIndex++;
+
+                if (calibPointIndex >= 4) {
+                    int32_t loX = calibX[0];
+                    int32_t hiX = calibX[0];
+                    int32_t loY = calibY[0];
+                    int32_t hiY = calibY[0];
+
+                    for (int i = 1; i < 4; i++) {
+                        if (calibX[i] < loX) loX = calibX[i];
+                        if (calibX[i] > hiX) hiX = calibX[i];
+                        if (calibY[i] < loY) loY = calibY[i];
+                        if (calibY[i] > hiY) hiY = calibY[i];
+                    }
+
+                    int32_t deltaX = hiX - loX;
+                    int32_t deltaY = hiY - loY;
+
+                    // Extrapolare la margini (legata de pozitiile crosshair 25/215, 85/300)
+                    calib.xmin = loX - (25 * deltaX) / 190;
+                    calib.xmax = hiX + (25 * deltaX) / 190;
+                    calib.ymin = loY - (85 * deltaY) / 215;
+                    calib.ymax = hiY + (20 * deltaY) / 215;
+
+                    calib.stage = 3;
+                    saveCalib();
+                    forceReboot();
+                }
+                else {
+                    renderCalibPointScreen(calibPointIndex);
+                }
+            }
+            collectState = COLLECT_IDLE;
+        }
+        delay(10);
+        return;
+    }
+
+    // --------------------------------------------------------
+    // MARBLE stage==3: buton recalibrare GP29 (2s hold) [PRELUARE]
+    // Masina non-blocanta cu 3 faze: repaus -> cronometrare -> eliberare
+    // --------------------------------------------------------
+    if (calib.stage == 3) {
+        static uint8_t recalibPhase = 0;
+        static unsigned long recalibStart = 0;
+        bool btnLow = (digitalRead(RECALIB_BUTTON) == LOW);
+
+        if (recalibPhase == 0 && btnLow) {
+            recalibPhase = 1;
+            recalibStart = millis();
+        }
+        else if (recalibPhase == 1) {
+            if (!btnLow) {
+                recalibPhase = 0; // eliberat inainte de 2s
+            }
+            else if (millis() - recalibStart >= 2000) {
+                halDisplaySelect();
+                display.fillScreen(0x7800); // MAROON
+                display.setCursor(15, 120);
+                display.setTextSize(2);
+                display.setTextColor(0xFFFF);
+                display.print("ELIBERATI BUTONUL...");
+                halDisplayDeselect();
+                recalibPhase = 2;
+            }
+        }
+        else if (recalibPhase == 2 && !btnLow) {
+            calib.magic = 0;
+            calib.stage = 1;
+            saveCalib();
+            forceReboot();
+        }
+    }
+
+    // Poarta non-blocanta: dupa o actiune, ignora touch pana la eliberare
+    if (awaitingRelease) {
+        if (pressed) {
+            releaseSince = 0;
+        }
+        else if (releaseSince == 0) {
+            releaseSince = millis();
+        }
+        else if (millis() - releaseSince >= 50) {
+            awaitingRelease = false;
+            releaseSince = 0;
+        }
+
+        if (awaitingRelease) {
+            delay(10);
+            return;
+        }
+    }
+
+#endif // SERVICEBOX_MARBLE
+
+    // Coordonate unificate pentru UI (setate de inputUpdate() la inceput de loop)
 #if defined(SERVICEBOX_WAVESHARE)
     int  currentX       = touch_x;
     int  currentY       = touch_y;
     bool isScreenActive = touch_pressed;
 #else
-    int  currentX       = simTouch.getX();       // PROVIZORIU - Marble
-    int  currentY       = simTouch.getY();       // PROVIZORIU - Marble
-    bool isScreenActive = simTouch.isTouched();  // PROVIZORIU - Marble
+    int  currentX       = marbleTouchX;   // Marble: touch real XPT2046
+    int  currentY       = marbleTouchY;
+    bool isScreenActive = marblePressed;
 #endif
 
     // ========================================================================

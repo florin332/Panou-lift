@@ -685,9 +685,11 @@ The agent must NOT modify protected documentation merely to resolve a proposal.
 - **Status:** OPEN
 - **Affected area:** src/main.cpp (branch graphic_ui) / hardware_map.md §2
 - **Finding:**
-  Portarea din wv_2350_lcd / tester_port foloseste GP29 ca buton hardware de
-  recalibrare touch (tinut apasat 2s -> flux calibrare axe). GP29 NU apare in
-  hardware_map.md si nu este atribuit niciunei alte functii documentate.
+  Portarile din wv_2350_lcd / tester_port (Waveshare) si tester-touch-lcd /
+  corectii_cod (Marble) folosesc GP29 ca buton hardware de recalibrare touch
+  (tinut apasat 2s -> flux calibrare axe). GP29 NU apare in hardware_map.md
+  (nici la §2 Waveshare, nici la §1 Marble) si nu este atribuit niciunei
+  alte functii documentate.
 - **Why it matters:**
   hardware_map.md este documentul autoritar pentru asignari GPIO. Orice pin
   folosit de cod trebuie sa fie documentat acolo.
@@ -725,13 +727,16 @@ The agent must NOT modify protected documentation merely to resolve a proposal.
 
 ### AP-003 — Marble / Simulator temporar pe branch-ul graphic_ui
 
-- **Status:** OPEN
-- **Affected area:** src/sim/, src/main.cpp (environment marble_pico)
+- **Status:** IMPLEMENTED (depasit)
+- **Affected area:** src/sim/ (eliminat), src/main.cpp (environment marble_pico)
 - **Finding:**
-  Dupa eliminarea HAL-ului, environment-ul marble_pico nu mai are drivere
-  reale (ILI9341 + XPT2046) pe acest branch. Pentru a putea compila si testa
-  navigarea meniului, marble_pico foloseste temporar simulatorul Serial din
-  src/sim/ (marcat PROVIZORIU).
+  REZOLVAT: marble_pico foloseste acum drivere reale (ILI9341 + XPT2046),
+  portate din tester-touch-lcd / corectii_cod (doar Model 1 BlueTab,
+  sectiunile [PRELUARE]; HAL-ul testerului nu a fost preluat). src/sim/
+  a fost eliminat; ramane disponibil in istoricul git (commit 5d7e576)
+  daca este nevoie ulterior de simulare.
+  [Istoric] Dupa eliminarea HAL-ului, environment-ul marble_pico nu mai avea
+  drivere reale si folosea temporar simulatorul Serial din src/sim/.
 - **Why it matters:**
   Simulatorul NU este hardware real; functionalitatea Marble nu poate fi
   considerata verificata pe acest branch. Driverele reale trebuie portate
@@ -748,25 +753,42 @@ The agent must NOT modify protected documentation merely to resolve a proposal.
 
 ### AP-004 — Marble / Board ID 'groundstudio_marble_pico' necunoscut
 
-- **Status:** OPEN
-- **Affected area:** platformio.ini [env:marble_pico] / instalare PlatformIO locala
-- **Finding:**
+- **Status:** IMPLEMENTED
+- **Affected area:** platformio.ini [env:marble_pico]
+- **Resolution applied:**
+  [env:marble_pico] a fost comutat de pe platforma stock `raspberrypi` pe
+  platforma comunitara maxgerhardt (`https://github.com/maxgerhardt/
+  platform-raspberrypi.git`) - aceeasi platforma folosita de env:waveshare
+  si de proiectul tester-touch-lcd (validat hardware). Platforma include
+  definitia board-ului groundstudio_marble_pico (RP2040, 133 MHz, 8MB flash).
+  Build marble_pico: SUCCESS (57s). Solutia 2 din variantele de mai jos.
+- **Finding (istoric):**
   La build-ul pe environment-ul marble_pico (branch graphic_ui), PlatformIO
-  raporteaza: `UnknownBoard: Unknown board ID 'groundstudio_marble_pico'`.
-  Eroarea apare INAINTE de compilarea codului - nu este cauzata de modificarile
-  din acest branch. Definitia board-ului lipseste din platforma instalata local.
+  raporta: `UnknownBoard: Unknown board ID 'groundstudio_marble_pico'`.
+  Eroarea aparea INAINTE de compilarea codului. Definitia board-ului lipsea
+  din platforma stock `raspberrypi` instalata local.
+- **Decision:** rezolvat - build verificat pe ambele environment-uri
+
+---
+
+### AP-005 — Marble / Conflict intern hardware_map.md: GP6 = TFT_DC si SD_SCLK
+
+- **Status:** OPEN
+- **Affected area:** hardware_map.md §1.1 vs §1.3
+- **Finding:**
+  hardware_map.md §1.1 asigneaza GP6 pentru LCD TFT_DC, iar §1.3 asigneaza
+  acelasi GP6 pentru SD_SCLK. Cele doua functii nu pot coexista pe acelasi
+  pin. Implementarea LCD/touch Marble (validata hardware, atat in vechiul
+  HAL cat si in tester-touch-lcd) foloseste GP6 ca TFT_DC. SD pe Marble
+  este NOT TESTED si nu este folosit pe acest branch.
 - **Why it matters:**
-  Cerinta pe branch-ul graphic_ui este ca ambele environment-uri sa compileze.
-  Fara definitia board-ului, marble_pico nu poate fi validat nici macar la
-  nivel de build.
-- **Affected documentation:** platformio.ini (nemodificat - decizie de build config)
+  La viitoarea integrare SD pe Marble, asignarea documentata intra in
+  conflict direct cu LCD-ul functional.
+- **Affected documentation:** hardware_map.md (document protejat - nemodificat)
 - **Possible resolution:**
-  1. Se adauga definitia board-ului in proiect: boards/groundstudio_marble_pico.json;
-  2. Sau se instaleaza platforma GroundStudio care include board-ul;
-  3. Sau se schimba board-ul pe un ID generic RP2040 (ex. pico) - necesita
-     verificare hardware (flash size, pini USB).
-- **Does it block the current task:** NO pentru Waveshare; DA pentru validarea
-  build-ului marble_pico
+  1. Se corecteaza §1.3 cu un pin SD_SCLK liber (de verificat pe placa);
+  2. Sau se confirma ca SD nu va fi folosit pe Marble si se marcheaza ca atare.
+- **Does it block the current task:** NO (SD nu este in scopul acestui branch)
 - **Decision:** human decision required
 
 ---
