@@ -3,21 +3,29 @@
 // Unified Color Palette (Hex conversion for ST7789/ILI9341 16-bit RGB565)
 #define COLOR_BACKGROUND 0x0000 // Black
 #define COLOR_TEXT_MAIN  0xFFFF // White
-#define COLOR_TEXT_MUTED 0x7BEF // Gray
+#define COLOR_TEXT_MUTED 0x9DF3 // Gray
 #define COLOR_BTN_BASE   0x1967 // Deep Blue
 #define COLOR_BTN_PUSH   0x341F // Lighter Blue/Cyan accent
 #define COLOR_GREEN      0x07E0 // Bright Green
 #define COLOR_RED        0xF800 // Red
 
-StartupScreen::StartupScreen(Adafruit_GFX* tftInstance) {
-    _tft = tftInstance;
-    _isRendered = false;
-    _buttonPressed = false;
+StartupScreen::StartupScreen(Adafruit_GFX* tftInstance, IBatteryProvider& battery)
+    : _tft(tftInstance)
+    , _battery(battery)
+    , _isRendered(false)
+    , _buttonPressed(false)
+    , _displayedLevel(0xFF)
+    , _displayedCharging(false)
+    , _lastBatteryUpdateMs(0)
+{
 }
 
 void StartupScreen::init() {
     _isRendered = false;
     _buttonPressed = false;
+    _displayedLevel = 0xFF;
+    _displayedCharging = false;
+    _lastBatteryUpdateMs = 0;
 }
 
 void StartupScreen::render(bool forceRedraw) {
@@ -44,6 +52,9 @@ void StartupScreen::render(bool forceRedraw) {
     // Base Interactive Button Render
     drawButton(false);
 
+    // Battery indicator (above SD status, same style as BatteryCheckScreen)
+    drawBatteryInfo();
+
     // Default Storage Row (Will override on runtime update calls)
     updateStorageInfo(0, 0, false);
 
@@ -64,28 +75,75 @@ void StartupScreen::drawButton(bool pressed) {
     _tft->print("START");
 }
 
+void StartupScreen::drawBatteryInfo() {
+    uint8_t level = _battery.getLevelPercent();
+    bool charging = _battery.isCharging();
+
+    // Clear battery display area (between button and SD status, left aligned with SD)
+    _tft->fillRect(10, 266, 220, 20, COLOR_BACKGROUND);
+
+    // Colored indicator dot (same style as SD indicator)
+    uint16_t color = levelToColor(level);
+    if (level == 100 && charging) {
+        color = COLOR_GREEN;
+    }
+    _tft->fillCircle(20, 274, BATTERY_DOT_RADIUS, color);
+
+    // Text aligned with SD status, textSize 1, fixed muted color
+    char percentStr[24];
+    snprintf(percentStr, sizeof(percentStr), "BATTERY LEVEL: %d %%", level);
+    _tft->setTextSize(1);
+    _tft->setTextColor(COLOR_TEXT_MUTED);
+    _tft->setCursor(32, 271);
+    _tft->print(percentStr);
+
+    _displayedLevel = level;
+    _displayedCharging = charging;
+}
+
+uint16_t StartupScreen::levelToColor(uint8_t percent) const {
+    if (percent < LOW_THRESHOLD_PERCENT) {
+        return COLOR_RED;
+    }
+    if (percent < MEDIUM_THRESHOLD_PERCENT) {
+        return COLOR_YELLOW;
+    }
+    return COLOR_GREEN;
+}
+
 void StartupScreen::updateStorageInfo(uint32_t freeMB, uint32_t totalMB, bool cardAvailable) {
     // Overwrite bottom line canvas chunk to avoid flicker artifacts
-    _tft->fillRect(10, 280, 220, 20, COLOR_BACKGROUND);
+    _tft->fillRect(10, 282, 220, 20, COLOR_BACKGROUND);
     _tft->setTextSize(1);
 
     if (cardAvailable) {
         // SD Status Indicator Bullet (Green dot)
-        _tft->fillCircle(20, 288, 4, COLOR_GREEN);
-        _tft->setTextColor(COLOR_TEXT_MAIN);
-        _tft->setCursor(32, 285);
+        _tft->fillCircle(20, 290, 4, COLOR_GREEN);
+        _tft->setTextColor(COLOR_TEXT_MUTED);
+        _tft->setCursor(32, 287);
         _tft->print("SD: " + String(freeMB) + " MB / " + String((float)totalMB / 1000.0, 1) + " GB FREE");
     } else {
         // SD Disconnected Bullet (Red dot)
-        _tft->fillCircle(20, 288, 4, COLOR_RED);
+        _tft->fillCircle(20, 290, 4, COLOR_RED);
         _tft->setTextColor(COLOR_TEXT_MUTED);
-        _tft->setCursor(32, 285);
+        _tft->setCursor(32, 287);
         _tft->print("SD CARD DISCONNECTED / ERROR");
     }
 }
 
 bool StartupScreen::update(int touchX, int touchY, bool isTouched) {
     bool startTriggered = false;
+
+    // Periodic battery update (same interval as BatteryCheckScreen)
+    unsigned long now = millis();
+    if (now - _lastBatteryUpdateMs >= BATTERY_UPDATE_MS) {
+        _lastBatteryUpdateMs = now;
+        uint8_t currentLevel = _battery.getLevelPercent();
+        bool currentCharging = _battery.isCharging();
+        if (currentLevel != _displayedLevel || currentCharging != _displayedCharging) {
+            drawBatteryInfo();
+        }
+    }
 
     if (isTouched) {
         // Evaluate boundary box intersection parameters

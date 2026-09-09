@@ -842,11 +842,17 @@ void waitTouchRelease()
 #endif // target selection
 
 #include "ui/StartupScreen.h"
+#include "ui/BatteryCheckScreen.h"
+
+// STUB / PROVIZORIU pentru testarea Battery Check pe graphic_ui.
+// Se elimină la integrarea implementării reale de baterie.
+#include "battery/BatteryStub.h"
 
 // ============================================================================
 // Pagini UI (comune, independente de hardware)
 // ============================================================================
 enum UiPage {
+    PAGE_BATTERY_CHECK,
     PAGE_START,
     PAGE_DASHBOARD
 };
@@ -860,8 +866,14 @@ Adafruit_GFX& activeDisplay = display;
 Adafruit_GFX& activeDisplay = display; // Marble: ILI9341 real (tft)
 #endif
 
+// STUB / PROVIZORIU pentru testarea Battery Check.
+BatteryStub batteryStub;
+
+// Pagina Battery Check (independentă de implementarea concretă a bateriei)
+BatteryCheckScreen batteryCheckScreen(&activeDisplay, batteryStub);
+
 // Pagina START (implementata anterior, decuplata de HAL)
-StartupScreen startupScreen(&activeDisplay);
+StartupScreen startupScreen(&activeDisplay, batteryStub);
 
 // ============================================================================
 // Pagina DASHBOARD (placeholder - doar desen, fara functionalitate)
@@ -897,7 +909,7 @@ static bool dashboardBackHit(int x, int y, bool touched) {
 // ============================================================================
 // Stare aplicatie
 // ============================================================================
-UiPage currentPage = PAGE_START;
+UiPage currentPage = PAGE_BATTERY_CHECK;
 bool refreshPageNeeded = true;
 
 // ============================================================================
@@ -968,7 +980,9 @@ void setup() {
     }
     else
     {
-        startupScreen.init();
+        // BOOT -> Battery Check (prima pagină UI afișată)
+        batteryStub.begin();
+        batteryCheckScreen.init();
     }
 
 #elif defined(SERVICEBOX_MARBLE)
@@ -1022,7 +1036,9 @@ void setup() {
         renderCalibPointScreen(0);
     }
     else {
-        startupScreen.init();
+        // BOOT -> Battery Check (prima pagină UI afișată)
+        batteryStub.begin();
+        batteryCheckScreen.init();
     }
 
 #endif
@@ -1032,6 +1048,9 @@ void setup() {
 // Loop principal
 // ============================================================================
 void loop() {
+
+    // STUB / PROVIZORIU: procesare comenzi seriale pentru testare baterie.
+    batteryStub.update();
 
     // Citire input - o singura data per iteratie de loop
     inputUpdate();
@@ -1334,7 +1353,29 @@ void loop() {
     // ========================================================================
     // UI APPLICATION STATE MACHINE ROUTING
     // ========================================================================
-    if (currentPage == PAGE_START) {
+    if (currentPage == PAGE_BATTERY_CHECK) {
+
+        // Procesăm întâi logica paginii (touch, timeout, citire baterie),
+        // apoi desenăm. Astfel, o comandă serială care schimbă nivelul este
+        // vizibilă imediat în aceeași iterație de loop.
+        batteryCheckScreen.update(currentX, currentY, isScreenActive);
+
+        if (refreshPageNeeded) {
+            batteryCheckScreen.render(true);
+            refreshPageNeeded = false;
+        }
+        else {
+            batteryCheckScreen.render();
+        }
+
+        if (batteryCheckScreen.shouldAdvance()) {
+            Serial.println("[UI Navigation] Battery Check OK -> PAGE_START");
+            currentPage = PAGE_START;
+            startupScreen.init();
+            refreshPageNeeded = true;
+        }
+    }
+    else if (currentPage == PAGE_START) {
 
         // 1. Initial Frame Base Canvas Render
         if (refreshPageNeeded) {
@@ -1362,6 +1403,7 @@ void loop() {
             Serial.println("[UI Navigation] BACK -> PAGE_START");
             waitTouchRelease();  // Waveshare: evita re-trigger; Marble: no-op
             currentPage = PAGE_START;
+            startupScreen.init();
             refreshPageNeeded = true;
         }
     }

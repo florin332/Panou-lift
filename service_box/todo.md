@@ -242,13 +242,17 @@ Reference: `ui_requirements.md`
 
 ## 4.2 BATTERY CHECK
 
-- [ ] Battery state acquisition
-- [ ] Battery percentage display
-- [ ] Battery status indication
-- [ ] Charging detection
-- [ ] Charging display
-- [ ] Charging hold behaviour
-- [ ] Normal timeout behaviour
+- [x] Battery state acquisition (via IBatteryProvider / BatteryStub)
+- [x] Battery percentage display
+- [x] Battery status indication (LOW/MEDIUM/GOOD colors)
+- [x] Charging detection (via IBatteryProvider / BatteryStub)
+- [x] Charging display
+- [x] Charging hold behaviour
+- [x] Normal timeout behaviour
+- [x] LOW threshold blocks automatic advance
+- [x] MEDIUM/GOOD automatic advance to START after timeout
+- [ ] Physical battery measurement verified
+- [ ] Physical charging detection verified
 
 ## 4.3 CAL PIN / Touch Calibration
 
@@ -771,6 +775,39 @@ The agent must NOT modify protected documentation merely to resolve a proposal.
   Vechea asignare §1.3 (SD_SCLK=GP6) intra in conflict direct cu TFT_DC=GP6
   si cu butonul de recalibrare (GP5). Pinii erau generici, nu cei fizici.
 - **Decision:** rezolvat - documentatie actualizata cu pinii fizici reali
+
+---
+
+### AP-006 — Battery / Pini baterie si detectie incarcare nu sunt documentati
+
+- **Status:** OPEN
+- **Affected area:** src/bsp/bsp_battery.h, src/bsp/bsp_battery.c,
+  hardware_map.md §4 Current Hardware Validation Status
+- **Finding:**
+  BSP-ul existent `bsp_battery.h` defineste pinii:
+  - BSP_BAT_ADC_PIN = 27
+  - BSP_BAT_EN_PIN  = 26
+  - BSP_BAT_KEY_PIN = 25
+  Acesti pini nu sunt documentati in hardware_map.md pentru niciun target.
+  De asemenea, hardware_map.md marcheaza "Battery measurement" si
+  "Charging detection" ca NOT VERIFIED pentru ambele targeturi.
+  Semnificatia pinului BSP_BAT_KEY_PIN (detectie incarcare?) nu este
+  confirmata.
+  In plus, codul existent din `src/bsp/bsp_battery.c` nu este utilizat in
+  `main.cpp`; pentru testarea pe graphic_ui se foloseste un stub controlat
+  prin comenzi seriale (`src/battery/BatteryStub.h/.cpp`).
+- **Why it matters:**
+  Implementarea reala a bateriei pe branch-urile marble/waveshare necesita
+  o harta hardware clara si validata. Pana la clarificare, Battery Check va
+  folosi un stub testabil prin comenzi seriale.
+- **Affected documentation:** hardware_map.md
+- **Possible resolution:**
+  1. Se adauga in hardware_map.md pinii bateriei pentru fiecare target,
+     impreuna cu schema de divizor, ADC si semnal de detectie incarcare;
+  2. Se valideaza fizic masurarea tensiunii si detectia de incarcare pe
+     fiecare target inainte de a inlocui stub-ul.
+- **Does it block the current task:** NO
+- **Decision:** human decision required
 
 ---
 

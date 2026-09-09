@@ -1,0 +1,6 @@
+bat low      -> 10%,  charging=false
+bat medium   -> 40%,  charging=false
+bat good     -> 80%,  charging=false
+bat full     -> 100%, charging=true
+bat charging -> toggle charging (păstrează ultimul %)
+bat status   -> raportează nivel și charging
