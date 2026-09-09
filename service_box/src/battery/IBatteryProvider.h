@@ -4,6 +4,24 @@
 #include <Arduino.h>
 
 // ============================================================================
+// Stare bateriei determinată de Battery Manager (hardware-dependent).
+// UI-ul / sistemul de navigație aplică politica în funcție de această stare.
+//
+//   NORMAL   - nivel suficient (de la MEDIUM la FULL); operațiuni normale.
+//   LOW      - avertizare; nu se pot porni teste noi, dar cele în desfășurare
+//              continuă.
+//   CRITICAL - nivel critic; sistemul întrerupe controlat testele și revine
+//              la Battery Check.
+//   CHARGING - baterie în curs de încărcare.
+// ============================================================================
+enum class BatteryState {
+    NORMAL,
+    LOW,
+    CRITICAL,
+    CHARGING
+};
+
+// ============================================================================
 // Interfață abstractă pentru furnizorul de stare baterie.
 //
 // Pagina BatteryCheckScreen primește o referință la această interfață și nu
@@ -23,6 +41,11 @@ public:
 
     // Returnează true dacă bateria este în curs de încărcare.
     virtual bool isCharging() = 0;
+
+    // Returnează starea discretă a bateriei (NORMAL / LOW / CRITICAL / CHARGING).
+    // Stabilirea stării ține de Battery Manager (hardware-dependent); UI-ul
+    // aplică doar politica asociată stării curente.
+    virtual BatteryState getState() = 0;
 };
 
 #endif // I_BATTERY_PROVIDER_H

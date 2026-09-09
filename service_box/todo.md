@@ -811,6 +811,34 @@ The agent must NOT modify protected documentation merely to resolve a proposal.
 
 ---
 
+### AP-007 — Battery Check UI / Indicator la încărcare completă
+
+- **Status:** OPEN
+- **Affected area:** src/ui/BatteryCheckScreen.h, src/ui/BatteryCheckScreen.cpp
+- **Finding:**
+  S-a identificat necesitatea ca, în pagina Battery Check standby,
+  punctul indicator să rămână aprins continuu sau să clipească cu altă
+  frecvență atunci când bateria este complet încărcată (100% + charging).
+  Momentan indicatorul clipește cu același ritm indiferent de starea de
+  încărcare.
+- **Why it matters:**
+  Afișarea unei diferențe vizuale pentru „încărcare completă” este o
+  îmbunătățire UI clară, dar depinde de capacitatea Battery Manager-ului
+  (hardware-dependent) de a distinge „încărcare în desfășurare” de
+  „încărcare completă”. State-ul curent `BatteryState` conține doar
+  `CHARGING`, nu și un `FULL` explicit.
+- **Possible resolution:**
+  1. Se confirmă de la hardware/Battery Manager dacă se poate obține
+     informația explicită de încărcare completă (de ex. prin `BatteryState::FULL`,
+     sau prin `CHARGING + getLevelPercent() == 100`).
+  2. Dacă semnalul este disponibil, se modifică doar UI-ul în
+     `BatteryCheckScreen` pentru a menține indicatorul verde aprins continuu
+     sau pentru a-i schimba frecvența de clipit în standby.
+- **Does it block the current task:** NO
+- **Decision:** human decision required
+
+---
+
 - `[x]` means the task has actually been completed.
 - Code compilation alone does not make a task complete.
 - Hardware tasks require physical verification on the corresponding target.

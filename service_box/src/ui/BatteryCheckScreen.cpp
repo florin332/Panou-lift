@@ -8,6 +8,9 @@ BatteryCheckScreen::BatteryCheckScreen(Adafruit_GFX* tft, IBatteryProvider& batt
     , _advancePending(false)
     , _lastActivityMs(0)
     , _lastBatteryUpdateMs(0)
+    , _standbyBlinkTimerMs(0)
+    , _standbyBlinkOn(false)
+    , _standbyIndicatorVisible(false)
     , _displayedLevel(0xFF)
     , _displayedCharging(false)
 {
@@ -20,6 +23,9 @@ void BatteryCheckScreen::init()
     _advancePending = false;
     _lastActivityMs = millis();
     _lastBatteryUpdateMs = 0;
+    _standbyBlinkTimerMs = 0;
+    _standbyBlinkOn = false;
+    _standbyIndicatorVisible = false;
     _displayedLevel = 0xFF;
     _displayedCharging = false;
 }
@@ -34,14 +40,19 @@ void BatteryCheckScreen::render(bool forceRedraw)
         _isRendered = true;
     }
     else {
-        // Stare stinsă: doar punct indicator, fără re-redare continuă.
-        // Dacă s-a schimbat nivelul, re-desenăm indicatorul.
+        // Stare standby: clipitul este gestionat de update() (timing).
+        // Aici redesenăm doar dacă nivelul sau starea de încărcare s-a
+        // schimbat între două apeluri update() (caz defensiv).
         uint8_t currentLevel = _battery.getLevelPercent();
         bool currentCharging = _battery.isCharging();
-        if (currentLevel != _displayedLevel || currentCharging != _displayedCharging) {
-            drawIndicator();
+
+        bool batteryChanged = (currentLevel != _displayedLevel) ||
+                              (currentCharging != _displayedCharging);
+
+        if (batteryChanged) {
             _displayedLevel = currentLevel;
             _displayedCharging = currentCharging;
+            drawStandbyContent();
         }
     }
 }
@@ -71,29 +82,40 @@ bool BatteryCheckScreen::update(int touchX, int touchY, bool isTouched)
         if (currentLevel != _displayedLevel || currentCharging != _displayedCharging) {
             _isRendered = false;  // Forțează re-desenare cu noile valori.
 
-            // Dacă ecranul este stins, re-desenăm indicatorul imediat.
+            _displayedLevel = currentLevel;
+            _displayedCharging = currentCharging;
+
+            // Dacă ecranul este în standby, re-desenăm conținutul standby
+            // pentru a reflecta noul nivel imediat.
             if (!_screenOn) {
-                drawIndicator();
-                _displayedLevel = currentLevel;
-                _displayedCharging = currentCharging;
+                _standbyBlinkTimerMs = now;
+                _standbyBlinkOn = true;
+                _standbyIndicatorVisible = true; // punctul pornește aprins
+                drawStandbyContent();
             }
         }
     }
 
+    // Clipitul standby avansează aici (logică de timing), nu în render().
+    // Astfel nu depindem de faptul că main.cpp apelează render() în fiecare
+    // iterație de loop cât ecranul este în standby.
+    if (!_screenOn && updateStandbyBlinkPhase()) {
+        drawStandbyContent();
+    }
+
     // Timeout de 5 secunde fără atingere.
     if (_screenOn && (now - _lastActivityMs >= SCREEN_ON_TIMEOUT_MS)) {
-        BatteryLevelState levelState = evaluateLevel(_battery.getLevelPercent());
-        bool charging = _battery.isCharging();
+        BatteryState state = _battery.getState();
 
-        if (charging || levelState == BatteryLevelState::LOW) {
-            // LOW sau CHARGING: rămâne în Battery Check, doar stinge ecranul.
+        if (state == BatteryState::NORMAL) {
+            // Nivel suficient: avansare automată către START.
+            _advancePending = true;
+        }
+        else {
+            // LOW, CRITICAL sau CHARGING: rămâne în Battery Check.
             _screenOn = false;
             _isRendered = false;
             clearScreenKeepIndicator();
-        }
-        else {
-            // MEDIUM/GOOD: avansare automată către START.
-            _advancePending = true;
         }
     }
 
@@ -103,6 +125,40 @@ bool BatteryCheckScreen::update(int touchX, int touchY, bool isTouched)
 bool BatteryCheckScreen::shouldAdvance() const
 {
     return _advancePending;
+}
+
+// Actualizează faza de clipit în standby. Returnează true dacă s-a schimbat
+// starea vizibilă a indicatorului (aprins/stins).
+bool BatteryCheckScreen::updateStandbyBlinkPhase()
+{
+    unsigned long now = millis();
+    unsigned long elapsed = now - _standbyBlinkTimerMs;
+
+    bool newVisible = _standbyIndicatorVisible;
+
+    if (_standbyBlinkOn) {
+        if (elapsed >= STANDBY_BLINK_ON_MS) {
+            _standbyBlinkOn = false;
+            _standbyBlinkTimerMs = now;
+            newVisible = false;
+        } else {
+            newVisible = true;
+        }
+    } else {
+        if (elapsed >= STANDBY_BLINK_OFF_MS) {
+            _standbyBlinkOn = true;
+            _standbyBlinkTimerMs = now;
+            newVisible = true;
+        } else {
+            newVisible = false;
+        }
+    }
+
+    if (newVisible == _standbyIndicatorVisible) {
+        return false;
+    }
+    _standbyIndicatorVisible = newVisible;
+    return true;
 }
 
 void BatteryCheckScreen::drawMainContent()
@@ -165,31 +221,66 @@ void BatteryCheckScreen::drawIndicator()
     _tft->fillCircle(120, 260, INDICATOR_RADIUS, color);
 }
 
+void BatteryCheckScreen::drawStandbyContent()
+{
+    uint8_t level = _battery.getLevelPercent();
+    bool charging = _battery.isCharging();
+
+    // Șterge doar zona indicatorului pentru a evita artefacte.
+    _tft->fillCircle(120, 260, INDICATOR_RADIUS + 2, COLOR_BACKGROUND);
+
+    if (_standbyIndicatorVisible) {
+        BatteryLevelState state = evaluateLevel(level);
+        uint16_t color = levelStateToColor(state);
+        if (level == 100 && charging) {
+            color = COLOR_GREEN;
+        }
+        _tft->fillCircle(120, 260, INDICATOR_RADIUS, color);
+    }
+
+    // Procent permanent aprins, deasupra indicatorului, textSize 1, culoare muted.
+    char percentStr[8];
+    snprintf(percentStr, sizeof(percentStr), "%d %%", level);
+
+    // Înălțime font textSize 1 = 8 px; zona text 16 px înălțime pentru curățare.
+    const int textY = 240;
+    _tft->fillRect(80, textY - 2, 80, 14, COLOR_BACKGROUND);
+
+    _tft->setTextColor(COLOR_TEXT_MUTED);
+    _tft->setTextSize(1);
+    int16_t textWidth = strlen(percentStr) * 6;
+    _tft->setCursor((240 - textWidth) / 2, textY);
+    _tft->print(percentStr);
+}
+
 void BatteryCheckScreen::clearScreenKeepIndicator()
 {
     _tft->fillScreen(COLOR_BACKGROUND);
-    drawIndicator();
+    _standbyBlinkTimerMs = millis();
+    _standbyBlinkOn = true;
+    _standbyIndicatorVisible = true; // punctul pornește aprins, fără cadru negru
+    drawStandbyContent();
 }
 
-BatteryLevelState BatteryCheckScreen::evaluateLevel(uint8_t percent) const
+BatteryCheckScreen::BatteryLevelState BatteryCheckScreen::evaluateLevel(uint8_t percent) const
 {
     if (percent < LOW_THRESHOLD_PERCENT) {
-        return BatteryLevelState::LOW;
+        return BatteryLevelState::BAT_LOW;
     }
     if (percent < MEDIUM_THRESHOLD_PERCENT) {
-        return BatteryLevelState::MEDIUM;
+        return BatteryLevelState::BAT_MEDIUM;
     }
-    return BatteryLevelState::GOOD;
+    return BatteryLevelState::BAT_GOOD;
 }
 
 uint16_t BatteryCheckScreen::levelStateToColor(BatteryLevelState state) const
 {
     switch (state) {
-        case BatteryLevelState::LOW:
+        case BatteryLevelState::BAT_LOW:
             return COLOR_RED;
-        case BatteryLevelState::MEDIUM:
+        case BatteryLevelState::BAT_MEDIUM:
             return COLOR_YELLOW;
-        case BatteryLevelState::GOOD:
+        case BatteryLevelState::BAT_GOOD:
         default:
             return COLOR_GREEN;
     }

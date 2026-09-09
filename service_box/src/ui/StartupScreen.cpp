@@ -1,13 +1,8 @@
 #include "StartupScreen.h"
 
-// Unified Color Palette (Hex conversion for ST7789/ILI9341 16-bit RGB565)
-#define COLOR_BACKGROUND 0x0000 // Black
-#define COLOR_TEXT_MAIN  0xFFFF // White
-#define COLOR_TEXT_MUTED 0x9DF3 // Gray
-#define COLOR_BTN_BASE   0x1967 // Deep Blue
-#define COLOR_BTN_PUSH   0x341F // Lighter Blue/Cyan accent
-#define COLOR_GREEN      0x07E0 // Bright Green
-#define COLOR_RED        0xF800 // Red
+// Paleta de culori este definită exclusiv ca constante constexpr în clasă
+// (StartupScreen.h). Nu există macro-uri duplicate care ar putea produce
+// conflicte de preprocessor la reordonarea codului.
 
 StartupScreen::StartupScreen(Adafruit_GFX* tftInstance, IBatteryProvider& battery)
     : _tft(tftInstance)
@@ -26,6 +21,7 @@ void StartupScreen::init() {
     _displayedLevel = 0xFF;
     _displayedCharging = false;
     _lastBatteryUpdateMs = 0;
+    _displayedButtonText = "";
 }
 
 void StartupScreen::render(bool forceRedraw) {
@@ -62,17 +58,41 @@ void StartupScreen::render(bool forceRedraw) {
 }
 
 void StartupScreen::drawButton(bool pressed) {
-    uint16_t btnColor = pressed ? COLOR_BTN_PUSH : COLOR_BTN_BASE;
-    
+    (void)pressed; // Nu mai există feedback vizual de culoare la apăsare.
+
+    // Determină textul curent în funcție de starea bateriei.
+    BatteryState state = _battery.getState();
+    const char* btnText = (state == BatteryState::LOW || state == BatteryState::CRITICAL)
+                          ? "BATT LOW"
+                          : "START";
+
+    // textSize=2 => 12 px lățime/literă, 16 px înălțime
+    int16_t textWidth = strlen(btnText) * 12;
+    int16_t textHeight = 16;
+    int16_t cursorX = BTN_X + (BTN_W - textWidth) / 2;
+    int16_t cursorY = BTN_Y + 15;
+
+    // Evită redesenarea continuă: redesenează DOAR dacă textul s-a schimbat.
+    // Starea "pressed" nu are feedback vizual, deci nu trebuie să declanșeze
+    // redesenare (asta era sursa flicker-ului la atingere, vizibil mai ales
+    // în starea blocat "BATT LOW" unde utilizatorul atinge repetat).
+    if (_displayedButtonText.equals(btnText)) {
+        return;
+    }
+    _displayedButtonText = btnText;
+
     // Draw Round Box outline filled canvas
-    _tft->fillRoundRect(BTN_X, BTN_Y, BTN_W, BTN_H, BTN_RADIUS, btnColor);
+    _tft->fillRoundRect(BTN_X, BTN_Y, BTN_W, BTN_H, BTN_RADIUS, COLOR_BTN_BASE);
     _tft->drawRoundRect(BTN_X, BTN_Y, BTN_W, BTN_H, BTN_RADIUS, COLOR_TEXT_MAIN);
 
-    // Center Text inside button geometries
-    _tft->setTextColor(COLOR_TEXT_MAIN);
+    // Curăță zona de text cu culoarea butonului pentru a evita artefacte
+    // la schimbarea dintre START / BATT LOW.
+    _tft->fillRect(cursorX - 2, cursorY - 2, textWidth + 4, textHeight + 4, COLOR_BTN_BASE);
+
+    _tft->setTextColor(COLOR_TEXT_MUTED);
     _tft->setTextSize(2);
-    _tft->setCursor(BTN_X + 41, BTN_Y + 15);
-    _tft->print("START");
+    _tft->setCursor(cursorX, cursorY);
+    _tft->print(btnText);
 }
 
 void StartupScreen::drawBatteryInfo() {
@@ -149,26 +169,34 @@ bool StartupScreen::update(int touchX, int touchY, bool isTouched) {
         // Evaluate boundary box intersection parameters
         if (touchX >= BTN_X && touchX <= (BTN_X + BTN_W) &&
             touchY >= BTN_Y && touchY <= (BTN_Y + BTN_H)) {
-            
-            if (!_buttonPressed) {
-                _buttonPressed = true;
-                drawButton(true); // Redraw button in active pushed state instantly
-            }
+
+            // Fără redesenare la apăsare: nu există feedback vizual de culoare,
+            // redesenarea era sursa flicker-ului.
+            _buttonPressed = true;
         } else {
             // Finger drifted outside boundary limits while pressing down
-            if (_buttonPressed) {
-                _buttonPressed = false;
-                drawButton(false);
-            }
+            _buttonPressed = false;
         }
     } else {
         // Finger released from active capacitive/resistive target window
         if (_buttonPressed) {
             _buttonPressed = false;
-            drawButton(false);
-            startTriggered = true; // Dispatch execution signal on confirmation release
+
+            // Aplicare politică baterie: LOW/CRITICAL blochează inițierea unui test nou.
+            BatteryState state = _battery.getState();
+            if (state == BatteryState::LOW || state == BatteryState::CRITICAL) {
+                Serial.print("[StartupScreen] START blocked: battery state is ");
+                Serial.println(state == BatteryState::LOW ? "LOW" : "CRITICAL");
+                startTriggered = false;
+            } else {
+                startTriggered = true; // Dispatch execution signal on confirmation release
+            }
         }
     }
+
+    // Asigură sincronizarea stării vizuale chiar dacă textul nu s-a schimbat
+    // (de ex. la prima afișare sau după init).
+    drawButton(false);
 
     return startTriggered;
 }

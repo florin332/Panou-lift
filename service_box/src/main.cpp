@@ -1351,6 +1351,19 @@ void loop() {
 #endif
 
     // ========================================================================
+    // POLITICĂ BATERIE: CRITICAL întrerupe orice test și revine la Battery Check
+    // ========================================================================
+    {
+        BatteryState batteryState = batteryStub.getState();
+        if (batteryState == BatteryState::CRITICAL && currentPage != PAGE_BATTERY_CHECK) {
+            Serial.println("[UI Navigation] CRITICAL battery -> PAGE_BATTERY_CHECK");
+            currentPage = PAGE_BATTERY_CHECK;
+            batteryCheckScreen.init();
+            refreshPageNeeded = true;
+        }
+    }
+
+    // ========================================================================
     // UI APPLICATION STATE MACHINE ROUTING
     // ========================================================================
     if (currentPage == PAGE_BATTERY_CHECK) {

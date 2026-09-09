@@ -8,6 +8,13 @@
 // Decuplat de HAL pe branch-ul graphic_ui: primeste doar o instanta
 // Adafruit_GFX (display real ST7789 pe Waveshare / simulator pe Marble)
 // si o referinta la furnizorul de stare baterie.
+//
+// Politică baterie:
+//   - START confirmă navigarea către Dashboard doar dacă starea bateriei
+//     este NORMAL sau CHARGING.
+//   - LOW sau CRITICAL blochează inițierea unui test nou (returnează false),
+//     conform politicii de navigație. Testele în desfășurare NU sunt oprite
+//     de această pagină; oprirea controlată la CRITICAL se face în main.cpp.
 
 class StartupScreen {
 private:
@@ -20,6 +27,10 @@ private:
     uint8_t _displayedLevel;
     bool _displayedCharging;
     unsigned long _lastBatteryUpdateMs;
+
+    // Button display tracking (avoid redraw flicker).
+    // Butonul nu are feedback vizual la apăsare, deci doar textul contează.
+    String _displayedButtonText;
 
     // UI Geometry Constants (Portrait 240x320)
     const int BTN_X = 50;
@@ -34,6 +45,7 @@ private:
     static constexpr uint16_t COLOR_BACKGROUND = 0x0000; // Black
     static constexpr uint16_t COLOR_TEXT_MAIN  = 0xFFFF; // White
     static constexpr uint16_t COLOR_TEXT_MUTED = 0x9DF3; // Gray
+    static constexpr uint16_t COLOR_BTN_BASE   = 0x1967; // Deep Blue
     static constexpr uint16_t COLOR_GREEN      = 0x07E0; // Bright Green
     static constexpr uint16_t COLOR_YELLOW     = 0xFFE0; // Yellow
     static constexpr uint16_t COLOR_RED        = 0xF800; // Red

@@ -39,15 +39,29 @@ public:
     // IBatteryProvider
     uint8_t getLevelPercent() override;
     bool isCharging() override;
+    BatteryState getState() override;
 
     // Setări explicite, utile pentru teste programmatic sau la inițializare.
     // După fiecare setare, starea este salvată în EEPROM.
     void setLevel(uint8_t level);
     void setCharging(bool charging);
 
+    // Simulează primirea celor 4 praguri de la Battery Management.
+    // Battery Manager (hardware-dependent) folosește aceste praguri pentru
+    // a decide starea discretă a bateriei.
+    void setThresholds(uint8_t critical, uint8_t low, uint8_t medium, uint8_t full);
+
 private:
     uint8_t _level;      // 0 .. 100
     bool    _charging;
+
+    // Praguri Battery Management: CRITICAL, LOW, MEDIUM, FULL.
+    // NU sunt persistate în EEPROM în acest stub; se reiau la boot din
+    // valorile implicite și pot fi modificate runtime prin comenzi seriale.
+    uint8_t _thresholdCritical;
+    uint8_t _thresholdLow;
+    uint8_t _thresholdMedium;
+    uint8_t _thresholdFull;
 
     // Persistență EEPROM
     // Adresa de start este aleasă pentru a nu se suprapune cu datele de
