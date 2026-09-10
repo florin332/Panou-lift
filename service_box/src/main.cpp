@@ -512,7 +512,7 @@ static const int8_t PIN_TCH_IRQ  = 8;
 // Marble: GP5 (ca in tester-touch-lcd; input de pe placa, INPUT_PULLUP,
 // activ LOW). NOTA: GP5 nu figureaza in hardware_map.md §1 - vezi
 // todo.md / Agent Proposals (AP-001)
-#define RECALIB_BUTTON 5
+#define RECALIB_BUTTON 3
 
 // ---------------- Praguri touch si calibrare [PRELUARE] --------------------
 // NOTA: biblioteca upstream calculeaza z = z1 + 4095 - z2 (unitati ADC raw)

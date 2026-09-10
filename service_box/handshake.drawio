@@ -1,0 +1,110 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36">
+  <diagram name="Page-1" id="W79Y5GQxcprjr70ttkuY">
+    <mxGraphModel dx="1800" dy="729" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="HE__V-L4_EkyxsYdy1pu-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;GRAPHIC REPORTS ON START PAGE:&lt;/div&gt;&lt;div&gt;sd status NOT PRESENT or PERCENT&lt;/div&gt;&lt;div&gt;if usb device not detected:&lt;/div&gt;&lt;div&gt;report TARGET NOT DETECTED and recheck&lt;/div&gt;if usb device detected:&lt;div&gt;&lt;div&gt;expected responses :&lt;/div&gt;&lt;div&gt;1. no response - report TARGET UNKNOWN&amp;nbsp;&lt;/div&gt;&lt;div&gt;2. &quot;&amp;lt;panel type / hardware version / firmware version&amp;gt;&quot; report TARGET: type&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="200" width="433" x="247" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-5" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="wcYtI_na1dycnOywRtmt-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-6" connectable="0" parent="wcYtI_na1dycnOywRtmt-5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="&amp;nbsp;YES&amp;nbsp;" vertex="1">
+          <mxGeometry relative="1" x="0.0343" y="3" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-11" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="wcYtI_na1dycnOywRtmt-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-12" connectable="0" parent="wcYtI_na1dycnOywRtmt-11" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="&lt;div&gt;NO&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.056" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-3" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="battery check LOW?" vertex="1">
+          <mxGeometry height="110" width="110" x="685" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="back to battery check page" vertex="1">
+          <mxGeometry height="75" width="126.5" x="50" y="227.5" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-10" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="wcYtI_na1dycnOywRtmt-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="850" y="455" />
+              <mxPoint x="850" y="265" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-13" connectable="0" parent="wcYtI_na1dycnOywRtmt-10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="&amp;nbsp;NO&amp;nbsp;" vertex="1">
+          <mxGeometry relative="1" x="-0.8341" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-20" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="wcYtI_na1dycnOywRtmt-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-24" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="HE__V-L4_EkyxsYdy1pu-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="455" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-7" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="check sd card present?" vertex="1">
+          <mxGeometry height="120" width="120" x="680" y="395" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-18" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="wcYtI_na1dycnOywRtmt-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="850" y="660" />
+              <mxPoint x="850" y="265.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-19" connectable="0" parent="wcYtI_na1dycnOywRtmt-18" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="&amp;nbsp;NO&amp;nbsp;" vertex="1">
+          <mxGeometry relative="1" x="-0.9192" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-25" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="wcYtI_na1dycnOywRtmt-23">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="740" y="940" />
+              <mxPoint x="740" y="940" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-26" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="HE__V-L4_EkyxsYdy1pu-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="580" y="659.94" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-17" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="check if usb device is conected&amp;nbsp;" vertex="1">
+          <mxGeometry height="110" width="110" x="685" y="605" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-27" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="HE__V-L4_EkyxsYdy1pu-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-23" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;handshake routine&lt;div&gt;usb send &quot;&amp;lt;mb_getinfo&amp;gt;&quot; message&lt;/div&gt;&lt;div&gt;expected USB responses :&lt;/div&gt;&lt;div&gt;1. no response - set flag&lt;/div&gt;&lt;div&gt;2. &quot;&amp;lt;XXX / YY.Y&amp;gt;&quot; - set flag&lt;/div&gt;&lt;div&gt;XXX is a panel identification code, combination of letters and numbers&lt;/div&gt;&lt;/div&gt;&lt;div&gt;YY.Y is firmware version&lt;/div&gt;" vertex="1">
+          <mxGeometry height="200" width="433" x="550" y="1010" as="geometry" />
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-28" edge="1" parent="1" source="wcYtI_na1dycnOywRtmt-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.322;entryY=-0.004;entryDx=0;entryDy=0;entryPerimeter=0;" target="HE__V-L4_EkyxsYdy1pu-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="386.35" y="300.06" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="wcYtI_na1dycnOywRtmt-29" connectable="0" parent="wcYtI_na1dycnOywRtmt-28" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="&amp;nbsp;yes&amp;nbsp; &amp;amp; no&amp;nbsp;" vertex="1">
+          <mxGeometry relative="1" x="-0.5081" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

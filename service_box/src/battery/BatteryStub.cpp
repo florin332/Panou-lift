@@ -171,39 +171,39 @@ void BatteryStub::processCommand(const String& cmd)
     Serial.print("[BatteryStub] command received: ");
     Serial.println(cmd);
 
-    if (cmd.equalsIgnoreCase("bat critical")) {
+    if (cmd.equalsIgnoreCase("bat 10")) {
         setLevel(_thresholdCritical);
         setCharging(false);
         Serial.println("[BatteryStub] set CRITICAL");
         printStatus();
     }
-    else if (cmd.equalsIgnoreCase("bat low")) {
+    else if (cmd.equalsIgnoreCase("bat 30")) {
         setLevel(_thresholdLow);
         setCharging(false);
         Serial.println("[BatteryStub] set LOW");
         printStatus();
     }
-    else if (cmd.equalsIgnoreCase("bat medium")) {
+    else if (cmd.equalsIgnoreCase("bat 60")) {
         setLevel(_thresholdMedium);
         setCharging(false);
         Serial.println("[BatteryStub] set MEDIUM (NORMAL state)");
         printStatus();
     }
-    else if (cmd.equalsIgnoreCase("bat good")) {
+    else if (cmd.equalsIgnoreCase("bat 80")) {
         uint8_t value = (_thresholdMedium + _thresholdFull) / 2;
         setLevel(value);
         setCharging(false);
         Serial.println("[BatteryStub] set GOOD (NORMAL state)");
         printStatus();
     }
-    else if (cmd.equalsIgnoreCase("bat normal")) {
+    else if (cmd.equalsIgnoreCase("bat 40")) {
         uint8_t value = (_thresholdLow + _thresholdMedium) / 2;
         setLevel(value);
         setCharging(false);
         Serial.println("[BatteryStub] set NORMAL");
         printStatus();
     }
-    else if (cmd.equalsIgnoreCase("bat full")) {
+    else if (cmd.equalsIgnoreCase("bat 100")) {
         setLevel(_thresholdFull);
         setCharging(true);
         Serial.println("[BatteryStub] set FULL (CHARGING state)");
@@ -267,12 +267,12 @@ void BatteryStub::processCommand(const String& cmd)
     }
     else if (cmd.equalsIgnoreCase("bat help")) {
         Serial.println("[BatteryStub] Commands:");
-        Serial.println("  bat critical             -> CRITICAL state");
-        Serial.println("  bat low                  -> LOW state");
-        Serial.println("  bat medium               -> MEDIUM level, NORMAL state");
-        Serial.println("  bat good                 -> GOOD level, NORMAL state");
-        Serial.println("  bat normal               -> NORMAL state");
-        Serial.println("  bat full                 -> FULL level, CHARGING state");
+        Serial.println("  bat 10                   -> CRITICAL state");
+        Serial.println("  bat 30                   -> LOW state");
+        Serial.println("  bat 60                   -> MEDIUM level, NORMAL state");
+        Serial.println("  bat 80                   -> GOOD level, NORMAL state");
+        Serial.println("  bat 40                   -> NORMAL level, NORMAL state");
+        Serial.println("  bat 100                  -> FULL level, CHARGING state");
         Serial.println("  bat charging             -> toggle charging state");
         Serial.println("  bat level <n>            -> set level 0..100");
         Serial.println("  bat thresholds <c> <l> <m> <f> -> set Battery Manager thresholds");
