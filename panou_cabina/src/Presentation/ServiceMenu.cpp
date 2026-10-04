@@ -8,12 +8,13 @@
 #include "SharedPanel.h"
 #include "PanelRenderer.h"
 #include <Arduino.h>
+#include <atomic>
 
 extern volatile SharedMemory gSharedMemory;
 
 namespace ServiceMenu {
 
-static bool sInService = false;
+static std::atomic<bool> sInService{false};
 static unsigned long sLastActivityMillis = 0;
 
 // Stare display: false = idle (date reale + overlay), true = test activ
@@ -25,6 +26,7 @@ static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData);
 static void restoreServiceMain();
 static void runCommTest();
 static void sendCommStatus();
+static void sendCommCountStatus();
 static void sendDiagnostics();
 static void runDispTest(uint8_t tftId);
 static void runDispReinit(uint8_t tftId);
@@ -65,13 +67,13 @@ static const char* occupancyText(Occupancy occupancy) {
 }
 
 void init() {
-    sInService = false;
+    sInService.store(false, std::memory_order_relaxed);
     sLastActivityMillis = 0;
     sDisplayTestActive = false;
 }
 
 bool isInServiceMode() {
-    return sInService;
+    return sInService.load(std::memory_order_relaxed);
 }
 
 bool isDisplayCommandActive() {
@@ -85,13 +87,13 @@ void update() {
     bool haveNewData = shared_panel_read(gSharedMemory, localPanel);
 
     // 2. In afara Service Mode, update() doar consuma comenzi de intrare.
-    if (sInService && !sDisplayTestActive) {
+    if (sInService.load(std::memory_order_relaxed) && !sDisplayTestActive) {
         if (haveNewData) {
             Display::update(localPanel);
+            PanelRenderer::render(DisplayTarget::Panel, localPanel.lift1, "ASCENSOR");
         }
         uint16_t overlayColor = getOverlayColor(localPanel, haveNewData);
-        Display::drawServiceOverlay(DisplayTarget::Left, overlayColor);
-        Display::drawServiceOverlay(DisplayTarget::Right, overlayColor);
+        Display::drawServiceOverlay(DisplayTarget::Panel, overlayColor);
     }
     // Daca sDisplayTestActive == true, ecranul ramane asa cum l-a lasat ultima comanda
 
@@ -117,32 +119,27 @@ static void restoreServiceMain() {
     SharedPanel panel;
     if (!shared_panel_read(gSharedMemory, panel)) return;
 
-    Display::clearTargetScreen(DisplayTarget::Left);
-    Display::clearTargetScreen(DisplayTarget::Right);
+    Display::clearTargetScreen(DisplayTarget::Panel);
+    PanelRenderer::invalidate(DisplayTarget::Panel);
 
-    PanelRenderer::invalidate(DisplayTarget::Left);
-    PanelRenderer::invalidate(DisplayTarget::Right);
-
-    PanelRenderer::render(DisplayTarget::Right, panel.lift2, "ASCENSOR 2");
-    PanelRenderer::render(DisplayTarget::Left, panel.lift1, "ASCENSOR 1");
+    PanelRenderer::render(DisplayTarget::Panel, panel.lift1, "ASCENSOR");
 
     uint16_t color = getOverlayColor(panel, true);
-    Display::drawServiceOverlay(DisplayTarget::Left, color);
-    Display::drawServiceOverlay(DisplayTarget::Right, color);
+    Display::drawServiceOverlay(DisplayTarget::Panel, color);
 }
 
 // ==================== HANDLERE COMENZI ====================
 static void handleCommand(const ServiceProtocol::Command &cmd) {
     switch (cmd.type) {
         case ServiceProtocol::Command::Type::EnterService:
-            sInService = true;
+            sInService.store(true, std::memory_order_relaxed);
             sDisplayTestActive = false;
             Display::setServiceMode(true);
             ServiceProtocol::sendResponse("ACK SRV ENTER");
             break;
 
         case ServiceProtocol::Command::Type::ExitService:
-            sInService = false;
+            sInService.store(false, std::memory_order_relaxed);
             sDisplayTestActive = false;
             Display::setServiceMode(false);
             ServiceProtocol::sendResponse("ACK SRV EXIT");
@@ -176,6 +173,11 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
         case ServiceProtocol::Command::Type::CommTestOut:
             if (!checkService()) break;
             exitDisplayTest();
+            break;
+
+        case ServiceProtocol::Command::Type::CommCountStatus:
+            if (!checkService()) break;
+            sendCommCountStatus();
             break;
 
         case ServiceProtocol::Command::Type::DispTestExit:
@@ -220,7 +222,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 }
 
 static bool checkService() {
-    if (!sInService) {
+    if (!sInService.load(std::memory_order_relaxed)) {
         ServiceProtocol::sendResponse("ERR 03 NOT_IN_SERVICE");
         return false;
     }
@@ -236,42 +238,25 @@ static void runCommTest() {
     }
 
     sDisplayTestActive = true;
-    Display::clearTargetScreen(DisplayTarget::Left);
-    Display::clearTargetScreen(DisplayTarget::Right);
+    Display::clearTargetScreen(DisplayTarget::Panel);
 
-    const DisplayTarget left = DisplayTarget::Left;
-    const DisplayTarget right = DisplayTarget::Right;
-    char lift1Pos[4];
-    char lift1Dst[4];
-    char lift2Pos[4];
-    char lift2Dst[4];
+    const DisplayTarget panelDisplay = DisplayTarget::Panel;
+    char liftPos[4];
+    char liftDst[4];
 
-    // ← MODIFICAT: separator galben 2px direct din printMenuHeader, fara suprascriere
-    Display::printMenuHeader(left,  "Comm. A 1", 0xFFE0, 2);
-    Display::printMenuHeader(right, "Comm. A 2", 0xFFE0, 2);
+    Display::printMenuHeader(panelDisplay, "Comm. Ascensor", 0xFFE0, 2);
 
-    Display::printCommLine(left, 0, "Pos :", floorText(panel.lift1.pos, lift1Pos, sizeof(lift1Pos)), 0xFFFF);
-    Display::printCommLine(left, 1, "Dst :", panel.lift1.sj == Direction::Idle ? "--" : floorText(panel.lift1.etd, lift1Dst, sizeof(lift1Dst)), 0xFFFF);
-    Display::printCommLine(left, 2, "S/J :", directionText(panel.lift1.sj), 0xFFFF);
-    Display::printCommLine(left, 3, "Svc :", serviceText(panel.lift1.svc), 0xFFFF);
+    Display::printCommLine(panelDisplay, 0, "Pos :", floorText(panel.lift1.pos, liftPos, sizeof(liftPos)), 0xFFFF);
+    Display::printCommLine(panelDisplay, 1, "Dst :", panel.lift1.sj == Direction::Idle ? "--" : floorText(panel.lift1.etd, liftDst, sizeof(liftDst)), 0xFFFF);
+    Display::printCommLine(panelDisplay, 2, "S/J :", directionText(panel.lift1.sj), 0xFFFF);
+    Display::printCommLine(panelDisplay, 3, "Svc :", serviceText(panel.lift1.svc), 0xFFFF);
 
-    // Ocp: portocaliu "- ! -" daca svc != Normal (functionare normala)
     bool svc1Normal = (panel.lift1.svc == ServiceState::Normal);
-    Display::printCommLine(left, 4, "Ocp :",
+    Display::printCommLine(panelDisplay, 4, "Ocp :",
         svc1Normal ? occupancyText(panel.lift1.ocp) : "- ! -",
         svc1Normal ? 0xFFFF : 0xFE60);
 
-    Display::printCommLine(right, 0, "Pos :", floorText(panel.lift2.pos, lift2Pos, sizeof(lift2Pos)), 0xFFFF);
-    Display::printCommLine(right, 1, "Dst :", panel.lift2.sj == Direction::Idle ? "--" : floorText(panel.lift2.etd, lift2Dst, sizeof(lift2Dst)), 0xFFFF);
-    Display::printCommLine(right, 2, "S/J :", directionText(panel.lift2.sj), 0xFFFF);
-    Display::printCommLine(right, 3, "Svc :", serviceText(panel.lift2.svc), 0xFFFF);
-
-    bool svc2Normal = (panel.lift2.svc == ServiceState::Normal);
-    Display::printCommLine(right, 4, "Ocp :",
-        svc2Normal ? occupancyText(panel.lift2.ocp) : "- ! -",
-        svc2Normal ? 0xFFFF : 0xFE60);
-
-    ServiceProtocol::sendResponse("OK mb_com L1=DATA L2=DATA");
+    ServiceProtocol::sendResponse("OK mb_com L1=DATA");
 }
 
 static void sendCommStatus() {
@@ -283,8 +268,31 @@ static void sendCommStatus() {
 
     char response[128];
     snprintf(response, sizeof(response),
-        "OK STATUS L1=%s L2=%s",
-        serviceText(panel.lift1.svc), serviceText(panel.lift2.svc));
+        "OK STATUS L1=%s",
+        serviceText(panel.lift1.svc));
+    ServiceProtocol::sendResponse(response);
+}
+
+// Raporteaza contoarele de receptie detaliate pe serial (afisarea se face pe Service Box)
+// Format: OK COMM STATUS L1=frames,valid,timeout,formatErr,crcErr,dataErr ON|OFF
+static void sendCommCountStatus() {
+    SharedPanel panel;
+    if (!shared_panel_read(gSharedMemory, panel)) {
+        ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
+        return;
+    }
+
+    const CommLineCounters &c1 = panel.comm.lift1;
+    char response[96];
+    snprintf(response, sizeof(response),
+        "OK COMM STATUS L1=%lu,%lu,%lu,%lu,%lu,%lu %s",
+        static_cast<unsigned long>(c1.rxFrames),
+        static_cast<unsigned long>(c1.rxValid),
+        static_cast<unsigned long>(c1.rxTimeout),
+        static_cast<unsigned long>(c1.rxFormatError),
+        static_cast<unsigned long>(c1.rxCrcError),
+        static_cast<unsigned long>(c1.rxDataError),
+        panel.comm.countingEnabled ? "ON" : "OFF");
     ServiceProtocol::sendResponse(response);
 }
 
@@ -306,17 +314,12 @@ static void sendDiagnostics() {
 static void runDispTest(uint8_t tftId) {
     sDisplayTestActive = true;
     if (tftId == 1) {
-        Display::clearTargetScreen(DisplayTarget::Left);
-        Display::printMenuHeader(DisplayTarget::Left, "DISP TEST 1");
-        Display::printMenuLineExt(DisplayTarget::Left, 3, "RESULT", "PASS", 0x07E0);
+        Display::clearTargetScreen(DisplayTarget::Panel);
+        Display::printMenuHeader(DisplayTarget::Panel, "DISPLAY TEST");
+        Display::printMenuLineExt(DisplayTarget::Panel, 3, "RESULT", "PASS", 0x07E0);
         ServiceProtocol::sendResponse("OK DISP TEST 1");
-    } else if (tftId == 2) {
-        Display::clearTargetScreen(DisplayTarget::Right);
-        Display::printMenuHeader(DisplayTarget::Right, "DISP TEST 2");
-        Display::printMenuLineExt(DisplayTarget::Right, 3, "RESULT", "PASS", 0x07E0);
-        ServiceProtocol::sendResponse("OK DISP TEST 2");
     } else {
-        ServiceProtocol::sendResponse("ERR 05 INVALID_TFT");
+        ServiceProtocol::sendResponse("ERR 05 INVALID_DISPLAY");
     }
 }
 
@@ -324,12 +327,8 @@ static void runDispReinit(uint8_t tftId) {
     sDisplayTestActive = true;
     if (tftId == 1) {
         ServiceProtocol::sendResponse("OK DISP REINIT 1");
-    } else if (tftId == 2) {
-        ServiceProtocol::sendResponse("OK DISP REINIT 2");
-    } else if (tftId == 3) {
-        ServiceProtocol::sendResponse("OK DISP REINIT BOTH");
     } else {
-        ServiceProtocol::sendResponse("ERR 05 INVALID_TFT");
+        ServiceProtocol::sendResponse("ERR 05 INVALID_DISPLAY");
     }
 }
 

@@ -7,8 +7,7 @@
 #include <gfxfont.h>
 
 enum class DisplayTarget : uint8_t {
-    Left,
-    Right
+    Panel
 };
 
 namespace Display

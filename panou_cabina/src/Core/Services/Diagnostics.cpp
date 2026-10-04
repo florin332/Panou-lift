@@ -55,14 +55,12 @@ namespace Diagnostics
         output.lift1.ocp = getOccupancyText(snapshot.lift1.ocp);
         output.lift1.svc = getServiceText(snapshot.lift1.svc);
 
-        // 3. Mapare ierarhizată directă pentru Cabina 2 (lift2. ...)
-        output.lift2.pos = snapshot.lift2.pos;
-        output.lift2.etd = snapshot.lift2.etd;
-        output.lift2.sj  = getDirectionText(snapshot.lift2.sj);
-        output.lift2.ocp = getOccupancyText(snapshot.lift2.ocp);
-        output.lift2.svc = getServiceText(snapshot.lift2.svc);
-
-        // 4. Copiere statistici magistrală
+        // 3. Copiere statistici sistem
         output.seqlockCollisions = snapshot.system.seqlockCollisions;
+        output.rxFrames = snapshot.comm.lift1.rxFrames;
+        output.rxTimeouts = snapshot.comm.lift1.rxTimeout;
+        output.rxFormatErrors = snapshot.comm.lift1.rxFormatError;
+        output.rxCrcErrors = snapshot.comm.lift1.rxCrcError;
+        output.rxDataErrors = snapshot.comm.lift1.rxDataError;
     }
 }

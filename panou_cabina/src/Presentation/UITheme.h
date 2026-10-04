@@ -11,10 +11,9 @@ namespace UITheme
 
         // --- TITLURI DE DASHBOARD ---
         if (strcmp(labelKey, "SYS_STATUS_TITLE") == 0) return "1. STATUS PANOU";
-        if (strcmp(labelKey, "LIFT_1_TITLE") == 0)     return "2. DASHBOARD LIFT 1";
-        if (strcmp(labelKey, "LIFT_2_TITLE") == 0)     return "3. DASHBOARD LIFT 2";
-        if (strcmp(labelKey, "COMM_TITLE") == 0)       return "4. COMUNICATIE";
-        if (strcmp(labelKey, "VER_TITLE") == 0)        return "5. DATE PRODUCTIE";
+        if (strcmp(labelKey, "LIFT_1_TITLE") == 0)     return "2. ASCENSOR CABINA";
+        if (strcmp(labelKey, "COMM_TITLE") == 0)       return "3. COMUNICATIE";
+        if (strcmp(labelKey, "VER_TITLE") == 0)        return "4. DATE PRODUCTIE";
         
         if (strcmp(labelKey, "DEV_ENG_TITLE") == 0)    return "ENG. PROPERTIES";
         if (strcmp(labelKey, "DEV_MEM_TITLE") == 0)    return "MEMORY LAYOUT RAM";
@@ -33,7 +32,6 @@ namespace UITheme
         if (strcmp(labelKey, "LIFT_OCP") == 0)         return "Stare Cabina  :";
         
         if (strcmp(labelKey, "COMM_L1_ERR") == 0)      return "Pierderi Pct L1:";
-        if (strcmp(labelKey, "COMM_L2_ERR") == 0)      return "Pierderi Pct L2:";
         if (strcmp(labelKey, "COMM_MISS_PKT") == 0)    return "Pachete Pierd.:";
         if (strcmp(labelKey, "COMM_TIMEOUTS") == 0)    return "Timeouts     :";
         
@@ -54,9 +52,10 @@ namespace UITheme
         if (strcmp(labelKey, "LOOP0_JITT") == 0)       return "Loop0 Tact Ms:";
         if (strcmp(labelKey, "LOOP1_TACT") == 0)       return "Loop1 Tact Us:";
         
-        if (strcmp(labelKey, "UART1_RX_PKT") == 0)     return "UART1 RX Pack:";
+        if (strcmp(labelKey, "UART1_ALARM_TX") == 0)   return "UART1 Alarm TX:";
         if (strcmp(labelKey, "UART2_RX_PKT") == 0)     return "UART2 RX Pack:";
-        if (strcmp(labelKey, "UART_TX_PKT") == 0)      return "TX Call Pack :";
+        if (strcmp(labelKey, "UART_TX_PKT") == 0)      return "UART1 TX     :";
+        if (strcmp(labelKey, "PARSER_ERRS") == 0)      return "Parser Errors:";
         if (strcmp(labelKey, "PARSER_ERRS") == 0)      return "Parser Errors:";
         if (strcmp(labelKey, "CRC_FAILURES") == 0)     return "CRC Failures :";
         

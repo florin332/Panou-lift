@@ -1,4 +1,6 @@
 #include "ServiceProtocol.h"
+#include "Protocol.h"
+#include "../../Presentation/ServiceMenu.h"
 #include <Arduino.h>
 #include <cstring>
 
@@ -9,6 +11,14 @@ static char sRxBuffer[64];
 static uint8_t sRxIndex = 0;
 
 static void parseLine(const char* line);
+
+static bool checkServiceMode() {
+    if (!ServiceMenu::isInServiceMode()) {
+        sendResponse("ERR 03 NOT_IN_SERVICE");
+        return false;
+    }
+    return true;
+}
 
 void init() {
     sRxIndex = 0;
@@ -68,6 +78,37 @@ static void parseLine(const char* line) {
     } else if (strncmp(line, "MCU STACK ", 10) == 0 || strncmp(line, "mb_stack ", 9) == 0) {
         cmd.type = Command::Type::McuStack;
         cmd.param = static_cast<uint8_t>(atoi(line[1] == 'b' ? line + 9 : line + 10));
+    } else if (strcmp(line, "comm_count_enable") == 0) {
+        if (!checkServiceMode()) return;
+        Protocol::commCountEnable();
+        sendResponse("ACK COMM COUNT ON");
+        return;
+    } else if (strcmp(line, "comm_count_disable") == 0) {
+        if (!checkServiceMode()) return;
+        Protocol::commCountDisable();
+        sendResponse("ACK COMM COUNT OFF");
+        return;
+    } else if (strcmp(line, "comm_count_reset") == 0) {
+        if (!checkServiceMode()) return;
+        Protocol::commCountReset();
+        sendResponse("ACK COMM COUNT RESET");
+        return;
+    } else if (strcmp(line, "com_analyze_enable") == 0) {
+        if (!checkServiceMode()) return;
+        Protocol::commAnalyzeEnable();
+        sendResponse("ACK COM ANALYZE ON");
+        return;
+    } else if (strcmp(line, "com_analyze_disable") == 0) {
+        if (!checkServiceMode()) return;
+        Protocol::commAnalyzeDisable();
+        sendResponse("ACK COM ANALYZE OFF");
+        return;
+    } else if (strcmp(line, "mb_com_status") == 0) {
+        cmd.type = Command::Type::CommCountStatus;
+    } else if (strcmp(line, "mb_com_status_out") == 0) {
+        // Fara pagina pe panou (afisarea e pe Service Box): ACK no-op
+        sendResponse("ACK COMM STATUS OUT");
+        return;
     } else {
         sendResponse("ERR 01 UNKNOWN_CMD");
         return;

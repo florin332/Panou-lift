@@ -15,7 +15,7 @@ namespace Config
     {
         constexpr uint8_t PANEL_FLOOR = 0;   // Parter (etajul unde e panoul)
         constexpr uint8_t FLOORS = 18;       // Total etaje instalație
-        constexpr uint8_t LIFTS = 2;         // Mod Duplex
+        constexpr uint8_t LIFTS = 1;         // Panou pentru un singur ascensor
     }
 
     // =========================================================
@@ -23,8 +23,6 @@ namespace Config
     // =========================================================
     namespace Timing
     {
-        constexpr uint32_t SCREEN_TIMEOUT_MS = 15000;   // Timeout standby ecran
-        constexpr uint32_t SHIFT_PERIOD_MS = 30000;      // Perioadă schimb standby
         constexpr uint32_t BUTTON_INHIBIT_MS = 5000;     // Inhibare buton după apel
         constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat
         constexpr uint32_t LED_BLINK_SLOW = 500;         // Perioadă clipire lentă LED
@@ -38,11 +36,6 @@ namespace Config
     namespace Display
     {
         constexpr uint32_t SPI_CLOCK = 8000000UL;   // Viteză SPI (8 MHz)
-
-        // Offset-uri pentru ST7735 (depind de variantă chip + PCB)
-        // Valori comune: BlackTab=(0,0), GreenTab=(1,2), ST7735S=(32,0)
-        constexpr int16_t ROW_START = 1;   // ← Ajustează pentru LCD-ul tău
-        constexpr int16_t COL_START = 2;   // ← Ajustează pentru LCD-ul tău
 
         constexpr uint8_t ROTATION = 0;    // 0=portrait, 1=landscape, etc.
     }

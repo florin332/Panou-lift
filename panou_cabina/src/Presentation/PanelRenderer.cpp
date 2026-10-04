@@ -1,13 +1,13 @@
 #include "PanelRenderer.h"
 #include "Display.h"
+#include "DisplayGeometry.h"
 #include "Config.h"
 #include "TextWidget.h"
 #include "Arduino.h"
 #include <cstdio>
 
-#include "../Fonts/oneslot30.h"
 #include "../Fonts/oneslot65.h"
-#include "../Fonts/arrows40.h"
+#include "../Fonts/oneslot100.h"
 #include "../Fonts/universalis12.h"
 
 namespace {
@@ -24,19 +24,16 @@ namespace {
     struct PanelScreenState {
         PanelLayout layout = PanelLayout::None;
         TextWidget wFloor;
-        TextWidget wArrow;
         TextWidget wEtd;
         TextWidget wLabel;
         bool firstRender = true;
         int lastPos = -1;
         int lastEtd = -1;
-        int lastOcp = -1;
         ServiceState lastSvc = ServiceState::Missing;
     };
 
     constexpr uint16_t C_BLACK   = 0x0000;
     constexpr uint16_t C_GREEN   = 0x07E0;
-    constexpr uint16_t C_RED     = 0xF800;
     constexpr uint16_t C_YELLOW  = 0xFFE0;
     constexpr uint16_t C_MAGENTA = 0xF81D;
 
@@ -87,107 +84,119 @@ namespace {
 
     inline void resetAllWidgets(PanelScreenState &st) {
         st.wFloor.reset();
-        st.wArrow.reset();
         st.wEtd.reset();
         st.wLabel.reset();
     }
 
-    struct LayoutCoords {
-        int16_t arrowStopX, arrowStopY;
-        int16_t xLargeSingle, xLargeDouble;
-        int16_t xSmallSingle, xSmallDouble;
-        int16_t arrowEtdX, etdEtjOffset;
-        const char* arrowChar;
-    };
+    // Toate pozițiile se calculează din rezoluția ecranului și metricile
+    // fonturilor, prin HAL-ul DisplayGeometry — fără coordonate hardcodate.
 
-    constexpr LayoutCoords CFG_LEFT = {
-        35, 53, 37, 5, 50, 35, 68, -30, "a"
-    };
+    // Mișcare: cifra mare ocupă zona din stânga (centrată pe jumătatea stângă),
+    // etd în dreapta. Animația sus/jos folosește fracțiuni din înălțime.
 
-    constexpr LayoutCoords CFG_RIGHT = {
-        33, 52, 36, 5, 50, 35, 2, 30, "b"
-    };
+    // Procent din înălțimea ecranului → pixel (tipizat, fără -Wnarrowing)
+    inline int16_t pctY(int pct) {
+        return static_cast<int16_t>((pct * static_cast<int>(DisplayGeom::screenH())) / 100);
+    }
 
     void drawDefect(DisplayTarget target, const char* label, const LiftState &lift) {
         const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
-        Display::drawText(target, 8, 25, &universalis12, label, C_YELLOW);
-        Display::drawText(target, 29, 56, &universalis12, "DEFECT", C_YELLOW);
+        const int16_t cx = DisplayGeom::centerX();
         char codeBuf[16];
         snprintf(codeBuf, sizeof(codeBuf), "( cod: 01-%s )", posStr);
-        Display::drawText(target, 2, 82, &universalis12, codeBuf, C_MAGENTA);
-        Display::drawText(target, 15, 105, &universalis12, "tel. service", C_YELLOW);
-        Display::drawText(target, 3, 130, &universalis12, "0740.317.707", C_YELLOW);
-        Display::drawText(target, 2, 155, &universalis12, "0740.317.707", C_YELLOW);
+        struct { const char* txt; int16_t cy; uint16_t col; } rows[] = {
+            { label,            pctY(15), C_YELLOW  },
+            { "DEFECT",         pctY(35), C_YELLOW  },
+            { codeBuf,          pctY(54), C_MAGENTA },
+            { "tel. service",   pctY(72), C_YELLOW  },
+            { "0740.317.707",   pctY(84), C_YELLOW  },
+        };
+        for (const auto &r : rows) {
+            Display::drawText(target,
+                DisplayGeom::cursorXForCenter(&universalis12, r.txt, cx),
+                DisplayGeom::baselineForVCenter(&universalis12, r.txt, r.cy),
+                &universalis12, r.txt, r.col);
+        }
     }
 
     void drawRevizie(DisplayTarget target, const char* label) {
-        Display::drawText(target, 10, 40, &universalis12, label, C_YELLOW);
-        Display::drawText(target, 28, 85, &universalis12, "REVIZIE", C_YELLOW);
-        Display::drawText(target, 3, 155, &universalis12, "0740.317.707", C_YELLOW);
+        const int16_t cx = DisplayGeom::centerX();
+        struct { const char* txt; int16_t cy; } rows[] = {
+            { label,          pctY(22) },
+            { "REVIZIE",      pctY(49) },
+            { "0740.317.707", pctY(86) },
+        };
+        for (const auto &r : rows) {
+            Display::drawText(target,
+                DisplayGeom::cursorXForCenter(&universalis12, r.txt, cx),
+                DisplayGeom::baselineForVCenter(&universalis12, r.txt, r.cy),
+                &universalis12, r.txt, C_YELLOW);
+        }
     }
 
     void drawNoSerial(DisplayTarget target, const char* label) {
-        Display::drawText(target, 8, 25, &universalis12, label, C_YELLOW);
-        Display::drawText(target, 32, 54, &universalis12, "folositi", C_YELLOW);
-        Display::drawText(target, 6, 75, &universalis12, "comanda de", C_YELLOW);
-        Display::drawText(target, 27, 96, &universalis12, "pe usa", C_YELLOW);
-        Display::drawText(target, 16, 123, &universalis12, "( cod: 03 )", C_MAGENTA);
-        Display::drawText(target, 2, 155, &universalis12, "0740.317.707", C_YELLOW);
-    }
-
-    void drawStop(DisplayTarget target, const LayoutCoords &cfg,
-                  const LiftState &lift, PanelScreenState &st) {
-        const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
-        const int16_t xFloor = (lift.pos <= 9) ? cfg.xLargeSingle : cfg.xLargeDouble;
-        const uint16_t numColor = (lift.ocp == Occupancy::Free) ? C_GREEN : C_RED;
-        const bool atPanelFloor = (lift.pos == Config::Hardware::PANEL_FLOOR);
-
-        if (atPanelFloor) {
-            drawTextDirty(target, st.wArrow, cfg.arrowChar,
-                          cfg.arrowStopX, cfg.arrowStopY, &arrows40, C_YELLOW);
-            drawTextDirty(target, st.wFloor, posStr, xFloor, 147, &oneslot65, numColor);
-        } else {
-            eraseWidget(target, st.wArrow);
-            drawTextDirty(target, st.wFloor, posStr, xFloor, 122, &oneslot65, numColor);
+        const int16_t cx = DisplayGeom::centerX();
+        struct { const char* txt; int16_t cy; uint16_t col; } rows[] = {
+            { label,            pctY(15), C_YELLOW  },
+            { "folositi",       pctY(30), C_YELLOW  },
+            { "comanda de",     pctY(42), C_YELLOW  },
+            { "pe usa",         pctY(55), C_YELLOW  },
+            { "( cod: 03 )",    pctY(68), C_MAGENTA },
+            { "0740.317.707",   pctY(86), C_YELLOW  },
+        };
+        for (const auto &r : rows) {
+            Display::drawText(target,
+                DisplayGeom::cursorXForCenter(&universalis12, r.txt, cx),
+                DisplayGeom::baselineForVCenter(&universalis12, r.txt, r.cy),
+                &universalis12, r.txt, r.col);
         }
     }
 
-    void drawMovement(DisplayTarget target, const LayoutCoords &cfg,
+    void drawStop(DisplayTarget target, const LiftState &lift, PanelScreenState &st) {
+        const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
+        const int16_t xFloor = DisplayGeom::cursorXForCenter(&oneslot100, posStr, DisplayGeom::centerX());
+        const int16_t yFloor = DisplayGeom::baselineForVCenter(&oneslot100, posStr, DisplayGeom::centerY());
+        drawTextDirty(target, st.wFloor, posStr, xFloor, yFloor, &oneslot100, C_GREEN);
+    }
+
+    // Mișcare: etaj (jos sau sus, în funcție de sens) + destinație (opus).
+    // Ambele cifre sunt centrate orizontal pe axa centrală a ecranului (x=W/2),
+    // una deasupra celeilalte; pozițiile verticale sunt fracțiuni din înălțime.
+    void drawMovement(DisplayTarget target,
                       const LiftState &lift, PanelScreenState &st,
-                      int16_t yEtd, int16_t yFloor) {
+                      bool movingUp) {
         const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
         const char* etdStr = (lift.etd < Config::Hardware::FLOORS) ? floorStr[lift.etd] : "??";
-        const int16_t xFloor = (lift.pos <= 9) ? cfg.xLargeSingle : cfg.xLargeDouble;
-        const int16_t xEtd   = (lift.etd <= 9) ? cfg.xSmallSingle : cfg.xSmallDouble;
-        const uint16_t numColor = (lift.ocp == Occupancy::Free) ? C_GREEN : C_RED;
-        const bool etdAtPanel = (lift.etd == Config::Hardware::PANEL_FLOOR);
+        const int16_t cx = DisplayGeom::centerX();
 
-        if (etdAtPanel) {
-            drawTextDirty(target, st.wArrow, cfg.arrowChar,
-                          cfg.arrowEtdX, yEtd + 10, &arrows40, C_YELLOW);
-            drawTextDirty(target, st.wEtd, etdStr,
-                          xEtd + cfg.etdEtjOffset, yEtd, &oneslot30, C_YELLOW);
-        } else {
-            eraseWidget(target, st.wArrow);
-            drawTextDirty(target, st.wEtd, etdStr, xEtd, yEtd, &oneslot30, C_MAGENTA);
-        }
-        drawTextDirty(target, st.wFloor, posStr, xFloor, yFloor, &oneslot65, numColor);
+        // Baseline-uri din fracțiuni de ecran, simetrice sus/jos:
+        //   up:   destinație sus (~31%), poziție curentă jos (~94%)
+        //   down: poziție curentă sus (~31%), destinație jos (~94%)
+        // Astfel elementul „în mișcare" semantica sensului: ținta e mereu
+        // în direcția de deplasare (sus la urcare, jos la coborâre).
+        const int16_t yFloor = movingUp ? pctY(94) : pctY(31);
+        const int16_t yEtd   = movingUp ? pctY(31) : pctY(94);
+
+        // Ambele cifre centrate pe aceeași axă verticală centrală.
+        const int16_t xFloor = DisplayGeom::cursorXForCenter(&oneslot100, posStr, cx);
+        const int16_t xEtd   = DisplayGeom::cursorXForCenter(&oneslot65,  etdStr, cx);
+        drawTextDirty(target, st.wEtd, etdStr, xEtd, yEtd, &oneslot65, C_MAGENTA);
+        drawTextDirty(target, st.wFloor, posStr, xFloor, yFloor, &oneslot100, C_GREEN);
     }
 
-    PanelScreenState stLeft;
-    PanelScreenState stRight;
+    PanelScreenState stPanel;
 }
 
 namespace PanelRenderer {
 
 void invalidate(DisplayTarget target) {
-    PanelScreenState &st = (target == DisplayTarget::Left) ? stLeft : stRight;
-    st.firstRender = true;
+    (void)target;
+    stPanel.firstRender = true;
 }
 
 void render(DisplayTarget target, const LiftState &lift, const char* label) {
-    PanelScreenState &st = (target == DisplayTarget::Left) ? stLeft : stRight;
-    const LayoutCoords &cfg = (target == DisplayTarget::Left) ? CFG_LEFT : CFG_RIGHT;
+    (void)target;
+    PanelScreenState &st = stPanel;
     PanelLayout newLayout = getLayout(lift.svc, lift.sj);
 
     // --- 1. FIRST RENDER ---
@@ -198,7 +207,6 @@ void render(DisplayTarget target, const LiftState &lift, const char* label) {
         resetAllWidgets(st);
         st.lastPos = -1;
         st.lastEtd = -1;
-        st.lastOcp = -1;
         st.lastSvc = ServiceState::Missing;  // ← CORECTAT
     }
 
@@ -208,33 +216,31 @@ void render(DisplayTarget target, const LiftState &lift, const char* label) {
             Display::clearTargetScreen(target);
         } else {
             eraseWidget(target, st.wFloor);
-            eraseWidget(target, st.wArrow);
             eraseWidget(target, st.wEtd);
         }
         resetAllWidgets(st);
         st.layout = newLayout;
         st.lastPos = -1;
         st.lastEtd = -1;
-        st.lastOcp = -1;
         st.lastSvc = ServiceState::Missing;  // ← CORECTAT
     }
 
     // --- 3. SAME LAYOUT - DIRTY CHECK ---
     if (lift.pos == st.lastPos && lift.etd == st.lastEtd
-        && static_cast<int>(lift.ocp) == st.lastOcp && lift.svc == st.lastSvc) {
+        && lift.svc == st.lastSvc) {
         return;
     }
 
     // --- 4. RENDER ---
     switch (newLayout) {
         case PanelLayout::Stop:
-            drawStop(target, cfg, lift, st);
+            drawStop(target, lift, st);
             break;
         case PanelLayout::Up:
-            drawMovement(target, cfg, lift, st, 50, 155);
+            drawMovement(target, lift, st, true);
             break;
         case PanelLayout::Down:
-            drawMovement(target, cfg, lift, st, 150, 90);
+            drawMovement(target, lift, st, false);
             break;
         case PanelLayout::Defect:
             if (lift.pos != st.lastPos) {
@@ -259,7 +265,6 @@ void render(DisplayTarget target, const LiftState &lift, const char* label) {
 
     st.lastPos = lift.pos;
     st.lastEtd = lift.etd;
-    st.lastOcp = static_cast<int>(lift.ocp);
     st.lastSvc = lift.svc;
 }
 

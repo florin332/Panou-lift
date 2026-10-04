@@ -18,12 +18,16 @@ struct ProcessedDiagnostics {
     const char* resetReason; 
     uint32_t uptime;
 
-    // Gruparea simetrică a cabinelor
+    // Starea singurului ascensor
     LiftDiagnostics lift1;
-    LiftDiagnostics lift2;
 
     // Statistici de sistem
     uint16_t seqlockCollisions;
+    uint32_t rxFrames;
+    uint32_t rxTimeouts;
+    uint32_t rxFormatErrors;
+    uint32_t rxCrcErrors;
+    uint32_t rxDataErrors;
 };
 
 namespace Diagnostics

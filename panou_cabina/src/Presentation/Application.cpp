@@ -11,7 +11,6 @@
 // 2. Rute interne în cadrul aceluiași folder src/Presentation/
 #include "Presentation.h"
 #include "Protocol.h"
-#include "LiftController.h"
 
 // 3. Rute către folderul src/Drivers/ (Urcat un nivel și intrat în Drivers)
 #include "../Drivers/Display.h"
@@ -45,7 +44,6 @@ namespace Application
     void init() {
         Presentation::init();
         Protocol::init();
-        LiftController::init();
         Diagnostics::init();
 
         // NOU: Inițializare Service Mode
@@ -76,8 +74,7 @@ namespace Application
         const bool returnedFromService = wasInServiceMode && !ServiceMenu::isInServiceMode();
 
         if (returnedFromService) {
-            PanelRenderer::invalidate(DisplayTarget::Left);
-            PanelRenderer::invalidate(DisplayTarget::Right);
+            PanelRenderer::invalidate(DisplayTarget::Panel);
         }
 
         // Dacă suntem în Service Mode, ServiceMenu preia controlul complet
@@ -93,19 +90,16 @@ namespace Application
             const bool displayWoke = Presentation::update(localSnapshot);
 
             if (displayWoke) {
-                PanelRenderer::invalidate(DisplayTarget::Left);
-                PanelRenderer::invalidate(DisplayTarget::Right);
+                PanelRenderer::invalidate(DisplayTarget::Panel);
             }
 
             const DiagnosticsNavigator::NavigatorState &nav = DiagnosticsNavigator::getState();
 
             // --- ECRAN PRINCIPAL ---
-            PanelRenderer::render(DisplayTarget::Right, localSnapshot.lift2, "ASCENSOR 2");
-
             if (!nav.isMenuOpen) {
-                PanelRenderer::render(DisplayTarget::Left, localSnapshot.lift1, "ASCENSOR 1");
+                PanelRenderer::render(DisplayTarget::Panel, localSnapshot.lift1, "ASCENSOR");
             } else {
-                PanelRenderer::invalidate(DisplayTarget::Left);
+                PanelRenderer::invalidate(DisplayTarget::Panel);
             }
 
             // --- MENIU DIAGNOSTIC ---
@@ -118,7 +112,7 @@ namespace Application
                     uint8_t pageIdx = (nav.currentProfile == DiagnosticsProfile::Service)
                         ? nav.servicePageIndex : nav.developerPageIndex;
                     UIPresenter::buildPage(info, nav.currentProfile, pageIdx, logicalPage);
-                    DisplayRenderer::render(DisplayTarget::Left, logicalPage);
+                    DisplayRenderer::render(DisplayTarget::Panel, logicalPage);
                 }
             }
 
@@ -138,14 +132,6 @@ namespace Application
         }
 
         Protocol::update(localPanelCore1);
-
-        // Scanăm la fiecare iterație microsecundică butoanele GP16/GP26 (V10.26)
-        DiagnosticsNavigator::updateButtons();
-
-        ControllerResult result = LiftController::process(localPanelCore1);
-        if (result.transmit) {
-            Protocol::trimiteApel(result.lift);
-        }
 
         if (millis() - lastUptimeUpdate >= 1000) {
             lastUptimeUpdate += 1000;

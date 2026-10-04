@@ -22,7 +22,8 @@ struct Command {
         McuWdt,
         McuLastReset,
         McuTemp,
-        McuStack
+        McuStack,
+        CommCountStatus      // mb_com_status: raporteaza contoarele RX pe serial
     } type = Type::None;
 
     uint8_t param = 0;

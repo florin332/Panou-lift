@@ -60,24 +60,14 @@ namespace DiagnosticsPages
                 fillTxt(output.lines[4], "LIFT_OCP", info.lift1.ocp, evalLiftState(info.lift1.ocp));
                 break;
 
-            case ServicePage::Lift2:
-                output.title = "LIFT_2_TITLE";
-                fillNum(output.lines[0], "LIFT_POS", info.lift2.pos, SemanticState::Neutral);
-                fillNum(output.lines[1], "LIFT_TRG", info.lift2.etd, SemanticState::Neutral);
-                fillTxt(output.lines[2], "LIFT_DIR", info.lift2.sj, evalLiftState(info.lift2.sj));
-                fillTxt(output.lines[3], "LIFT_SVC", info.lift2.svc, evalLiftState(info.lift2.svc));
-                fillTxt(output.lines[4], "LIFT_OCP", info.lift2.ocp, evalLiftState(info.lift2.ocp));
-                break;
-
             case ServicePage::Communication:
                 output.title = "COMM_TITLE";
                 fillTxt(output.lines[0], "COMM_L1_STS",
                     strcmp(info.lift1.svc, "No Serial") == 0 ? "MISSING" : "OK",
                     strcmp(info.lift1.svc, "No Serial") == 0 ? SemanticState::Alert : SemanticState::Success);
-                fillTxt(output.lines[1], "COMM_L2_STS",
-                    strcmp(info.lift2.svc, "No Serial") == 0 ? "MISSING" : "OK",
-                    strcmp(info.lift2.svc, "No Serial") == 0 ? SemanticState::Alert : SemanticState::Success);
-                fillTxt(output.lines[2], "COMM_TIMEOUTS", "OK", SemanticState::Success);
+                fillNum(output.lines[1], "COMM_TIMEOUTS", info.rxTimeouts,
+                    info.rxTimeouts == 0 ? SemanticState::Success : SemanticState::Alert);
+                fillEmpty(output.lines[2]);
                 fillEmpty(output.lines[3]);
                 fillEmpty(output.lines[4]);
                 break;
@@ -127,10 +117,13 @@ namespace DiagnosticsPages
 
             case DevPage::ProtocolStats:
                 output.title = "DEV_PROT_TITLE";
-                fillNum(output.lines[0], "UART1_RX_PKT", 12457, SemanticState::Neutral);
-                fillNum(output.lines[1], "UART2_RX_PKT", 12455, SemanticState::Neutral);
-                fillNum(output.lines[2], "UART_TX_PKT", 842, SemanticState::Neutral);
-                fillNum(output.lines[3], "CRC_FAILURES", 0, SemanticState::Success);
+                fillTxt(output.lines[0], "UART1_ALARM_TX", "RESERVED", SemanticState::Warning);
+                fillNum(output.lines[1], "UART2_RX_PKT", info.rxFrames, SemanticState::Neutral);
+                fillNum(output.lines[2], "CRC_FAILURES", info.rxCrcErrors,
+                    info.rxCrcErrors == 0 ? SemanticState::Success : SemanticState::Alert);
+                fillNum(output.lines[3], "PARSER_ERRS",
+                    info.rxFormatErrors + info.rxDataErrors,
+                    info.rxFormatErrors + info.rxDataErrors == 0 ? SemanticState::Success : SemanticState::Alert);
                 fillEmpty(output.lines[4]);
                 break;
 
@@ -138,9 +131,7 @@ namespace DiagnosticsPages
                 output.title = "DEV_ASRT_TITLE";
                 fillTxt(output.lines[0], "ASRT_PANEL", "OK", SemanticState::Success);
                 fillTxt(output.lines[1], "ASRT_EEPROM", "OK", SemanticState::Success);
-                fillTxt(output.lines[2], "ASRT_UART1",
-                    strcmp(info.lift2.svc, "No Serial") == 0 ? "NO" : "OK",
-                    strcmp(info.lift2.svc, "No Serial") == 0 ? SemanticState::Alert : SemanticState::Success);
+                fillTxt(output.lines[2], "ASRT_UART1", "RESERVED", SemanticState::Warning);
                 fillTxt(output.lines[3], "ASRT_UART2",
                     strcmp(info.lift1.svc, "No Serial") == 0 ? "NO" : "OK",
                     strcmp(info.lift1.svc, "No Serial") == 0 ? SemanticState::Alert : SemanticState::Success);

@@ -48,7 +48,6 @@ struct SoundState {
 
 struct ScreenState {
     ScreenMode tft1;
-    ScreenMode tft2;
 };
 
 struct UiState {
@@ -66,11 +65,26 @@ struct SystemState {
     uint8_t  lastResetReason;
 };
 
+// Contoare receptie seriala detaliate (incrementate doar cand counting e activat din Service Box)
+struct CommLineCounters {
+    uint32_t rxFrames;      // cadre complet delimitate (START...END)
+    uint32_t rxValid;       // cadre acceptate (format + CRC + domeniu)
+    uint32_t rxTimeout;     // cadru inceput, dar neterminat in timeout
+    uint32_t rxFormatError; // delimitatori/campuri/format invalide
+    uint32_t rxCrcError;    // CRC prezent, dar incorect
+    uint32_t rxDataError;   // format corect, dar valori imposibile
+};
+
+struct CommState {
+    CommLineCounters lift1;
+    uint8_t countingEnabled; // 1 = numarare activa (pornita cu comm_count_enable)
+};
+
 struct SharedPanel {
     LiftState lift1;
-    LiftState lift2;
     UiState ui;                 
     SystemState system;
+    CommState comm;
 };
 
 struct alignas(8) SharedMemory {

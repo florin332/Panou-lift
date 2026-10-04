@@ -46,10 +46,10 @@ struct PageModel {
 
 namespace DiagnosticsPages
 {
-    enum class ServicePage : uint8_t { System, Lift1, Lift2, Communication, Version };
+    enum class ServicePage : uint8_t { System, Lift1, Communication, Version };
     enum class DevPage : uint8_t { Engineering, MemoryLayout, Tasks, ProtocolStats, Assertions };
 
-    constexpr uint8_t TOTAL_SERVICE_PAGES = 5;
+    constexpr uint8_t TOTAL_SERVICE_PAGES = 4;
     constexpr uint8_t TOTAL_DEV_PAGES     = 5;
 
     void init();
