@@ -38,6 +38,21 @@ void shared_panel_write(volatile SharedMemory &sharedMem, const SharedPanel &new
     sharedMem.panel.system.seqlockCollisions  = newData.system.seqlockCollisions;
     sharedMem.panel.system.bootCounter        = newData.system.bootCounter;
     sharedMem.panel.system.lastResetReason    = newData.system.lastResetReason;
+
+    // --- COPIERE PRIMITIVĂ TYPE-SAFE STRUCTURA COMM (CONTOARE RX DETALIATE) ---
+    sharedMem.panel.comm.lift1.rxFrames      = newData.comm.lift1.rxFrames;
+    sharedMem.panel.comm.lift1.rxValid       = newData.comm.lift1.rxValid;
+    sharedMem.panel.comm.lift1.rxTimeout     = newData.comm.lift1.rxTimeout;
+    sharedMem.panel.comm.lift1.rxFormatError = newData.comm.lift1.rxFormatError;
+    sharedMem.panel.comm.lift1.rxCrcError    = newData.comm.lift1.rxCrcError;
+    sharedMem.panel.comm.lift1.rxDataError   = newData.comm.lift1.rxDataError;
+    sharedMem.panel.comm.lift2.rxFrames      = newData.comm.lift2.rxFrames;
+    sharedMem.panel.comm.lift2.rxValid       = newData.comm.lift2.rxValid;
+    sharedMem.panel.comm.lift2.rxTimeout     = newData.comm.lift2.rxTimeout;
+    sharedMem.panel.comm.lift2.rxFormatError = newData.comm.lift2.rxFormatError;
+    sharedMem.panel.comm.lift2.rxCrcError    = newData.comm.lift2.rxCrcError;
+    sharedMem.panel.comm.lift2.rxDataError   = newData.comm.lift2.rxDataError;
+    sharedMem.panel.comm.countingEnabled     = newData.comm.countingEnabled;
     
     asm volatile("dmb" : : : "memory"); // Asigură scrierea datelor înainte de modificarea seq finală
     sharedMem.seq++; // Pasul 2: Validăm snapshot-ul stabil (Devine PAR)
@@ -77,6 +92,20 @@ bool shared_panel_read(volatile const SharedMemory &sharedMem, SharedPanel &loca
         localCopy.system.seqlockCollisions = sharedMem.panel.system.seqlockCollisions;
         localCopy.system.bootCounter       = sharedMem.panel.system.bootCounter;
         localCopy.system.lastResetReason   = sharedMem.panel.system.lastResetReason;
+
+        localCopy.comm.lift1.rxFrames      = sharedMem.panel.comm.lift1.rxFrames;
+        localCopy.comm.lift1.rxValid       = sharedMem.panel.comm.lift1.rxValid;
+        localCopy.comm.lift1.rxTimeout     = sharedMem.panel.comm.lift1.rxTimeout;
+        localCopy.comm.lift1.rxFormatError = sharedMem.panel.comm.lift1.rxFormatError;
+        localCopy.comm.lift1.rxCrcError    = sharedMem.panel.comm.lift1.rxCrcError;
+        localCopy.comm.lift1.rxDataError   = sharedMem.panel.comm.lift1.rxDataError;
+        localCopy.comm.lift2.rxFrames      = sharedMem.panel.comm.lift2.rxFrames;
+        localCopy.comm.lift2.rxValid       = sharedMem.panel.comm.lift2.rxValid;
+        localCopy.comm.lift2.rxTimeout     = sharedMem.panel.comm.lift2.rxTimeout;
+        localCopy.comm.lift2.rxFormatError = sharedMem.panel.comm.lift2.rxFormatError;
+        localCopy.comm.lift2.rxCrcError    = sharedMem.panel.comm.lift2.rxCrcError;
+        localCopy.comm.lift2.rxDataError   = sharedMem.panel.comm.lift2.rxDataError;
+        localCopy.comm.countingEnabled     = sharedMem.panel.comm.countingEnabled;
         
         asm volatile("dmb" : : : "memory"); // Împiedică devansarea citirii contorului final seq
         end_seq = sharedMem.seq;

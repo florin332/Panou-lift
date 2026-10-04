@@ -8,12 +8,13 @@
 #include "SharedPanel.h"
 #include "PanelRenderer.h"
 #include <Arduino.h>
+#include <atomic>
 
 extern volatile SharedMemory gSharedMemory;
 
 namespace ServiceMenu {
 
-static bool sInService = false;
+static std::atomic<bool> sInService{false};
 static unsigned long sLastActivityMillis = 0;
 
 // Stare display: false = idle (date reale + overlay), true = test activ
@@ -25,6 +26,7 @@ static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData);
 static void restoreServiceMain();
 static void runCommTest();
 static void sendCommStatus();
+static void sendCommCountStatus();
 static void sendDiagnostics();
 static void runDispTest(uint8_t tftId);
 static void runDispReinit(uint8_t tftId);
@@ -65,13 +67,13 @@ static const char* occupancyText(Occupancy occupancy) {
 }
 
 void init() {
-    sInService = false;
+    sInService.store(false, std::memory_order_relaxed);
     sLastActivityMillis = 0;
     sDisplayTestActive = false;
 }
 
 bool isInServiceMode() {
-    return sInService;
+    return sInService.load(std::memory_order_relaxed);
 }
 
 bool isDisplayCommandActive() {
@@ -85,9 +87,11 @@ void update() {
     bool haveNewData = shared_panel_read(gSharedMemory, localPanel);
 
     // 2. In afara Service Mode, update() doar consuma comenzi de intrare.
-    if (sInService && !sDisplayTestActive) {
+    if (sInService.load(std::memory_order_relaxed) && !sDisplayTestActive) {
         if (haveNewData) {
             Display::update(localPanel);
+            PanelRenderer::render(DisplayTarget::Right, localPanel.lift2, "ASCENSOR 2");
+            PanelRenderer::render(DisplayTarget::Left, localPanel.lift1, "ASCENSOR 1");
         }
         uint16_t overlayColor = getOverlayColor(localPanel, haveNewData);
         Display::drawServiceOverlay(DisplayTarget::Left, overlayColor);
@@ -135,14 +139,14 @@ static void restoreServiceMain() {
 static void handleCommand(const ServiceProtocol::Command &cmd) {
     switch (cmd.type) {
         case ServiceProtocol::Command::Type::EnterService:
-            sInService = true;
+            sInService.store(true, std::memory_order_relaxed);
             sDisplayTestActive = false;
             Display::setServiceMode(true);
             ServiceProtocol::sendResponse("ACK SRV ENTER");
             break;
 
         case ServiceProtocol::Command::Type::ExitService:
-            sInService = false;
+            sInService.store(false, std::memory_order_relaxed);
             sDisplayTestActive = false;
             Display::setServiceMode(false);
             ServiceProtocol::sendResponse("ACK SRV EXIT");
@@ -176,6 +180,11 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
         case ServiceProtocol::Command::Type::CommTestOut:
             if (!checkService()) break;
             exitDisplayTest();
+            break;
+
+        case ServiceProtocol::Command::Type::CommCountStatus:
+            if (!checkService()) break;
+            sendCommCountStatus();
             break;
 
         case ServiceProtocol::Command::Type::DispTestExit:
@@ -220,7 +229,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 }
 
 static bool checkService() {
-    if (!sInService) {
+    if (!sInService.load(std::memory_order_relaxed)) {
         ServiceProtocol::sendResponse("ERR 03 NOT_IN_SERVICE");
         return false;
     }
@@ -285,6 +294,36 @@ static void sendCommStatus() {
     snprintf(response, sizeof(response),
         "OK STATUS L1=%s L2=%s",
         serviceText(panel.lift1.svc), serviceText(panel.lift2.svc));
+    ServiceProtocol::sendResponse(response);
+}
+
+// Raporteaza contoarele de receptie detaliate pe serial (afisarea se face pe Service Box)
+// Format: OK COMM STATUS L1=frames,valid,timeout,formatErr,crcErr,dataErr L2=... ON|OFF
+static void sendCommCountStatus() {
+    SharedPanel panel;
+    if (!shared_panel_read(gSharedMemory, panel)) {
+        ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
+        return;
+    }
+
+    const CommLineCounters &c1 = panel.comm.lift1;
+    const CommLineCounters &c2 = panel.comm.lift2;
+    char response[160];
+    snprintf(response, sizeof(response),
+        "OK COMM STATUS L1=%lu,%lu,%lu,%lu,%lu,%lu L2=%lu,%lu,%lu,%lu,%lu,%lu %s",
+        static_cast<unsigned long>(c1.rxFrames),
+        static_cast<unsigned long>(c1.rxValid),
+        static_cast<unsigned long>(c1.rxTimeout),
+        static_cast<unsigned long>(c1.rxFormatError),
+        static_cast<unsigned long>(c1.rxCrcError),
+        static_cast<unsigned long>(c1.rxDataError),
+        static_cast<unsigned long>(c2.rxFrames),
+        static_cast<unsigned long>(c2.rxValid),
+        static_cast<unsigned long>(c2.rxTimeout),
+        static_cast<unsigned long>(c2.rxFormatError),
+        static_cast<unsigned long>(c2.rxCrcError),
+        static_cast<unsigned long>(c2.rxDataError),
+        panel.comm.countingEnabled ? "ON" : "OFF");
     ServiceProtocol::sendResponse(response);
 }
 
