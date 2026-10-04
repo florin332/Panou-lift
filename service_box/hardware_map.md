@@ -67,23 +67,23 @@ Status: **TESTED - OK**
 
 Status: **NOT TESTED**
 
-- [ ] VBAT_STATUS = GP24 (Digital Input)
+- [ ] USB_PRESENT_PIN = GP24 (Digital Input)
 
 * **Purpose**: Hardware Power Path Switching monitor.
 * **Logic HIGH (1)**: USB Type-C (5V) is connected and stable. The onboard MOSFETs safely isolate the battery to prevent overvoltage damage.
 * **Logic LOW (0)**: USB is disconnected. VSYS has dropped to battery voltage levels (~3.7V - 4.2V).
 * **Note**: Replaces the standard Raspberry Pi Pico SMPS power-saving toggle.
 
-- [ ] VSYS_STATUS = GP23 (Digital Input)
+- [ ] BAT_ACTIVE_PIN = GP23 (Digital Input)
 
 * **Purpose**: Battery connection and charge cycle state monitor.
 * **Logic HIGH (1)**: Battery is connected and discharging (running exclusively on battery).
 * **Logic LOW (0)**: System is powered via USB. The TP4065 charger is either actively charging the battery (Red LED on), the charge cycle is finished, or no battery is plugged in.
 
-- [ ] VBUS_ADC = GP29 ADC Channel 3 - Voltage Measurement (Analog Input)
+- [ ] BAT_VOLTAGE_ADC = GP29 ADC Channel 3 - Voltage Measurement (Analog Input)
 
 * **Purpose**: Actual battery voltage monitoring.
-* **Mechanism**: Connected to the VSYS rail via an onboard voltage divider (divides voltage by 3 to safely match the 3.3V RP2040 limit).
+* **Mechanism**: Connected to the VBUS rail via an onboard voltage divider (divides voltage by 3 to safely match the 3.3V RP2040 limit).
 * **Usage**: Only read this pin to calculate battery capacity percentage (0-100%) when GPIO23 is LOW (Battery Mode).
 
 Copilot Programming Guidelines & Prompts
@@ -92,49 +92,36 @@ When generating code for power monitoring on Marble Pico, adhere to these rules:
 
 1. **State vs. Voltage**: Never use GPIO23 or GPIO24 to measure analog voltage. They only return digital binary states (`0` or `1`).
 2. **Conditional ADC Reading**: Only read `ADC(29)` when `GPIO23 == 0` to get an accurate representation of the battery's remaining capacity.
-3. **Conversion Formula**: Multiply the raw 16-bit ADC value (`read_u16()`) by the scaling factor to reconstruct the actual battery voltage:
-   \[\text{Voltage} = \frac{\text{ADC\_Raw}}{65535} \times 3.3 \times 3\]
+3. **Conversion Formula**: Multiply the raw 16-bit ADC value (`read_u16()`) by the scaling factor to reconstruct the actual battery voltage.
 
 Board-specific battery measurement inputs.
 
 ### ADC inputs
 
-- [ ] VSYS_ADC = GP23
-- [ ] VBAT_ADC = GP24
+- [ ] BAT_VOLTAGE_ADC = GP29
 
-### Voltage dividers
 
-Both inputs use the same resistive divider:
+### Voltage divider:
+
+
 
 ```text
-VBAT / VSYS
-     |
-    100 kΩ
-     |
-     +---> GP24 / GP23
+    VBUS
      |
     200 kΩ
      |
-    100 nF
+     +---> GP29
+     |
+    100 kΩ & 100 nF
+
      |
     GND
 ```
 
-- Divider ratio: (100 kΩ + 200 kΩ) / 200 kΩ = **1.5**
+
 - Filter capacitor: **100 nF** to GND
 
-### Notes
 
-- These ADC inputs are defined by the Marble Pico board wiring.
-- The RP2040 native ADC channels are GPIO26..GPIO29; ensure the board
-  routes GP23/GP24 to the ADC block or an external ADC.
-- Charging/battery state detection follows the state matrix defined in
-  the project battery policy:
-    - VSYS ≈ 5.0 V and VBAT noisy  → no battery connected;
-    - VSYS ≈ 5.0 V and VBAT stable → charging or battery full;
-    - VSYS < 4.4 V and VSYS ≈ VBAT → running on battery (USB disconnected).
-- Thresholds and conversion curve are defined in the target-specific
-  Battery Manager implementation, not in this hardware map.
 
 ## 1.6 USB / UF2
 
