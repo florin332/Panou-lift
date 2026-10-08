@@ -156,12 +156,16 @@ namespace {
         const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
         const int16_t xFloor = DisplayGeom::cursorXForCenter(&oneslot100, posStr, DisplayGeom::centerX());
         const int16_t yFloor = DisplayGeom::baselineForVCenter(&oneslot100, posStr, DisplayGeom::centerY());
-        drawTextDirty(target, st.wFloor, posStr, xFloor, yFloor, &oneslot100, C_GREEN);
+        drawTextDirty(target, st.wFloor, posStr, xFloor, yFloor, &oneslot100, C_YELLOW);
     }
 
-    // Mișcare: etaj (jos sau sus, în funcție de sens) + destinație (opus).
-    // Ambele cifre sunt centrate orizontal pe axa centrală a ecranului (x=W/2),
-    // una deasupra celeilalte; pozițiile verticale sunt fracțiuni din înălțime.
+    // Mișcare: poziția curentă (font mare, verde) și destinația (font mic, magenta),
+    // ambele centrate pe axa centrală (x=W/2), una sus și una jos, în funcție de sens.
+    //   up:   destinație sus (~31%), poziție curentă jos (~94%)
+    //   down: poziție curentă sus, destinație jos (~94%)
+    // La coborâre poziția curentă (font mare, 129px) nu poate sta la ~31% — ar ieși
+    // din ecran în sus — deci o coborâm la ~44% (baseline 140/320), sub care rămâne
+    // loc pentru destinație.
     void drawMovement(DisplayTarget target,
                       const LiftState &lift, PanelScreenState &st,
                       bool movingUp) {
@@ -169,15 +173,9 @@ namespace {
         const char* etdStr = (lift.etd < Config::Hardware::FLOORS) ? floorStr[lift.etd] : "??";
         const int16_t cx = DisplayGeom::centerX();
 
-        // Baseline-uri din fracțiuni de ecran, simetrice sus/jos:
-        //   up:   destinație sus (~31%), poziție curentă jos (~94%)
-        //   down: poziție curentă sus (~31%), destinație jos (~94%)
-        // Astfel elementul „în mișcare" semantica sensului: ținta e mereu
-        // în direcția de deplasare (sus la urcare, jos la coborâre).
-        const int16_t yFloor = movingUp ? pctY(94) : pctY(31);
+        const int16_t yFloor = movingUp ? pctY(94) : pctY(44);
         const int16_t yEtd   = movingUp ? pctY(31) : pctY(94);
 
-        // Ambele cifre centrate pe aceeași axă verticală centrală.
         const int16_t xFloor = DisplayGeom::cursorXForCenter(&oneslot100, posStr, cx);
         const int16_t xEtd   = DisplayGeom::cursorXForCenter(&oneslot65,  etdStr, cx);
         drawTextDirty(target, st.wEtd, etdStr, xEtd, yEtd, &oneslot65, C_MAGENTA);

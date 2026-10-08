@@ -39,6 +39,7 @@ namespace Display
     constexpr uint16_t COLOR_RED    = 0xF800;
 
     static bool backlightOn = true;
+    static bool displayActive = true;
     static bool serviceModeActive = false;
 
     static void setBacklight(bool enabled) {
@@ -73,6 +74,7 @@ namespace Display
     void setServiceMode(bool active) {
         serviceModeActive = active;
         if (active) {
+            displayActive = true;
             setBacklight(true);
         }
     }
@@ -82,13 +84,37 @@ namespace Display
     }
 
     bool update(const SharedPanel &localPanel) {
-        (void)localPanel;
+        if (serviceModeActive) {
+            displayActive = true;
+            setBacklight(true);
+            return false;
+        }
+
+        const bool shouldDisplay = localPanel.ui.screen.tft1 == ScreenMode::Normal
+            && (localPanel.lift1.ocp == Occupancy::Busy
+                || localPanel.lift1.svc != ServiceState::Normal);
+
+        if (!shouldDisplay) {
+            if (displayActive || backlightOn) {
+                tft1.fillScreen(COLOR_BLACK);
+                displayActive = false;
+                setBacklight(false);
+            }
+            return false;
+        }
+
+        if (!displayActive) {
+            displayActive = true;
+            setBacklight(true);
+            return true;
+        }
+
         setBacklight(true);
         return false;
     }
 
     void showBacklight() {
-        setBacklight(true);
+        setBacklight(displayActive);
     }
 
     // --- IMPLEMENTATION OF THE TECHNICAL DASHBOARD PRIMITIVES ---

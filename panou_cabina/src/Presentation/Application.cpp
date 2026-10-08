@@ -93,6 +93,11 @@ namespace Application
                 PanelRenderer::invalidate(DisplayTarget::Panel);
             }
 
+            if (localSnapshot.lift1.ocp == Occupancy::Free
+                && localSnapshot.lift1.svc == ServiceState::Normal) {
+                return;
+            }
+
             const DiagnosticsNavigator::NavigatorState &nav = DiagnosticsNavigator::getState();
 
             // --- ECRAN PRINCIPAL ---
