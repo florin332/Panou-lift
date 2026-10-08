@@ -12,6 +12,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <SPI.h>
+#include "../Core/Models/Images.h"
 
 // 2. Custom hardware dashboard fonts loaded from src/Fonts/
 #include "../Fonts/oneslot30.h"
@@ -41,6 +42,7 @@ namespace Display
     static bool backlightOn = true;
     static bool displayActive = true;
     static bool serviceModeActive = false;
+    static bool overloadImageVisible = false;
 
     static void setBacklight(bool enabled) {
         if (backlightOn == enabled) return;
@@ -115,6 +117,30 @@ namespace Display
 
     void showBacklight() {
         setBacklight(displayActive);
+    }
+
+    void showOverloadImage() {
+        displayActive = true;
+        setBacklight(true);
+
+        if (overloadImageVisible)
+            return;
+
+        uint16_t rowBuffer[240];
+        tft1.startWrite();
+        tft1.setAddrWindow(0, 0, image_max300_width, image_max300_height);
+        for (int y = 0; y < image_max300_height; y++) {
+            for (int x = 0; x < image_max300_width; x++) {
+                rowBuffer[x] = pgm_read_word(&image_max300[y * image_max300_width + x]);
+            }
+            tft1.writePixels(rowBuffer, image_max300_width);
+        }
+        tft1.endWrite();
+        overloadImageVisible = true;
+    }
+
+    void hideOverloadImage() {
+        overloadImageVisible = false;
     }
 
     // --- IMPLEMENTATION OF THE TECHNICAL DASHBOARD PRIMITIVES ---

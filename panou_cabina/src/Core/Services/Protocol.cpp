@@ -280,8 +280,8 @@ namespace Protocol
         Serial2.setRX(Pins::UART::DATA_RX);
         Serial1.begin(Config::Protocol::SERIAL_BAUD);
         Serial2.begin(Config::Protocol::SERIAL_BAUD);
-        pinMode(Pins::Inputs::ALARM, INPUT);
-        pinMode(Pins::Inputs::OVERLOAD, INPUT);
+        pinMode(Pins::Inputs::ALARM, INPUT_PULLUP);
+        pinMode(Pins::Inputs::OVERLOAD, INPUT_PULLUP);
         memset(&rxLift1, 0, sizeof(RxBuffer));
         rxLift1.lastValidPacketMillis = millis();
         // Dupa reboot numararea este inactiva si contoarele sunt zero

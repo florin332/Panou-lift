@@ -71,11 +71,26 @@ namespace Application
 
     // ==================== CORE 0: Randare + Service Mode ====================
     void runCore0() {
+        static bool overloadImageWasActive = false;
+
+        if (digitalRead(Pins::Inputs::OVERLOAD) == LOW) {
+            Display::showOverloadImage();
+            overloadImageWasActive = true;
+            return;
+        }
+
+        if (overloadImageWasActive) {
+            Display::hideOverloadImage();
+            PanelRenderer::invalidate(DisplayTarget::Panel);
+            overloadImageWasActive = false;
+        }
+
         const bool wasInServiceMode = ServiceMenu::isInServiceMode();
         ServiceMenu::update();
+        const bool enteredService = !wasInServiceMode && ServiceMenu::isInServiceMode();
         const bool returnedFromService = wasInServiceMode && !ServiceMenu::isInServiceMode();
 
-        if (returnedFromService) {
+        if (enteredService || returnedFromService) {
             PanelRenderer::invalidate(DisplayTarget::Panel);
         }
 
@@ -133,6 +148,8 @@ namespace Application
     void runCore1() {
         static SharedPanel localPanelCore1 = {};
         static unsigned long lastUptimeUpdate = 0;
+        static unsigned long lastOverloadSoundMillis = 0;
+        static bool overloadWasActive = false;
 
         if (!shared_panel_read(gSharedMemory, localPanelCore1)) {
             return;
@@ -147,6 +164,18 @@ namespace Application
         }
 
         Sound::update(localPanelCore1);
+
+        const bool overloadActive = digitalRead(Pins::Inputs::OVERLOAD) == LOW;
+        if (!overloadActive) {
+            overloadWasActive = false;
+        } else if (!overloadWasActive) {
+            Sound::overload();
+            lastOverloadSoundMillis = millis();
+            overloadWasActive = true;
+        } else if (millis() - lastOverloadSoundMillis >= 5000 && !Sound::isPlaying()) {
+            Sound::overload();
+            lastOverloadSoundMillis = millis();
+        }
 
         if (millis() - lastUptimeUpdate >= 1000) {
             lastUptimeUpdate += 1000;

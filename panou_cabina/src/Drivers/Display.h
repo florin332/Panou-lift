@@ -15,6 +15,8 @@ namespace Display
     void init();
     bool update(const SharedPanel &localPanel);
     void showBacklight();
+    void showOverloadImage();
+    void hideOverloadImage();
 
     // Service Mode control
     void setServiceMode(bool active);
