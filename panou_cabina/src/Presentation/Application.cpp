@@ -14,6 +14,7 @@
 
 // 3. Rute către folderul src/Drivers/ (Urcat un nivel și intrat în Drivers)
 #include "../Drivers/Display.h"
+#include "../Drivers/Sound.h"
 
 // 4. Rute către tab-urile rămase în rădăcina mare a proiectului (Urcat două niveluri)
 #include "Diagnostics.h"
@@ -43,6 +44,7 @@ namespace Application
 
     void init() {
         Presentation::init();
+        Sound::init();
         Protocol::init();
         Diagnostics::init();
 
@@ -136,7 +138,15 @@ namespace Application
             return;
         }
 
+        const Direction previousDirection = localPanelCore1.lift1.sj;
         Protocol::update(localPanelCore1);
+
+        if (previousDirection != Direction::Idle &&
+            localPanelCore1.lift1.sj == Direction::Idle) {
+            Sound::liftStopped();
+        }
+
+        Sound::update(localPanelCore1);
 
         if (millis() - lastUptimeUpdate >= 1000) {
             lastUptimeUpdate += 1000;
