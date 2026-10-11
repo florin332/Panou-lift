@@ -16,7 +16,7 @@ namespace
     constexpr int I2S_DATA  = 10;
 
     constexpr int AUDIO_SAMPLE_RATE = 16000;
-    constexpr float AUDIO_GAIN = 0.3f;
+    constexpr float AUDIO_GAIN = 0.5f;
 
     class PersistentAudioOutputI2S : public AudioOutputI2S
     {

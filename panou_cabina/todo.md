@@ -6,7 +6,7 @@
 - [ ] Implement direct automated ASCII feedback transmissions: `ACK SRV ENTER`, `ACK SRV EXIT`, and global `ERR` strings.
 
 ## 2. Dual TFT Graphic Rendering Layers
-- [ ] Code the service layout frame overlay to lock out standard display rendering when `mb_in` status is active.
+- [ ] Code the service layout frame overlay to lock out standard display rendering when `mb_01` status is active.
 - [ ] Map the tokenized data array from the `mb_com` response payload directly into separate Left/Right text layout objects.
 - [ ] Create the fullscreen visual state switcher for the isolated **"PASS"** graphic testing pattern (`mb_display_test`).
 - [ ] Fill the low-level hardware controller reinitialization placeholder inside the display reset branch.
