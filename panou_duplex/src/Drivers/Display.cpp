@@ -6,6 +6,7 @@
 #include "Pins.h"
 #include "Config.h"
 #include "SharedPanel.h"
+#include "Settings.h"
 
 #include "Arduino.h"
 #include <Adafruit_GFX.h>
@@ -139,7 +140,7 @@ namespace Display
             return false;
         }
 
-        if (!serviceModeActive && (millis() - lastActivityMillis >= Config::Timing::SCREEN_TIMEOUT_MS)) {
+        if (!serviceModeActive && (millis() - lastActivityMillis >= Settings::standbyTimeoutMs())) {
             if (!standbyActive) {
                 setBacklight(false);
                 tft1.fillScreen(COLOR_BLACK);

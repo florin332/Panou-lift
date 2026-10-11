@@ -41,6 +41,18 @@ Ambele comenzi necesită Service Mode activ. Captura începe cu următorul marke
 | `com_analyze_enable` | Activează retransmiterea datelor seriale recepționate; `ACK COM ANALYZE ON`. |
 | `com_analyze_disable` | Oprește retransmiterea; `ACK COM ANALYZE OFF`. |
 
+## Setări persistente (flash protejat)
+
+Valorile sunt salvate în ultimul sector de flash (EEPROM emulat), în afara imaginii de firmware, deci supraviețuiesc update-urilor `.uf2`. Argumentul numeric poate fi trimis simplu (`mb_standby 20000`) sau încadrat de markerele protocolului (`mb_etj <3>`, `mb_etj<3>`) — markerele sunt eliminate la parsare. Toate comenzile din această secțiune necesită Service activ.
+
+| Comandă | Răspuns / efect |
+| --- | --- |
+| `mb_etj` | Interoghează etajul unde e montat panoul (Etj): `OK ETJ <n>`. |
+| `mb_etj <n>` | Setează etajul panoului (`0`–`17`) și îl salvează în flash; `ACK ETJ <n>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
+| `mb_standby` | Interoghează timeout-ul de standby ecran: `OK STANDBY <ms>`. |
+| `mb_standby <ms>` | Setează timeout-ul de standby (`5000`–`300000` ms, default `15000`) și îl salvează în flash; `ACK STANDBY <ms>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
+| `mb_defaults` | Revine la default-urile din `Config.h` (Etj + standby) și le persistă; `ACK DEFAULTS`. |
+
 ## Display
 
 | Comandă | Alias | Parametri | Cerință | Răspuns / efect |
@@ -73,3 +85,4 @@ Toate comenzile din această secțiune necesită Service activ.
 | `ERR 05 INVALID_TFT` | ID TFT invalid. |
 | `ERR 06 SEQLOCK` | Nu s-a putut citi un snapshot coerent din memoria partajată. |
 | `ERR 07 INVALID_CORE` | ID core diferit de `0` sau `1`. |
+| `ERR 08 INVALID_PARAM` | Parametru în afara intervalului valid (etaj panou sau timeout standby). |

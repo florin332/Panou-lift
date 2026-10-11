@@ -3,6 +3,7 @@
 #include "Protocol.h"
 #include "Pins.h"
 #include "Config.h"
+#include "Settings.h"
 #include "Arduino.h"
 #include <SoftwareSerial.h>
 
@@ -415,7 +416,7 @@ namespace Protocol
         if (ascAlocat == 0) return;
 
         char payload[16];
-        snprintf(payload, sizeof(payload), "%u,%u", ascAlocat, Config::Hardware::PANEL_FLOOR);
+        snprintf(payload, sizeof(payload), "%u,%u", ascAlocat, Settings::panelFloor());
         uint8_t crc = crc8_ccitt(payload);
         char crcStr[3];
         byteToHexUpper(crc, crcStr);

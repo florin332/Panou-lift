@@ -5,6 +5,7 @@
 // Rute către folderul src/ (Urcat un nivel)
 #include "Pins.h"
 #include "Config.h"
+#include "Settings.h"
 
 #include "Arduino.h"
 
@@ -66,8 +67,8 @@ namespace LiftController
 
     // --- SUBRUTINĂ PRIVATĂ 3: ALGORITM SELECȚIE DUPLEX PRIORITARĂ ---
     static uint8_t selectLift(const SharedPanel &localPanel) {
-        int dif1 = abs(int(localPanel.lift1.pos) - int(Config::Hardware::PANEL_FLOOR));
-        int dif2 = abs(int(localPanel.lift2.pos) - int(Config::Hardware::PANEL_FLOOR));
+        int dif1 = abs(int(localPanel.lift1.pos) - int(Settings::panelFloor()));
+        int dif2 = abs(int(localPanel.lift2.pos) - int(Settings::panelFloor()));
 
         if (localPanel.lift1.ocp == Occupancy::Busy && localPanel.lift2.ocp == Occupancy::Free)       return 2;
         if (localPanel.lift1.ocp == Occupancy::Free && localPanel.lift2.ocp == Occupancy::Busy)       return 1;
@@ -81,10 +82,10 @@ namespace LiftController
 
     // --- SUBRUTINĂ PRIVATĂ 4: LOGICĂ DE ROTAȚIE ȘI BALANSARE UZURĂ ---
     static void updateWearBalancer(const SharedPanel &localPanel) {
-        if ((localPanel.lift1.etd == Config::Hardware::PANEL_FLOOR || localPanel.lift2.etd == Config::Hardware::PANEL_FLOOR) && !ctx.buton_a_fost_apasat) {
+        if ((localPanel.lift1.etd == Settings::panelFloor() || localPanel.lift2.etd == Settings::panelFloor()) && !ctx.buton_a_fost_apasat) {
             ctx.alterna_uzura = !ctx.alterna_uzura; ctx.buton_a_fost_apasat = true;
         }
-        if (localPanel.lift1.etd != Config::Hardware::PANEL_FLOOR && localPanel.lift2.etd != Config::Hardware::PANEL_FLOOR) {
+        if (localPanel.lift1.etd != Settings::panelFloor() && localPanel.lift2.etd != Settings::panelFloor()) {
             ctx.buton_a_fost_apasat = false;
         }
     }
@@ -123,8 +124,8 @@ namespace LiftController
         // Executarea liniară a subrutinelor private (Observația 5)
         updateButtonState(b_state, currentMillis);
         
-        uint8_t nocom = ((localPanel.lift1.pos == Config::Hardware::PANEL_FLOOR && localPanel.lift1.sj == Direction::Idle) || 
-                         (localPanel.lift2.pos == Config::Hardware::PANEL_FLOOR && localPanel.lift2.sj == Direction::Idle)) ? 1 : 0;
+        uint8_t nocom = ((localPanel.lift1.pos == Settings::panelFloor() && localPanel.lift1.sj == Direction::Idle) || 
+                         (localPanel.lift2.pos == Settings::panelFloor() && localPanel.lift2.sj == Direction::Idle)) ? 1 : 0;
         
         updateLeds(localPanel, b_state, nocom, currentMillis);
         

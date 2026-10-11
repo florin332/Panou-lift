@@ -13,9 +13,9 @@ namespace Config
     // =========================================================
     namespace Hardware
     {
-        constexpr uint8_t PANEL_FLOOR = 0;   // Parter (etajul unde e panoul)
-        constexpr uint8_t FLOORS = 18;       // Total etaje instalație
-        constexpr uint8_t LIFTS = 2;         // Mod Duplex
+        constexpr uint8_t PANEL_FLOOR_DEFAULT = 0;   // Default etaj panou (Etj); suprascris din Service
+        constexpr uint8_t FLOORS = 18;               // Total etaje instalație
+        constexpr uint8_t LIFTS = 2;                 // Mod Duplex
     }
 
     // =========================================================
@@ -23,7 +23,9 @@ namespace Config
     // =========================================================
     namespace Timing
     {
-        constexpr uint32_t SCREEN_TIMEOUT_MS = 15000;   // Timeout standby ecran
+        constexpr uint32_t STANDBY_TIMEOUT_DEFAULT_MS = 15000;   // Default timeout standby ecran
+        constexpr uint32_t STANDBY_TIMEOUT_MIN_MS     = 5000;    // Limita inferioară standby (5 s)
+        constexpr uint32_t STANDBY_TIMEOUT_MAX_MS     = 300000;  // Limita superioară standby (5 min)
         constexpr uint32_t SHIFT_PERIOD_MS = 30000;      // Perioadă schimb standby
         constexpr uint32_t BUTTON_INHIBIT_MS = 5000;     // Inhibare buton după apel
         constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat

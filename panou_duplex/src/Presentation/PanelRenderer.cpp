@@ -1,6 +1,7 @@
 #include "PanelRenderer.h"
 #include "Display.h"
 #include "Config.h"
+#include "Settings.h"
 #include "TextWidget.h"
 #include "Arduino.h"
 #include <cstdio>
@@ -140,7 +141,7 @@ namespace {
         const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
         const int16_t xFloor = (lift.pos <= 9) ? cfg.xLargeSingle : cfg.xLargeDouble;
         const uint16_t numColor = (lift.ocp == Occupancy::Free) ? C_GREEN : C_RED;
-        const bool atPanelFloor = (lift.pos == Config::Hardware::PANEL_FLOOR);
+        const bool atPanelFloor = (lift.pos == Settings::panelFloor());
 
         if (atPanelFloor) {
             drawTextDirty(target, st.wArrow, cfg.arrowChar,
@@ -160,7 +161,7 @@ namespace {
         const int16_t xFloor = (lift.pos <= 9) ? cfg.xLargeSingle : cfg.xLargeDouble;
         const int16_t xEtd   = (lift.etd <= 9) ? cfg.xSmallSingle : cfg.xSmallDouble;
         const uint16_t numColor = (lift.ocp == Occupancy::Free) ? C_GREEN : C_RED;
-        const bool etdAtPanel = (lift.etd == Config::Hardware::PANEL_FLOOR);
+        const bool etdAtPanel = (lift.etd == Settings::panelFloor());
 
         if (etdAtPanel) {
             drawTextDirty(target, st.wArrow, cfg.arrowChar,

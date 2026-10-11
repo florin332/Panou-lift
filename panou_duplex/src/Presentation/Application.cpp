@@ -25,6 +25,7 @@
 
 // 5. NOU: Service Mode — rute către src/Core/Services/ și src/Presentation/
 #include "../Core/Services/ServiceProtocol.h"
+#include "../Core/Services/Settings.h"
 #include "ServiceMenu.h"
 
 #include <EEPROM.h>
@@ -32,8 +33,7 @@
 
 namespace Application
 {
-    constexpr int EEPROM_BOOT_COUNT_ADDR = 0;
-    constexpr int EEPROM_SIZE = 4;
+    constexpr int EEPROM_BOOT_COUNT_ADDR = 0;   // 0..3 rezervate; setările sunt la offset 4 (Settings.cpp)
 
     static uint8_t getHardwareResetReason() {
         uint32_t reason = vreg_and_chip_reset_hw->chip_reset;
@@ -43,6 +43,9 @@ namespace Application
     }
 
     void init() {
+        // Primul: deschide sectorul EEPROM (256 B) și încarcă setările persistente
+        Settings::init();
+
         Presentation::init();
         Protocol::init();
         LiftController::init();
@@ -52,7 +55,7 @@ namespace Application
         ServiceProtocol::init();
         ServiceMenu::init();
 
-        EEPROM.begin(EEPROM_SIZE);
+        // EEPROM este deja deschis (256 B) de Settings::init()
         uint16_t curentBoots = 0;
         EEPROM.get(EEPROM_BOOT_COUNT_ADDR, curentBoots);
         if (curentBoots == 0xFFFF) { curentBoots = 0; }
