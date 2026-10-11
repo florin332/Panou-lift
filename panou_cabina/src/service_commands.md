@@ -62,6 +62,20 @@ Toate comenzile din această secțiune necesită Service activ.
 | `MCU TEMP` | `mb_temp` | `OK MCU TEMP <grade Celsius>`. |
 | `MCU STACK <core>` | `mb_stack <core>` | `core` trebuie să fie `0` sau `1`; răspunde cu `OK MCU STACK <core> USED=... FREE=... HW=...`. Alt ID: `ERR 07 INVALID_CORE`. |
 
+## Setări persistente (flash protejat)
+
+Valorile sunt stocate în zona de flash protejată (ultimul sector, în afara imaginii de firmware) și **nu se pierd la update-ul de firmware prin .uf2**. Toate comenzile din această secțiune necesită Service Mode activ și sunt executate direct în parserul serial.
+
+Argumentul numeric poate fi trimis simplu (`mb_gain 0.60`) sau încadrat de markerele protocolului (`mb_gain <0.60>`, `mb_gain<0.60>`) — markerele sunt eliminate la parsare.
+
+| Comandă | Efect / răspuns |
+| --- | --- |
+| `mb_lift` | Interoghează numărul ascensorului: `OK LIFT <n>`. |
+| `mb_lift <n>` | Setează numărul ascensorului (`1`–`65535`) și îl salvează în flash; `ACK LIFT <n>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
+| `mb_gain` | Interoghează gain-ul audio: `OK GAIN <x.xx>`. |
+| `mb_gain <x.xx>` | Setează gain-ul audio (`0.00`–`4.00`), îl aplică imediat pe ieșirea I2S și îl salvează în flash; `ACK GAIN <x.xx>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
+| `mb_defaults` | Revine la default-urile din `Config.h` (număr ascensor + gain) și le persistă; `ACK DEFAULTS`. |
+
 ## Erori comune
 
 | Răspuns | Semnificație |
@@ -73,3 +87,4 @@ Toate comenzile din această secțiune necesită Service activ.
 | `ERR 05 INVALID_DISPLAY` | ID display invalid. |
 | `ERR 06 SEQLOCK` | Nu s-a putut citi un snapshot coerent din memoria partajată. |
 | `ERR 07 INVALID_CORE` | ID core diferit de `0` sau `1`. |
+| `ERR 08 INVALID_PARAM` | Parametru în afara intervalului valid (număr ascensor sau gain). |

@@ -4,6 +4,7 @@
 
 #include "Sound.h"
 #include "Alerts.h"
+#include "Settings.h"
 
 #include <AudioFileSourcePROGMEM.h>
 #include <AudioGeneratorWAV.h>
@@ -16,7 +17,7 @@ namespace
     constexpr int I2S_DATA  = 10;
 
     constexpr int AUDIO_SAMPLE_RATE = 16000;
-    constexpr float AUDIO_GAIN = 0.5f;
+    // Gain-ul NU mai e constantă: vine din Settings (flash protejat)
 
     class PersistentAudioOutputI2S : public AudioOutputI2S
     {
@@ -106,7 +107,7 @@ namespace Sound
         );
 
         out->SetRate(AUDIO_SAMPLE_RATE);
-        out->SetGain(AUDIO_GAIN);
+        out->SetGain(Settings::audioGain());
 
         if (!out->begin())
         {
@@ -166,5 +167,21 @@ namespace Sound
     bool isPlaying()
     {
         return wav != nullptr && wav->isRunning();
+    }
+
+    bool setGain(float gain)
+    {
+        if (!Settings::setAudioGain(gain))
+            return false;
+
+        if (out != nullptr)
+            out->SetGain(Settings::audioGain());
+
+        return true;
+    }
+
+    float gain()
+    {
+        return Settings::audioGain();
     }
 }

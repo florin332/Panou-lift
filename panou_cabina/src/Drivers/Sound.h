@@ -21,4 +21,9 @@ namespace Sound
 
     // Returns true while a sound is being played
     bool isPlaying();
+
+    // Gain persistent (Settings / flash protejat).
+    // setGain aplică imediat pe ieșirea I2S și salvează în flash.
+    bool setGain(float gain);
+    float gain();
 }

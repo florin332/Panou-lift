@@ -16,6 +16,10 @@ namespace Config
         constexpr uint8_t PANEL_FLOOR = 0;   // Parter (etajul unde e panoul)
         constexpr uint8_t FLOORS = 18;       // Total etaje instalație
         constexpr uint8_t LIFTS = 1;         // Panou pentru un singur ascensor
+
+        // Default număr ascensor — folosit doar la primul boot sau dacă
+        // zona persistentă e coruptă; valoarea reală stă în Settings (flash)
+        constexpr uint16_t LIFT_NUMBER_DEFAULT = 1;
     }
 
     // =========================================================
@@ -66,6 +70,12 @@ namespace Config
     {
         constexpr uint16_t BUZZER_FREQ = 4000;
         constexpr uint32_t BOOT_BEEP_MS = 80;
+
+        // Gain audio — DEFAULT_GAIN e folosit doar la primul boot;
+        // valoarea reală stă în Settings (flash protejat) și se aplică live
+        constexpr float DEFAULT_GAIN = 0.5f;
+        constexpr float MIN_GAIN = 0.0f;
+        constexpr float MAX_GAIN = 4.0f;
 
         constexpr uint32_t ARRIVAL_FIRST_PULSE_MS = 60;
         constexpr uint32_t ARRIVAL_GAP_MS = 160;

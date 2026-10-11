@@ -19,8 +19,12 @@
 #include "ServiceProtocol.h"
 #include "ServiceMenu.h"
 
+// NOU: Setări persistente (flash protejat — supraviețuiește update .uf2)
+#include "Settings.h"
+
 void setup() {
     Serial.begin(115200);
+    Settings::init();          // ← NOU: înainte de Application (Sound citește gain-ul)
     Application::init();
     ServiceProtocol::init();   // ← NOU
     ServiceMenu::init();       // ← NOU
