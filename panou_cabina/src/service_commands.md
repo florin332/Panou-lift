@@ -8,7 +8,7 @@ Comenzile marcate **necesită Service activ** răspund cu `ERR 03 NOT_IN_SERVICE
 
 | Comandă | Alias | Cerință | Răspuns / efect |
 | --- | --- | --- | --- |
-| `SRV ENTER` | `mb_01` | Oricând | Activează Service Mode; `ACK SRV ENTER`. |
+| `SRV ENTER` | `mb_01` | Oricând | Activează Service Mode; identifică panoul, de exemplu `C_01_1.01` (tip, variantă hardware, variantă firmware). |
 | `SRV EXIT` | `mb_00` | Oricând | Dezactivează Service Mode; `ACK SRV EXIT`. |
 
 ## Comunicație lifturi
