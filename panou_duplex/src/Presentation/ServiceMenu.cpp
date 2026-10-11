@@ -7,6 +7,7 @@
 #include "Display.h"
 #include "SharedPanel.h"
 #include "PanelRenderer.h"
+#include "BuildInfo.h"
 #include <Arduino.h>
 #include <atomic>
 
@@ -142,7 +143,12 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             sInService.store(true, std::memory_order_relaxed);
             sDisplayTestActive = false;
             Display::setServiceMode(true);
-            ServiceProtocol::sendResponse("ACK SRV ENTER");
+            char panelId[16];
+            snprintf(panelId, sizeof(panelId), "D_%02u_%02u.%02u",
+                     static_cast<unsigned>(BuildInfo::HardwareVariant),
+                     static_cast<unsigned>(BuildInfo::Major),
+                     static_cast<unsigned>(BuildInfo::Minor));
+            ServiceProtocol::sendResponse(panelId);
             break;
 
         case ServiceProtocol::Command::Type::ExitService:

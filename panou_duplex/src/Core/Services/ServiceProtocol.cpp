@@ -44,9 +44,9 @@ static void parseLine(const char* line) {
     while (*line == ' ') line++;
 
     Command cmd{};
-    if (strcmp(line, "SRV ENTER") == 0 || strcmp(line, "mb_in") == 0) {
+    if (strcmp(line, "SRV ENTER") == 0 || strcmp(line, "mb_01") == 0) {
         cmd.type = Command::Type::EnterService;
-    } else if (strcmp(line, "SRV EXIT") == 0 || strcmp(line, "mb_out") == 0) {
+    } else if (strcmp(line, "SRV EXIT") == 0 || strcmp(line, "mb_00") == 0) {
         cmd.type = Command::Type::ExitService;
     } else if (strcmp(line, "COMM TEST") == 0 || strcmp(line, "mb_com") == 0) {
         cmd.type = Command::Type::CommTest;
