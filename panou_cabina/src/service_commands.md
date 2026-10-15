@@ -10,6 +10,7 @@ Comenzile marcate **necesită Service activ** răspund cu `ERR 03 NOT_IN_SERVICE
 | --- | --- | --- | --- |
 | `SRV ENTER` | `mb_01` | Oricând | Activează Service Mode; identifică panoul, de exemplu `C_01_1.01` (tip, variantă hardware, variantă firmware). |
 | `SRV EXIT` | `mb_00` | Oricând | Dezactivează Service Mode; `ACK SRV EXIT`. |
+| `SRV BOOTSEL` | `mb_boot` | Service activ | `ACK SRV BOOTSEL`, apoi reset în bootloader USB (dispozitivul se re-enumerază ca volum MSC `RPI-RP2`, pentru flash-uire firmware de pe Service Box). ACK-ul poate lipsi dacă resetul survine înainte de golirea FIFO-ului USB. |
 
 ## Comunicație lifturi
 

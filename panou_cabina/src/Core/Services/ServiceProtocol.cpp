@@ -4,6 +4,7 @@
 #include "Sound.h"
 #include "../../Presentation/ServiceMenu.h"
 #include <Arduino.h>
+#include <pico/bootrom.h>
 #include <cstring>
 #include <cstdio>
 
@@ -72,6 +73,16 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::EnterService;
     } else if (strcmp(line, "SRV EXIT") == 0 || strcmp(line, "mb_00") == 0) {
         cmd.type = Command::Type::ExitService;
+    } else if (strcmp(line, "SRV BOOTSEL") == 0 || strcmp(line, "mb_boot") == 0) {
+        // Reset in bootloader USB (volum MSC "RPI-RP2") pentru flash-uire
+        // de pe Service Box. ACK-ul poate sa nu apuca sa iasa pe USB inainte
+        // de reset - confirmarea reala pentru box este detach-ul CDC.
+        if (!checkServiceMode()) return;
+        sendResponse("ACK SRV BOOTSEL");
+        Serial.flush();
+        delay(100);   // lasa FIFO-ul USB sa se goleasca
+        reset_usb_boot(0, 0);
+        return;
     } else if (strcmp(line, "COMM TEST") == 0 || strcmp(line, "mb_com") == 0) {
         cmd.type = Command::Type::CommTest;
     } else if (strcmp(line, "mb_com_out") == 0) {
