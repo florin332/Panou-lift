@@ -10,7 +10,7 @@ Comenzile marcate **necesită Service activ** răspund cu `ERR 03 NOT_IN_SERVICE
 | --- | --- | --- | --- |
 | `SRV ENTER` | `mb_01` | Oricând | Activează Service Mode; trimite identificatorul `D_<hardware>_<major>.<minor>` (curent `D_01_10.28`). |
 | `SRV EXIT` | `mb_00` | Oricând | Dezactivează Service Mode; `ACK SRV EXIT`. |
-| `SRV BOOTSEL` | `mb_boot` | Service activ | `ACK SRV BOOTSEL`, apoi reset în bootloader USB (dispozitivul se re-enumerază ca volum MSC `RPI-RP2`, pentru flash-uire firmware de pe Service Box). ACK-ul poate lipsi dacă resetul survine înainte de golirea FIFO-ului USB. |
+| `SRV BOOTSEL` | `mb_boot` | Service activ | `ACK SRV BOOTSEL`, apoi reset în bootloader USB (dispozitivul se re-enumerază ca volum MSC `RPI-RP2`, pentru flash-uire firmware de pe Service Box). Secvența e atomică: ACK + `Serial.flush()`, ~100 ms pentru golirea FIFO-ului USB, apoi `noInterrupts()` și `reset_usb_boot(0, 0)` direct, fără alte așteptări. Confirmarea reală pentru box este detach-ul CDC. |
 
 ## Comunicație lifturi
 
