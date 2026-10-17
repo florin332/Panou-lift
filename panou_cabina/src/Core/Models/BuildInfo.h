@@ -8,8 +8,8 @@ namespace BuildInfo
     constexpr char PanelType = 'C';
     constexpr uint8_t HardwareVariant = 1;
     constexpr uint8_t Major = 1;
-    constexpr uint8_t Minor = 1;
-    constexpr uint16_t Build = 101;
+    constexpr uint8_t Minor = 2;     // <--- V1.02: fix BOOTSEL pe core0 (portat din duplex 10.37)
+    constexpr uint16_t Build = 102;
 
     // Amprente de trasabilitate capturate granular la momentul compilării fizice
     constexpr char Date[] = __DATE__;

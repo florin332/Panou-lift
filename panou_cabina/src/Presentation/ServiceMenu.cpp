@@ -9,6 +9,9 @@
 #include "SharedPanel.h"
 #include "PanelRenderer.h"
 #include <Arduino.h>
+#include <pico/bootrom.h>
+#include <pico/multicore.h>
+#include <hardware/watchdog.h>
 #include <atomic>
 
 extern volatile SharedMemory gSharedMemory;
@@ -151,6 +154,29 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             Display::setServiceMode(false);
             ServiceProtocol::sendResponse("ACK SRV EXIT");
             break;
+
+        case ServiceProtocol::Command::Type::EnterBootsel:
+            if (!checkService()) break;
+            // Suntem pe core0 (acelasi core cu task-ul TinyUSB).
+            // FARA Serial.flush(): atarna si de pe core0; scrierile simple
+            // ies pe fir, delay-ul acopera golirea FIFO-ului inainte de reset.
+            ServiceProtocol::sendResponse("ACK SRV BOOTSEL");
+            ServiceProtocol::sendResponse("DBG S1 ack-trimis");
+            delay(150);       // lasa hostul (Service Box) sa consume FIFO-ul
+            ServiceProtocol::sendResponse("DBG S3 pre-reset");
+            delay(20);
+            // Oprim core1 ca sa eliminam accesul concurent la XIP/periferice
+            // in handoff-ul spre bootrom; tick-ul watchdog e pornit explicit
+            // (un tick oprit blocheaza watchdog_reboot din reset_usb_boot).
+            multicore_reset_core1();
+            watchdog_start_tick(12);
+            reset_usb_boot(0, 0);
+            // Nu ar trebui sa se ajunga aici; marker pentru cazul anormal in
+            // care ROM-ul ar returna.
+            while (true) {
+                ServiceProtocol::sendResponse("DBG S4 rom-a-returnat");
+                delay(500);
+            }
 
         case ServiceProtocol::Command::Type::CommTest:
             if (!checkService()) break;
