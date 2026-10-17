@@ -74,6 +74,13 @@ namespace Application
 
     // ==================== CORE 0: Randare + Service Mode ====================
     void runCore0() {
+        // Poll comanda seriala de la Service Box (master).
+        // TREBUIE sa ruleze pe core0: TinyUSB device (pico_stdio_usb) are
+        // IRQ/task pe core0, iar Serial.available/read/println din core1
+        // corupeau starea stack-ului (hang aleator la write/flush/delay in
+        // secventa BOOTSEL). Tot accesul USB este acum single-core.
+        ServiceProtocol::poll();
+
         const bool wasInServiceMode = ServiceMenu::isInServiceMode();
         ServiceMenu::update();
         const bool returnedFromService = wasInServiceMode && !ServiceMenu::isInServiceMode();
@@ -156,9 +163,5 @@ namespace Application
         }
 
         shared_panel_write(gSharedMemory, localPanelCore1);
-
-        // NOU: Poll comandă serial de la Magic Box (master)
-        // Rulează pe Core 1 (comunicație) pentru a nu bloca randarea pe Core 0
-        ServiceProtocol::poll();
     }
 }

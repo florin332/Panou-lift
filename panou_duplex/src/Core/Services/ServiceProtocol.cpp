@@ -69,18 +69,12 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::ExitService;
     } else if (strcmp(line, "SRV BOOTSEL") == 0 || strcmp(line, "mb_boot") == 0) {
         // Reset in bootloader USB (volum MSC "RPI-RP2") pentru flash-uire
-        // de pe Service Box.
-        // Secventa trebuie sa fie atomica si fara asteptari dupa ACK: daca
-        // MCU-ul ramane blocat intre ACK si reset_usb_boot, pull-up-ul pe D+
-        // ramane activ, hostul nu vede detach si nu poate detecta re-attach.
-        if (!checkServiceMode()) return;
-        sendResponse("ACK SRV BOOTSEL");
-        Serial.flush();   // impinge ACK-ul pe fir
-        delay(100);       // lasa hostul sa consume FIFO-ul USB
-        noInterrupts();   // niciun IRQ USB/SPI in timpul tranzitiei ROM
-        reset_usb_boot(0, 0);
-        // Nu se ajunge aici; capcana in cazul in care ROM-ul ar returna.
-        while (true) { tight_loop_contents(); }
+        // de pe Service Box. Executia este amanata ca comanda si ruleaza pe
+        // core0 (ServiceMenu::handleCommand) - TinyUSB nu este thread-safe.
+        // Markerul P0 dovedeste in logul box-ului ca comanda a AJUNS pe panou
+        // (parseLine ruleaza acum tot pe core0, sendResponse e sigur aici).
+        sendResponse("DBG P0 bootsel-primit");
+        cmd.type = Command::Type::EnterBootsel;
     } else if (strcmp(line, "COMM TEST") == 0 || strcmp(line, "mb_com") == 0) {
         cmd.type = Command::Type::CommTest;
     } else if (strcmp(line, "mb_com_out") == 0) {

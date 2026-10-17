@@ -9,6 +9,9 @@
 #include "PanelRenderer.h"
 #include "BuildInfo.h"
 #include <Arduino.h>
+#include <pico/bootrom.h>
+#include <pico/multicore.h>
+#include <hardware/watchdog.h>
 #include <atomic>
 
 extern volatile SharedMemory gSharedMemory;
@@ -157,6 +160,35 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             Display::setServiceMode(false);
             ServiceProtocol::sendResponse("ACK SRV EXIT");
             break;
+
+        case ServiceProtocol::Command::Type::EnterBootsel:
+            if (!checkService()) break;
+            // Suntem pe core0 (acelasi core cu task-ul TinyUSB).
+            // FARA Serial.flush(): atarna si de pe core0 (deadlock pe
+            // mutex-ul TinyUSB, inca atins de RX-ul Serial.available/read
+            // din ServiceProtocol::poll() de pe core1). Scrierile simple
+            // s-au dovedit a iesi pe fir fara flush; delay-ul acopera
+            // golirea FIFO-ului inainte de reset.
+            ServiceProtocol::sendResponse("ACK SRV BOOTSEL");
+            ServiceProtocol::sendResponse("DBG S1 ack-trimis");
+            delay(150);       // lasa hostul (Service Box) sa consume FIFO-ul
+            ServiceProtocol::sendResponse("DBG S3 pre-reset");
+            delay(20);
+            // ROM-ul BOOTSEL ruleaza in timp ce core1 inca executa Protocol
+            // din flash. Oprirea explicita a core1 elimina accesul concurent
+            // la XIP/periferice pe durata handoff-ului spre bootrom.
+            multicore_reset_core1();
+            // watchdog_reboot (apelat din reset_usb_boot) atarna la infinit
+            // daca tick-ul watchdog-ului nu ruleaza; pornim explicit tick-ul
+            // (clk_ref = XOSC 12 MHz / 12 = 1 MHz) inainte de apelul ROM.
+            watchdog_start_tick(12);
+            reset_usb_boot(0, 0);
+            // Nu ar trebui sa se ajunga aici; pastram markerul pentru cazul
+            // anormal in care ROM-ul ar returna.
+            while (true) {
+                ServiceProtocol::sendResponse("DBG S4 rom-a-returnat");
+                delay(500);
+            }
 
         case ServiceProtocol::Command::Type::CommTest:
             if (!checkService()) break;
