@@ -14,14 +14,22 @@ namespace Sound
         uint8_t lastProcessedSeq;
         unsigned long startMillis;
         bool isActive;
+        bool buzzerOn;
+        uint16_t currentFreq;
         SoundEvent currentEvent;
     };
 
-    static SoundContext ctx = {0, 0, false, SoundEvent::None};
+    static SoundContext ctx = {0, 0, false, false, 0, SoundEvent::None};
 
-    static void setBuzzer(bool stare) {
+    static void setBuzzer(bool stare, uint16_t freq = Config::Audio::BUZZER_FREQ) {
+        // tone()/noTone() doar la TRANZITIE (sau la schimbarea frecventei):
+        // reaplelarea tone() in bucla reseteaza faza PWM si transforma
+        // pulsul continuu intr-un "carait" audibil
+        if (stare == ctx.buzzerOn && (!stare || freq == ctx.currentFreq)) return;
+        ctx.buzzerOn = stare;
+        ctx.currentFreq = freq;
         if (stare) {
-            tone(Pins::UI::BUZZER, Config::Audio::BUZZER_FREQ);
+            tone(Pins::UI::BUZZER, freq);
         } else {
             noTone(Pins::UI::BUZZER);
         }
@@ -30,7 +38,7 @@ namespace Sound
     void init() {
         pinMode(Pins::UI::BUZZER, OUTPUT);
         digitalWrite(Pins::UI::BUZZER, LOW);
-        ctx = {0, 0, false, SoundEvent::None};
+        ctx = {0, 0, false, false, 0, SoundEvent::None};
     }
 
     void update(const SharedPanel &localPanel) {
@@ -40,7 +48,15 @@ namespace Sound
             ctx.lastProcessedSeq = localPanel.ui.sound.seq;
             
             if (localPanel.ui.sound.event != SoundEvent::None) {
-                ctx.currentEvent = localPanel.ui.sound.event;
+                SoundEvent incoming = localPanel.ui.sound.event;
+                // Fuziune: un alt Arrival in timpul unei secvente Arrival/ArrivalBoth in curs
+                // comuta pe varianta extinsa (3 beep-uri), repornita de la t=0
+                if (incoming == SoundEvent::Arrival && ctx.isActive &&
+                    (ctx.currentEvent == SoundEvent::Arrival ||
+                     ctx.currentEvent == SoundEvent::ArrivalBoth)) {
+                    incoming = SoundEvent::ArrivalBoth;
+                }
+                ctx.currentEvent = incoming;
                 ctx.startMillis = currentMillis;
                 ctx.isActive = true;
                 setBuzzer(true);
@@ -64,13 +80,43 @@ namespace Sound
 
             case SoundEvent::Arrival:
                 if (timpTrecut < Config::Audio::ARRIVAL_FIRST_PULSE_MS) {
-                    setBuzzer(true);
+                    setBuzzer(true, Config::Audio::ARRIVAL_FIRST_FREQ);
                 }
                 else if (timpTrecut >= Config::Audio::ARRIVAL_FIRST_PULSE_MS && timpTrecut < Config::Audio::ARRIVAL_GAP_MS) {
                     setBuzzer(false);
                 }
                 else if (timpTrecut >= Config::Audio::ARRIVAL_GAP_MS && timpTrecut < Config::Audio::ARRIVAL_SECOND_PULSE_MS) {
-                    setBuzzer(true);
+                    setBuzzer(true, Config::Audio::ARRIVAL_SECOND_FREQ);
+                }
+                else {
+                    setBuzzer(false); ctx.isActive = false; ctx.currentEvent = SoundEvent::None;
+                }
+                break;
+
+            case SoundEvent::ArrivalBoth:
+                if (timpTrecut < Config::Audio::ARRIVAL_FIRST_PULSE_MS) {
+                    setBuzzer(true, Config::Audio::ARRIVAL_FIRST_FREQ);
+                }
+                else if (timpTrecut < Config::Audio::ARRIVAL_GAP_MS) {
+                    setBuzzer(false);
+                }
+                else if (timpTrecut < Config::Audio::ARRIVAL_SECOND_PULSE_MS) {
+                    setBuzzer(true, Config::Audio::ARRIVAL_SECOND_FREQ);
+                }
+                else if (timpTrecut < Config::Audio::ARRIVAL_BOTH_SECOND_GAP_MS) {
+                    setBuzzer(false);
+                }
+                else if (timpTrecut < Config::Audio::ARRIVAL_BOTH_END_MS) {
+                    setBuzzer(true, Config::Audio::ARRIVAL_FIRST_FREQ);
+                }
+                else {
+                    setBuzzer(false); ctx.isActive = false; ctx.currentEvent = SoundEvent::None;
+                }
+                break;
+
+            case SoundEvent::Free:
+                if (timpTrecut < Config::Audio::FREE_PULSE_MS) {
+                    setBuzzer(true, Config::Audio::FREE_FREQ);
                 }
                 else {
                     setBuzzer(false); ctx.isActive = false; ctx.currentEvent = SoundEvent::None;

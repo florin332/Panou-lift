@@ -81,8 +81,17 @@ namespace Config
         constexpr uint32_t BOOT_BEEP_MS = 80;
 
         constexpr uint32_t ARRIVAL_FIRST_PULSE_MS = 60;
-        constexpr uint32_t ARRIVAL_GAP_MS = 160;
-        constexpr uint32_t ARRIVAL_SECOND_PULSE_MS = 310;
+        constexpr uint32_t ARRIVAL_GAP_MS = 210;
+        constexpr uint32_t ARRIVAL_SECOND_PULSE_MS = 360;
+        constexpr uint16_t ARRIVAL_FIRST_FREQ = 4200;
+        constexpr uint16_t ARRIVAL_SECOND_FREQ = 3800;
+        // ArrivalBoth: varianta extinsa (sosire in timpul unei secvente Arrival) —
+        // dupa pattern-ul normal urmeaza pauza 360-510 ms si al treilea beep 510-570 ms
+        constexpr uint32_t ARRIVAL_BOTH_SECOND_GAP_MS = 510;
+        constexpr uint32_t ARRIVAL_BOTH_END_MS = 570;
+        // Al treilea beep: la eliberarea cabinei (ocp Busy -> Free) dupa sosire
+        constexpr uint32_t FREE_PULSE_MS = 80;
+        constexpr uint16_t FREE_FREQ = 3400;
 
         constexpr uint32_t ALERT_FIRST_PULSE_MS = 40;
         constexpr uint32_t ALERT_FIRST_GAP_MS = 80;
