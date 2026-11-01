@@ -26,7 +26,9 @@ enum class Occupancy : uint8_t {
 // ArrivalBoth nu este emis de producatori: il genereaza driverul Sound prin fuziunea
 // unui al doilea Arrival primit in timpul unei secvente Arrival in curs
 enum class SoundEvent : uint8_t { None, Boot, Confirm, Arrival, Error, Free, ArrivalBoth };
-enum class LedMode    : uint8_t { Off, On, BlinkFast, BlinkSlow };
+// Alternate este un mod compus: blink alternativ roșu/verde, interpretat de driver
+// doar când ambele LED-uri sunt Alternate (apel preluat, buton blocat)
+enum class LedMode    : uint8_t { Off, On, BlinkFast, BlinkSlow, Alternate };
 enum class ScreenMode : uint8_t { Normal, StandbyActive, StandbyShift };
 
 // Structura curată a unui singur ascensor (Fără primitive numerice - Observația 1)

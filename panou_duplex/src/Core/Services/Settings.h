@@ -26,6 +26,10 @@ namespace Settings
     uint32_t standbyTimeoutMs();
     bool setStandbyTimeoutMs(uint32_t timeoutMs); // validează + persistă în flash
 
+    // Al doilea apel (duplex): false = blocat (default), true = permis (apăsare lungă 3 s)
+    bool secondCall();
+    bool setSecondCall(bool enabled);             // persistă în flash
+
     // Scrie explicit în flash starea curentă (setterii o fac deja)
     bool save();
 

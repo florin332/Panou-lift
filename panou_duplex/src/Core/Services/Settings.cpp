@@ -22,6 +22,7 @@ namespace
         uint32_t magic;
         uint16_t version;
         uint8_t  panelFloor;
+        uint8_t  secondCall;   // 0 = al doilea apel blocat (default), 1 = permis
         uint32_t standbyTimeoutMs;
         uint32_t crc32;
     };
@@ -63,6 +64,7 @@ namespace
         data.magic            = SETTINGS_MAGIC;
         data.version          = SETTINGS_VERSION;
         data.panelFloor       = Config::Hardware::PANEL_FLOOR_DEFAULT;
+        data.secondCall       = Config::Hardware::SECOND_CALL_DEFAULT ? 1 : 0;
         data.standbyTimeoutMs = Config::Timing::STANDBY_TIMEOUT_DEFAULT_MS;
     }
 
@@ -71,6 +73,7 @@ namespace
         return d.magic == SETTINGS_MAGIC &&
                d.version == SETTINGS_VERSION &&
                floorIsValid(d.panelFloor) &&
+               d.secondCall <= 1 &&
                standbyIsValid(d.standbyTimeoutMs) &&
                computeCrc(d) == d.crc32;
     }
@@ -129,6 +132,17 @@ namespace Settings
             return false;
 
         data.standbyTimeoutMs = timeoutMs;
+        return save();
+    }
+
+    bool secondCall()
+    {
+        return data.secondCall != 0;
+    }
+
+    bool setSecondCall(bool enabled)
+    {
+        data.secondCall = enabled ? 1 : 0;
         return save();
     }
 

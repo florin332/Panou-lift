@@ -1,4 +1,4 @@
-// Logic/LiftController.cpp (Calcul Duplex cu Uzură și Anti-Stuck)
+// Logic/LiftController.cpp (Calcul Duplex cu Uzură, Anti-Stuck și Confirmare Preluare Apel)
 
 #include "LiftController.h" // Local în src/Logic/
 
@@ -13,6 +13,10 @@
 
 namespace LiftController
 {
+    // Mașina de stări pentru confirmarea preluării apelului:
+    // Idle -> Sent (comandă trimisă, așteaptă tranziția etd) -> Confirmed (cursă în execuție)
+    enum class CallState : uint8_t { Idle, Sent, Confirmed };
+
     struct ControllerContext {
         unsigned long startMillis;
         unsigned long buttPressedMillis;
@@ -20,33 +24,52 @@ namespace LiftController
         bool b_prev;
         bool alterna_uzura;
         bool buton_a_fost_apasat;
-        bool resetArmed;
+        uint8_t resetPressCount;             // apăsări consecutive acumulate în fereastra de reset
+        unsigned long firstResetPressMillis; // începutul ferestrei de reset (prima apăsare din serie)
         Direction prevSj1;
         Direction prevSj2;
         Occupancy prevOcp1;
         Occupancy prevOcp2;
+        // Confirmare preluare apel
+        CallState callState;
+        uint8_t cmdLift;                // liftul comandat (1/2)
+        unsigned long callStartMillis;  // momentul trimiterii comenzii (timeout unic)
+        bool runStarted;                // latch: sj a fost non-Idle după confirmare
+        bool ocpArmed;                  // latch: ocp a fost Busy după confirmare
+        uint8_t prevEtd1;               // bază pentru detecția tranziției etd -> etaj panou
+        uint8_t prevEtd2;
+        bool longPressFired;            // one-shot: al doilea apel trimis deja pe ținerea curentă
     };
 
     static ControllerContext ctx;
 
-    // --- SUBRUTINĂ PRIVATĂ 1: GESTIUNE FILTRU ANTI-STUCK ȘI RESET LA APĂSARE LUNGĂ ---
+    // --- SUBRUTINĂ PRIVATĂ 1: GESTIUNE FILTRU ANTI-STUCK ȘI RESET LA 4 APĂSĂRI RAPIDE ---
     static void updateButtonState(bool b_state, unsigned long currentMillis) {
         if (b_state) {
-            if (ctx.b_prev == false) { ctx.buttPressedMillis = currentMillis; }
-            if ((currentMillis - ctx.buttPressedMillis) >= Config::Timing::BUTTON_STUCK_MS) { ctx.buttonStuck = true; }
+            if (ctx.b_prev == false) {
+                ctx.buttPressedMillis = currentMillis;
 
-            // Reset hardware la apăsare lungă (prag SUB anti-stuck).
-            // Armat doar după ce butonul a fost eliberat cel puțin o dată post-boot:
-            // previne bucla infinită de reboot dacă butonul rămâne blocat fizic.
-            if (ctx.resetArmed && (currentMillis - ctx.buttPressedMillis) >= Config::Timing::BUTTON_RESET_MS) {
-                watchdog_hw->scratch[0] = Config::Hardware::RESET_MAGIC_BUTTON;
-                // watchdog_reboot atârnă la infinit dacă tick-ul watchdog nu rulează (vezi ServiceMenu.cpp)
-                watchdog_start_tick(12);
-                watchdog_reboot(0, 0, 0);   // Nu returnează niciodată
+                // Reset hardware: 4 apăsări consecutive, toate într-o fereastră de 2 s.
+                // Fereastra pornește la prima apăsare din serie; o pauză mai mare de
+                // 2 s între apăsări resetează numărătorul. Un buton blocat fizic nu
+                // poate produce fronturi, deci nu mai e nevoie de armare post-boot.
+                if (ctx.resetPressCount == 0 ||
+                    (currentMillis - ctx.firstResetPressMillis) >= Config::Timing::RESET_PRESS_WINDOW_MS) {
+                    ctx.resetPressCount = 1;
+                    ctx.firstResetPressMillis = currentMillis;
+                } else {
+                    ctx.resetPressCount++;
+                    if (ctx.resetPressCount >= Config::Timing::RESET_PRESS_COUNT) {
+                        watchdog_hw->scratch[0] = Config::Hardware::RESET_MAGIC_BUTTON;
+                        // watchdog_reboot atârnă la infinit dacă tick-ul watchdog nu rulează (vezi ServiceMenu.cpp)
+                        watchdog_start_tick(12);
+                        watchdog_reboot(0, 0, 0);   // Nu returnează niciodată
+                    }
+                }
             }
+            if ((currentMillis - ctx.buttPressedMillis) >= Config::Timing::BUTTON_STUCK_MS) { ctx.buttonStuck = true; }
         } else {
-            ctx.buttonStuck = false; 
-            ctx.resetArmed = true;
+            ctx.buttonStuck = false;
         }
     }
 
@@ -55,6 +78,13 @@ namespace LiftController
         if (ctx.buttonStuck) {
             localPanel.ui.led.red   = LedMode::Off;
             localPanel.ui.led.green = LedMode::Off;
+            return;
+        }
+
+        // Apel preluat și în execuție: blink alternativ roșu/verde cât butonul e blocat
+        if (ctx.callState == CallState::Confirmed) {
+            localPanel.ui.led.red   = LedMode::Alternate;
+            localPanel.ui.led.green = LedMode::Alternate;
             return;
         }
 
@@ -158,6 +188,48 @@ namespace LiftController
         return false;
     }
 
+    // --- SUBRUTINĂ PRIVATĂ 7: MAȘINA DE STARI PENTRU CONFIRMAREA PRELUĂRII APELULUI ---
+    static void updateCallState(SharedPanel &localPanel, unsigned long currentMillis) {
+        if (ctx.callState != CallState::Idle) {
+            const LiftState &cmd = (ctx.cmdLift == 1) ? localPanel.lift1 : localPanel.lift2;
+            uint8_t prevEtd = (ctx.cmdLift == 1) ? ctx.prevEtd1 : ctx.prevEtd2;
+
+            if (currentMillis - ctx.callStartMillis >= Config::Timing::CALL_TIMEOUT_MS) {
+                // Timeout unic de la trimitere: acoperă și confirmarea absentă, și cursa neterminată
+                ctx.callState = CallState::Idle;
+            } else if (cmd.svc != ServiceState::Normal) {
+                // Linie căzută, fault sau revizie: comanda nu mai poate fi onorată
+                ctx.callState = CallState::Idle;
+            } else if (ctx.callState == CallState::Sent) {
+                // Confirmarea reală a preluării: etd DEVINE etajul panoului după trimitere.
+                // Dacă etd era deja egal (comandă din cabină), nu există tranziție și
+                // butonul nu se blochează.
+                if (prevEtd != Settings::panelFloor() && cmd.etd == Settings::panelFloor()) {
+                    ctx.callState = CallState::Confirmed;
+                    ctx.runStarted = false;
+                    ctx.ocpArmed = false;
+                    localPanel.ui.sound.event = SoundEvent::Confirm;
+                    localPanel.ui.sound.seq++;
+                }
+            } else { // Confirmed
+                // sj -> Idle și ocp -> Free deblochează doar după ce cursa a pornit efectiv:
+                // imediat după confirmare liftul poate sta încă pe loc (uși în curs de
+                // închidere), cu sj == Idle și ocp == Free, fără ca comanda să fie abandonată
+                if (cmd.sj != Direction::Idle) { ctx.runStarted = true; }
+                if (cmd.ocp == Occupancy::Busy) { ctx.ocpArmed = true; }
+                // ocp -> Free după start = comandă abandonată; sj -> Idle după start = sosire/oprire
+                if ((ctx.ocpArmed && cmd.ocp == Occupancy::Free) ||
+                    (ctx.runStarted && cmd.sj == Direction::Idle)) {
+                    ctx.callState = CallState::Idle;
+                }
+            }
+        }
+
+        // Baza pentru detecția tranziției etd, mereu proaspătă
+        ctx.prevEtd1 = localPanel.lift1.etd;
+        ctx.prevEtd2 = localPanel.lift2.etd;
+    }
+
     void init() {
         pinMode(Pins::UI::BUTTON, INPUT_PULLUP);
         ctx.startMillis = 0;
@@ -166,14 +238,24 @@ namespace LiftController
         ctx.b_prev = true; 
         ctx.alterna_uzura = false;
         ctx.buton_a_fost_apasat = false;
-        // Reset-ul pe apăsare lungă se armează doar dacă butonul e eliberat la boot
-        ctx.resetArmed = (digitalRead(Pins::UI::BUTTON) == HIGH);
+        // Numărătorul de apăsări pentru reset pornește gol
+        ctx.resetPressCount = 0;
+        ctx.firstResetPressMillis = 0;
         // Idle la boot: un lift parcat la etajul panoului nu declanșează Arrival la pornire
         ctx.prevSj1 = Direction::Idle;
         ctx.prevSj2 = Direction::Idle;
         // Free la boot: evita un beep fals la prima eliberare raportata dupa pornire
         ctx.prevOcp1 = Occupancy::Free;
         ctx.prevOcp2 = Occupancy::Free;
+        // Mașina de stări apel pornește dezarmată
+        ctx.callState = CallState::Idle;
+        ctx.cmdLift = 0;
+        ctx.callStartMillis = 0;
+        ctx.runStarted = false;
+        ctx.ocpArmed = false;
+        ctx.prevEtd1 = 0;
+        ctx.prevEtd2 = 0;
+        ctx.longPressFired = false;
     }
 
     // INTERFAȚA PUBLICĂ ORCHESTRATOARE COMPLET DECUPLATĂ
@@ -188,7 +270,8 @@ namespace LiftController
 
         // Executarea liniară a subrutinelor private (Observația 5)
         updateButtonState(b_state, currentMillis);
-        
+        updateCallState(localPanel, currentMillis);
+
         uint8_t nocom = ((localPanel.lift1.pos == Settings::panelFloor() && localPanel.lift1.sj == Direction::Idle) || 
                          (localPanel.lift2.pos == Settings::panelFloor() && localPanel.lift2.sj == Direction::Idle)) ? 1 : 0;
         
@@ -203,15 +286,42 @@ namespace LiftController
         updateWearBalancer(localPanel);
         updateArrivalSound(localPanel);
 
-        if (b_state && (ctx.b_prev == false)) {
+        // Butonul e blocat doar în Confirmed (apel preluat, în execuție). În Sent rămâne
+        // activ (limitat de debounce): dacă etd era deja egal cu etajul panoului (comandă
+        // din cabină), preluarea nu se confirmă și se poate relansa un apel nou.
+        // Beep-ul Confirm s-a mutat pe confirmarea reală (vezi updateCallState).
+        if (b_state && (ctx.b_prev == false) && ctx.callState != CallState::Confirmed) {
             if (processCall(currentMillis, nocom, selectedAsc)) {
                 result.transmit = true;
                 result.lift = selectedAsc;
-                localPanel.ui.sound.event = SoundEvent::Confirm; 
-                localPanel.ui.sound.seq++;
-                localPanel.ui.led.red = LedMode::BlinkFast;
+                ctx.callState = CallState::Sent;
+                ctx.cmdLift = selectedAsc;
+                ctx.callStartMillis = currentMillis;
+                ctx.runStarted = false;
+                ctx.ocpArmed = false;
             }
         }
+
+        // Al doilea apel (permis din Service Box, mb_13): în Confirmed, o apăsare lungă
+        // (3 s) comandă și celălalt lift. selectLift rutează natural (liftul în execuție
+        // e Busy); dacă ambele sunt ocupate sau unul e deja la etaj (nocom), nu se trimite.
+        // One-shot pe ținere, fără semnal la trigger; tracking-ul comută pe al doilea lift.
+        if (b_state && ctx.callState == CallState::Confirmed && Settings::secondCall() &&
+            !ctx.longPressFired &&
+            (currentMillis - ctx.buttPressedMillis) >= Config::Timing::LONG_PRESS_SECOND_CALL_MS) {
+            ctx.longPressFired = true;
+            uint8_t secondAsc = selectLift(localPanel);
+            if (nocom == 0 && secondAsc != 0) {
+                result.transmit = true;
+                result.lift = secondAsc;
+                ctx.callState = CallState::Sent;
+                ctx.cmdLift = secondAsc;
+                ctx.callStartMillis = currentMillis;
+                ctx.runStarted = false;
+                ctx.ocpArmed = false;
+            }
+        }
+        if (!b_state) { ctx.longPressFired = false; }
 
         ctx.b_prev = b_state;
         return result;

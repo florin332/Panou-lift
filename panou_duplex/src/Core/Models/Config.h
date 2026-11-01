@@ -14,11 +14,12 @@ namespace Config
     namespace Hardware
     {
         constexpr uint8_t PANEL_FLOOR_DEFAULT = 0;   // Default etaj panou (Etj); suprascris din Service
+        constexpr bool SECOND_CALL_DEFAULT = false;  // Default al doilea apel: blocat (setabil Service Box, mb_13)
         constexpr uint8_t FLOORS = 18;               // Total etaje instalație
         constexpr uint8_t LIFTS = 2;                 // Mod Duplex
 
-        // Marcă persistență prin watchdog scratch: reset declanșat de apăsare lungă buton
-        constexpr uint32_t RESET_MAGIC_BUTTON = 0x4C505253UL;  // "LPRS" (Long-Press ReSet)
+        // Marcă persistență prin watchdog scratch: reset declanșat de apăsări rapide buton
+        constexpr uint32_t RESET_MAGIC_BUTTON = 0x4C505253UL;  // "LPRS" (buton apel, ReSet)
     }
 
     // =========================================================
@@ -30,8 +31,11 @@ namespace Config
         constexpr uint32_t STANDBY_TIMEOUT_MIN_MS     = 5000;    // Limita inferioară standby (5 s)
         constexpr uint32_t STANDBY_TIMEOUT_MAX_MS     = 300000;  // Limita superioară standby (5 min)
         constexpr uint32_t SHIFT_PERIOD_MS = 30000;      // Perioadă schimb standby
-        constexpr uint32_t BUTTON_INHIBIT_MS = 5000;     // Inhibare buton după apel
-        constexpr uint32_t BUTTON_RESET_MS = 8000;       // Apăsare lungă buton apel → reset hardware (< BUTTON_STUCK_MS)
+        constexpr uint32_t BUTTON_INHIBIT_MS = 1500;     // Debounce buton după apel
+        constexpr uint32_t CALL_TIMEOUT_MS = 60000;      // Timeout unic preluare+execuție apel (≈ cursă completă 0-17)
+        constexpr uint32_t RESET_PRESS_WINDOW_MS = 2000; // Fereastra în care trebuie să încapă toate apăsările de reset
+        constexpr uint8_t  RESET_PRESS_COUNT = 4;        // Apăsări consecutive în fereastră → reset hardware
+        constexpr uint32_t LONG_PRESS_SECOND_CALL_MS = 3000; // Apăsare lungă în Confirmed → al doilea apel (dacă e permis)
         constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat
         constexpr uint32_t LED_BLINK_SLOW = 500;         // Perioadă clipire lentă LED
         constexpr uint32_t LED_BLINK_FAST = 150;         // Perioadă clipire rapidă LED

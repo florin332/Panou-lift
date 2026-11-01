@@ -453,7 +453,7 @@ static void sendMcuLastReset() {
             case 1: reason = "BOR"; break;
             case 2: reason = "WDT"; break;
             case 3: reason = "SYSREQ"; break;
-            case 4: reason = "BTNLP"; break;   // Reset apăsare lungă buton apel
+            case 4: reason = "BTN4P"; break;   // Reset 4 apăsări rapide buton apel
             default: break;
         }
         char buf[64];

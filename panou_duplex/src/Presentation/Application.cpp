@@ -42,7 +42,7 @@ namespace Application
         // dar se șterge la POR. Citit o singură dată și invalidat imediat.
         if (watchdog_hw->scratch[0] == Config::Hardware::RESET_MAGIC_BUTTON) {
             watchdog_hw->scratch[0] = 0;
-            return 4;   // Reset declanșat de apăsare lungă buton apel
+            return 4;   // Reset declanșat de 4 apăsări rapide buton apel
         }
         uint32_t reason = vreg_and_chip_reset_hw->chip_reset;
         if (reason & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS) return 2;

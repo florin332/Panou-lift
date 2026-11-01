@@ -29,6 +29,14 @@ namespace Leds
         ctx.toggleFast = (currentMillis / Config::Timing::LED_BLINK_FAST) % 2 == 0;
         ctx.toggleSlow = (currentMillis / Config::Timing::LED_BLINK_SLOW) % 2 == 0;
 
+        // Mod compus: blink alternativ roșu/verde pe ritm lent (apel preluat, buton blocat)
+        if (localPanel.ui.led.red == LedMode::Alternate &&
+            localPanel.ui.led.green == LedMode::Alternate) {
+            digitalWrite(Pins::UI::LED_RED,   ctx.toggleSlow ? HIGH : LOW);
+            digitalWrite(Pins::UI::LED_GREEN, ctx.toggleSlow ? LOW : HIGH);
+            return;
+        }
+
         switch (localPanel.ui.led.red) {
             case LedMode::On:        digitalWrite(Pins::UI::LED_RED, HIGH); break;
             case LedMode::BlinkFast: digitalWrite(Pins::UI::LED_RED, ctx.toggleFast ? HIGH : LOW); break;

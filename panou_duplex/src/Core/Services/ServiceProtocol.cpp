@@ -171,8 +171,28 @@ static void parseLine(const char* line) {
         }
         sendResponse(resp);
         return;
+    } else if (strncmp(line, "mb_13", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+        // Permisiune al doilea apel (SecondCall) persistentă (flash protejat)
+        if (!checkServiceMode()) return;
+        char resp[48];
+        if (line[5] == '\0') {
+            snprintf(resp, sizeof(resp), "OK SECOND CALL %u", Settings::secondCall() ? 1u : 0u);
+        } else {
+            char scratch[16];
+            const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+            char* endPtr = nullptr;
+            long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+            if (arg == nullptr || endPtr == arg || *endPtr != '\0' || (value != 0 && value != 1)) {
+                sendResponse("ERR 08 INVALID_PARAM");
+                return;
+            }
+            Settings::setSecondCall(value == 1);
+            snprintf(resp, sizeof(resp), "ACK_13 %ld", value);
+        }
+        sendResponse(resp);
+        return;
     } else if (strcmp(line, "mb_defaults") == 0) {
-        // Revine la default-urile din Config.h (Etj + standby) și persistă
+        // Revine la default-urile din Config.h (Etj + standby + secondCall) și persistă
         if (!checkServiceMode()) return;
         Settings::resetDefaults();
         sendResponse("ACK DEFAULTS");

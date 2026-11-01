@@ -40,7 +40,9 @@ Valorile sunt salvate în ultimul sector de flash (EEPROM emulat), în afara ima
 | `mb_03` | Interoghează etajul unde e montat panoul: `OK ETJ <n>`. |
 | `mb_03 <n>` | Setează etajul panoului (`0`–`17`) și îl salvează în flash; `ACK_03 <n>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
 | `mb_04` | Rezervat (gain audio, doar cabină); pe duplex răspunde `ERR 01 UNKNOWN_CMD`. |
-| `mb_05` | Revine la default-urile din `Config.h` (etaj + standby) și le persistă; `ACK_05`. |
+| `mb_05` | Revine la default-urile din `Config.h` (etaj + standby + second call) și le persistă; `ACK_05`. |
+| `mb_13` | Interoghează permisiunea al doilea apel: `OK SECOND CALL <x>` (`0` = blocat, `1` = permis). |
+| `mb_13 <x>` | Setează permisiunea al doilea apel (`0`/`1`) și o persistă în flash; `ACK_13 <x>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
 
 ## Erori comune
 

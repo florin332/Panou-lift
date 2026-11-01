@@ -2,16 +2,26 @@
 #define CHANGELOG_H
 
 /* ============================================================================
-   VERSIUNEA CURENTĂ DE LUCRU: V10.38
-   STATUS: DEVELOPMENT OPEN (Etapa: Reset Hardware pe Apăsare Lungă)
+   VERSIUNEA CURENTĂ DE LUCRU: V10.39
+   STATUS: DEVELOPMENT OPEN (Etapa: Confirmare Preluare Apel + Al Doilea Apel)
    ============================================================================
-   [+] FEATURE: Reset hardware la apăsare lungă (8s) a butonului de apel (GP7).
-       - Prag nou 'Config::Timing::BUTTON_RESET_MS' (8000 ms, sub anti-stuck 10s).
-       - Detecție integrată în 'LiftController::updateButtonState()' (core1).
-       - Protecție buclă reboot: armat doar după prima eliberare a butonului post-boot.
-       - Motiv reset distins prin watchdog scratch[0] (magic 'LPRS'), raportat ca
-         reason=4 în Diagnostics și ServiceProtocol (BTNLP).
-       - Replicat workaround V10.37: 'watchdog_start_tick(12)' înainte de reboot.
+   [+] FEATURE: Confirmare reală a preluării apelului (mașina de stări
+       Idle/Sent/Confirmed în 'LiftController::updateCallState()'):
+       - Confirmare pe tranziția etd -> etaj panou pe liftul comandat; beep-ul
+         Confirm s-a mutat pe confirmarea reală (nu mai sună la apăsare).
+       - Buton blocat în Confirmed până la sosire (sj->Idle, latch runStarted),
+         abandon (ocp->Free, latch ocpArmed), svc != Normal sau timeout unic
+         60 s ('Config::Timing::CALL_TIMEOUT_MS').
+       - Blink alternativ roșu/verde ('LedMode::Alternate') cât butonul e blocat.
+   [+] FEATURE: Al doilea apel configurabil din Service Box (mb_13, variabila
+       persistentă 'SecondCall', default 0 = blocat): la 1, apăsare lungă 3 s
+       ('Config::Timing::LONG_PRESS_SECOND_CALL_MS') în Confirmed comandă și
+       celălalt lift; tracking-ul mașinii de stări comută pe al doilea lift.
+   [*] REFACTOR: Reset hardware: apăsare lungă 8 s -> 4 apăsări consecutive în
+       2 s ('RESET_PRESS_COUNT' / 'RESET_PRESS_WINDOW_MS'); motiv raportat BTN4P.
+   [!] ATENȚIE: structura 'PersistedData' s-a modificat (câmp secondCall) ->
+       CRC-ul datelor existente invalidează la primul boot după update; Etj
+       revine la default și trebuie re-setat din Service Box pe fiecare panou.
    ============================================================================ */
 
 /* 
