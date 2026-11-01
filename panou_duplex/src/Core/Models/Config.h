@@ -97,6 +97,13 @@ namespace Config
         constexpr uint32_t FREE_PULSE_MS = 80;
         constexpr uint16_t FREE_FREQ = 3400;
 
+        // Warning: apel apasat cu liftul deja la palier — doua beep-uri ascendente
+        constexpr uint32_t WARNING_FIRST_PULSE_MS = 100;
+        constexpr uint32_t WARNING_GAP_MS = 200;
+        constexpr uint32_t WARNING_SECOND_PULSE_MS = 300;
+        constexpr uint16_t WARNING_FIRST_FREQ = 3600;
+        constexpr uint16_t WARNING_SECOND_FREQ = 4000;
+
         constexpr uint32_t ALERT_FIRST_PULSE_MS = 40;
         constexpr uint32_t ALERT_FIRST_GAP_MS = 80;
         constexpr uint32_t ALERT_SECOND_PULSE_MS = 120;

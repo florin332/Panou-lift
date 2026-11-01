@@ -25,7 +25,8 @@ enum class Occupancy : uint8_t {
 // ======== ENUMERĂRI TIPISATE EXCLUSIV PENTRU INTERFAȚA UI ========
 // ArrivalBoth nu este emis de producatori: il genereaza driverul Sound prin fuziunea
 // unui al doilea Arrival primit in timpul unei secvente Arrival in curs
-enum class SoundEvent : uint8_t { None, Boot, Confirm, Arrival, Error, Free, ArrivalBoth };
+// Warning: atentionare la apasarea butonului de apel cat timp liftul e deja la palier
+enum class SoundEvent : uint8_t { None, Boot, Confirm, Arrival, Error, Free, ArrivalBoth, Warning };
 // Alternate este un mod compus: blink alternativ roșu/verde, interpretat de driver
 // doar când ambele LED-uri sunt Alternate (apel preluat, buton blocat)
 enum class LedMode    : uint8_t { Off, On, BlinkFast, BlinkSlow, Alternate };

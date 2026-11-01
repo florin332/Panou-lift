@@ -123,6 +123,21 @@ namespace Sound
                 }
                 break;
 
+            case SoundEvent::Warning:
+                if (timpTrecut < Config::Audio::WARNING_FIRST_PULSE_MS) {
+                    setBuzzer(true, Config::Audio::WARNING_FIRST_FREQ);
+                }
+                else if (timpTrecut < Config::Audio::WARNING_GAP_MS) {
+                    setBuzzer(false);
+                }
+                else if (timpTrecut < Config::Audio::WARNING_SECOND_PULSE_MS) {
+                    setBuzzer(true, Config::Audio::WARNING_SECOND_FREQ);
+                }
+                else {
+                    setBuzzer(false); ctx.isActive = false; ctx.currentEvent = SoundEvent::None;
+                }
+                break;
+
             case SoundEvent::Error:
                 if (timpTrecut < Config::Audio::ALERT_FIRST_PULSE_MS) {
                     setBuzzer(true);

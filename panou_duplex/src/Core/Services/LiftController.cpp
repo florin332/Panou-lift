@@ -105,9 +105,9 @@ namespace LiftController
                 localPanel.ui.led.red   = LedMode::Off;
                 localPanel.ui.led.green = LedMode::BlinkSlow;
                 if (b_state && (ctx.b_prev == false)) {
-                    // PROVIZORIU: sunetul Error este dezactivat
-                    // localPanel.ui.sound.event = SoundEvent::Error;
-                    // localPanel.ui.sound.seq++;
+                    // Atentionare: liftul e deja stationat la palier, apelul nu se transmite
+                    localPanel.ui.sound.event = SoundEvent::Warning;
+                    localPanel.ui.sound.seq++;
                 }
                 break;
         }
