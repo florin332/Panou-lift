@@ -63,11 +63,11 @@ static void parseLine(const char* line) {
     while (*line == ' ') line++;
 
     Command cmd{};
-    if (strcmp(line, "SRV ENTER") == 0 || strcmp(line, "mb_01") == 0) {
+    if (strcmp(line, "mb_01") == 0) {
         cmd.type = Command::Type::EnterService;
-    } else if (strcmp(line, "SRV EXIT") == 0 || strcmp(line, "mb_00") == 0) {
+    } else if (strcmp(line, "mb_00") == 0) {
         cmd.type = Command::Type::ExitService;
-    } else if (strcmp(line, "SRV BOOTSEL") == 0 || strcmp(line, "mb_boot") == 0) {
+    } else if (strcmp(line, "mb_02") == 0) {
         // Reset in bootloader USB (volum MSC "RPI-RP2") pentru flash-uire
         // de pe Service Box. Executia este amanata ca comanda si ruleaza pe
         // core0 (ServiceMenu::handleCommand) - TinyUSB nu este thread-safe.

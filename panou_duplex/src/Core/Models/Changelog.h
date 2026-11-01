@@ -1,6 +1,19 @@
 #ifndef CHANGELOG_H
 #define CHANGELOG_H
 
+/* ============================================================================
+   VERSIUNEA CURENTĂ DE LUCRU: V10.38
+   STATUS: DEVELOPMENT OPEN (Etapa: Reset Hardware pe Apăsare Lungă)
+   ============================================================================
+   [+] FEATURE: Reset hardware la apăsare lungă (8s) a butonului de apel (GP7).
+       - Prag nou 'Config::Timing::BUTTON_RESET_MS' (8000 ms, sub anti-stuck 10s).
+       - Detecție integrată în 'LiftController::updateButtonState()' (core1).
+       - Protecție buclă reboot: armat doar după prima eliberare a butonului post-boot.
+       - Motiv reset distins prin watchdog scratch[0] (magic 'LPRS'), raportat ca
+         reason=4 în Diagnostics și ServiceProtocol (BTNLP).
+       - Replicat workaround V10.37: 'watchdog_start_tick(12)' înainte de reboot.
+   ============================================================================ */
+
 /* 
 
 /* ============================================================================

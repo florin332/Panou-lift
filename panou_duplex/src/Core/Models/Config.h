@@ -16,6 +16,9 @@ namespace Config
         constexpr uint8_t PANEL_FLOOR_DEFAULT = 0;   // Default etaj panou (Etj); suprascris din Service
         constexpr uint8_t FLOORS = 18;               // Total etaje instalație
         constexpr uint8_t LIFTS = 2;                 // Mod Duplex
+
+        // Marcă persistență prin watchdog scratch: reset declanșat de apăsare lungă buton
+        constexpr uint32_t RESET_MAGIC_BUTTON = 0x4C505253UL;  // "LPRS" (Long-Press ReSet)
     }
 
     // =========================================================
@@ -28,6 +31,7 @@ namespace Config
         constexpr uint32_t STANDBY_TIMEOUT_MAX_MS     = 300000;  // Limita superioară standby (5 min)
         constexpr uint32_t SHIFT_PERIOD_MS = 30000;      // Perioadă schimb standby
         constexpr uint32_t BUTTON_INHIBIT_MS = 5000;     // Inhibare buton după apel
+        constexpr uint32_t BUTTON_RESET_MS = 8000;       // Apăsare lungă buton apel → reset hardware (< BUTTON_STUCK_MS)
         constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat
         constexpr uint32_t LED_BLINK_SLOW = 500;         // Perioadă clipire lentă LED
         constexpr uint32_t LED_BLINK_FAST = 150;         // Perioadă clipire rapidă LED

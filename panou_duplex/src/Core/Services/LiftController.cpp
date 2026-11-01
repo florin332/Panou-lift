@@ -8,6 +8,7 @@
 #include "Settings.h"
 
 #include "Arduino.h"
+#include <hardware/watchdog.h>
 
 
 namespace LiftController
@@ -19,17 +20,29 @@ namespace LiftController
         bool b_prev;
         bool alterna_uzura;
         bool buton_a_fost_apasat;
+        bool resetArmed;
     };
 
     static ControllerContext ctx;
 
-    // --- SUBRUTINĂ PRIVATĂ 1: GESTIUNE FILTRU ANTI-STUCK ---
+    // --- SUBRUTINĂ PRIVATĂ 1: GESTIUNE FILTRU ANTI-STUCK ȘI RESET LA APĂSARE LUNGĂ ---
     static void updateButtonState(bool b_state, unsigned long currentMillis) {
         if (b_state) {
             if (ctx.b_prev == false) { ctx.buttPressedMillis = currentMillis; }
             if ((currentMillis - ctx.buttPressedMillis) >= Config::Timing::BUTTON_STUCK_MS) { ctx.buttonStuck = true; }
+
+            // Reset hardware la apăsare lungă (prag SUB anti-stuck).
+            // Armat doar după ce butonul a fost eliberat cel puțin o dată post-boot:
+            // previne bucla infinită de reboot dacă butonul rămâne blocat fizic.
+            if (ctx.resetArmed && (currentMillis - ctx.buttPressedMillis) >= Config::Timing::BUTTON_RESET_MS) {
+                watchdog_hw->scratch[0] = Config::Hardware::RESET_MAGIC_BUTTON;
+                // watchdog_reboot atârnă la infinit dacă tick-ul watchdog nu rulează (vezi ServiceMenu.cpp)
+                watchdog_start_tick(12);
+                watchdog_reboot(0, 0, 0);   // Nu returnează niciodată
+            }
         } else {
             ctx.buttonStuck = false; 
+            ctx.resetArmed = true;
         }
     }
 
@@ -109,6 +122,8 @@ namespace LiftController
         ctx.b_prev = true; 
         ctx.alterna_uzura = false;
         ctx.buton_a_fost_apasat = false;
+        // Reset-ul pe apăsare lungă se armează doar dacă butonul e eliberat la boot
+        ctx.resetArmed = (digitalRead(Pins::UI::BUTTON) == HIGH);
     }
 
     // INTERFAȚA PUBLICĂ ORCHESTRATOARE COMPLET DECUPLATĂ

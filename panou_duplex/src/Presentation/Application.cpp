@@ -7,6 +7,7 @@
 #include "SharedPanel.h"
 #include "BuildInfo.h"
 #include "Pins.h"
+#include "Config.h"
 
 // 2. Rute interne în cadrul aceluiași folder src/Presentation/
 #include "Presentation.h"
@@ -30,12 +31,19 @@
 
 #include <EEPROM.h>
 #include "hardware/structs/vreg_and_chip_reset.h"
+#include <hardware/watchdog.h>
 
 namespace Application
 {
     constexpr int EEPROM_BOOT_COUNT_ADDR = 0;   // 0..3 rezervate; setările sunt la offset 4 (Settings.cpp)
 
     static uint8_t getHardwareResetReason() {
+        // Marca software are prioritate: scratch-ul watchdog supraviețuiește resetului,
+        // dar se șterge la POR. Citit o singură dată și invalidat imediat.
+        if (watchdog_hw->scratch[0] == Config::Hardware::RESET_MAGIC_BUTTON) {
+            watchdog_hw->scratch[0] = 0;
+            return 4;   // Reset declanșat de apăsare lungă buton apel
+        }
         uint32_t reason = vreg_and_chip_reset_hw->chip_reset;
         if (reason & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS) return 2;
         if (reason & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS) return 1;

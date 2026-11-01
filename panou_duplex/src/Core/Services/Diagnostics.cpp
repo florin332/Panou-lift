@@ -11,6 +11,7 @@ namespace Diagnostics
             case 1:  return "POR (Power-On Reset)";
             case 2:  return "Watchdog Timer Reset";
             case 3:  return "Software Reset / RUN Pin";
+            case 4:  return "Reset Buton (Apasare Lunga)";
             default: return "Unknown Reset Reason";
         }
     }

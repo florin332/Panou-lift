@@ -10,7 +10,7 @@ struct Command {
         None,
         EnterService,
         ExitService,
-        EnterBootsel,     // SRV BOOTSEL / mb_boot - executat pe core0
+        EnterBootsel,     // mb_02 - executat pe core0
         CommTest,
         CommTestOut,      // exit COMM test
         CommStatus,

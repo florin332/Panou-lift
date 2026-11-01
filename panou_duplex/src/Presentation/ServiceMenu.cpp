@@ -158,7 +158,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             sInService.store(false, std::memory_order_relaxed);
             sDisplayTestActive = false;
             Display::setServiceMode(false);
-            ServiceProtocol::sendResponse("ACK SRV EXIT");
+            ServiceProtocol::sendResponse("ACK_00");
             break;
 
         case ServiceProtocol::Command::Type::EnterBootsel:
@@ -169,7 +169,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             // din ServiceProtocol::poll() de pe core1). Scrierile simple
             // s-au dovedit a iesi pe fir fara flush; delay-ul acopera
             // golirea FIFO-ului inainte de reset.
-            ServiceProtocol::sendResponse("ACK SRV BOOTSEL");
+            ServiceProtocol::sendResponse("ACK_02");
             ServiceProtocol::sendResponse("DBG S1 ack-trimis");
             delay(150);       // lasa hostul (Service Box) sa consume FIFO-ul
             ServiceProtocol::sendResponse("DBG S3 pre-reset");
@@ -453,6 +453,7 @@ static void sendMcuLastReset() {
             case 1: reason = "BOR"; break;
             case 2: reason = "WDT"; break;
             case 3: reason = "SYSREQ"; break;
+            case 4: reason = "BTNLP"; break;   // Reset apăsare lungă buton apel
             default: break;
         }
         char buf[64];
