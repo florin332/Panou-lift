@@ -10,24 +10,9 @@ struct Command {
         None,
         EnterService,
         ExitService,
-        EnterBootsel,     // mb_02 - executat pe core0
-        CommTest,
-        CommTestOut,      // exit COMM test
-        CommStatus,
-        Diagnostics,
-        DispTest,
-        DispReinit,
-        DispTestExit,     // exit LCD test (fostul TestExit)
-        McuUptime,
-        McuResets,
-        McuWdt,
-        McuLastReset,
-        McuTemp,
-        McuStack,
-        CommCountStatus      // mb_com_status: raporteaza contoarele RX pe serial
+        EnterBootsel      // mb_02 - executat pe core0
     } type = Type::None;
 
-    uint8_t param = 0;
     bool pending = false;
 };
 
