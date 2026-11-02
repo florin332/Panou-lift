@@ -155,7 +155,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
                 PanelRenderer::invalidate(DisplayTarget::Right);
             }
             char response[16];
-            snprintf(response, sizeof(response), "ACK_16 %u", static_cast<unsigned>(cmd.argument));
+            snprintf(response, sizeof(response), "ACK_31 %u", static_cast<unsigned>(cmd.argument));
             ServiceProtocol::sendResponse(response);
             break;
 
@@ -169,7 +169,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             sColorTestActive = true;
             drawColorTestPage();
             char testResponse[16];
-            snprintf(testResponse, sizeof(testResponse), "ACK_17 %u", static_cast<unsigned>(cmd.argument));
+            snprintf(testResponse, sizeof(testResponse), "ACK_32 %u", static_cast<unsigned>(cmd.argument));
             ServiceProtocol::sendResponse(testResponse);
             break;
         }
@@ -177,7 +177,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
         case ServiceProtocol::Command::Type::StopDisplayTest:
             if (!checkService()) break;
             stopColorTest();
-            ServiceProtocol::sendResponse("ACK_18");
+            ServiceProtocol::sendResponse("ACK_33");
             break;
 
         default:

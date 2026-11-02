@@ -29,24 +29,36 @@
 #include "../Core/Services/Settings.h"
 #include "ServiceMenu.h"
 
-#include <EEPROM.h>
+#include "SystemCounters.h"
+#include <hardware/regs/watchdog.h>
 #include "hardware/structs/vreg_and_chip_reset.h"
 #include <hardware/watchdog.h>
 
 namespace Application
 {
-    constexpr int EEPROM_BOOT_COUNT_ADDR = 0;   // 0..3 rezervate; setările sunt la offset 4 (Settings.cpp)
-
     static uint8_t getHardwareResetReason() {
+        const uint32_t watchdogReason = watchdog_hw->reason;
+        const uint32_t chipResetReason = vreg_and_chip_reset_hw->chip_reset;
+        vreg_and_chip_reset_hw->chip_reset =
+            VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS |
+            VREG_AND_CHIP_RESET_CHIP_RESET_HAD_RUN_BITS |
+            VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS;
+
         // Marca software are prioritate: scratch-ul watchdog supraviețuiește resetului,
         // dar se șterge la POR. Citit o singură dată și invalidat imediat.
         if (watchdog_hw->scratch[0] == Config::Hardware::RESET_MAGIC_BUTTON) {
             watchdog_hw->scratch[0] = 0;
+            // Categoria 4: resetul local declanșat de 4 apăsări rapide.
             return 4;   // Reset declanșat de 4 apăsări rapide buton apel
         }
-        uint32_t reason = vreg_and_chip_reset_hw->chip_reset;
-        if (reason & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS) return 2;
-        if (reason & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS) return 1;
+
+        // Categoria 2: reset real watchdog, prin timer sau comandă force.
+        if (watchdogReason & (WATCHDOG_REASON_TIMER_BITS | WATCHDOG_REASON_FORCE_BITS)) return 2;
+
+        // Categoria 1: registrul grupează POR și brownout în același indicator.
+        if (chipResetReason & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS) return 1;
+
+        // Categoria 3: RUN, debug, reset software sau cauză nedeterminată.
         return 3;
     }
 
@@ -64,16 +76,12 @@ namespace Application
         ServiceMenu::init();
 
         // EEPROM este deja deschis (256 B) de Settings::init()
-        uint16_t curentBoots = 0;
-        EEPROM.get(EEPROM_BOOT_COUNT_ADDR, curentBoots);
-        if (curentBoots == 0xFFFF) { curentBoots = 0; }
-        curentBoots++;
-        EEPROM.put(EEPROM_BOOT_COUNT_ADDR, curentBoots);
-        EEPROM.commit();
+        const uint8_t resetReason = getHardwareResetReason();
+        const uint16_t curentBoots = SystemCounters::recordBoot(resetReason);
 
         SharedPanel initPanel = {};
         initPanel.system.bootCounter = curentBoots;
-        initPanel.system.lastResetReason = getHardwareResetReason();
+        initPanel.system.lastResetReason = resetReason;
         initPanel.ui.sound.event = SoundEvent::Boot;
         initPanel.ui.sound.seq = 1;
 
