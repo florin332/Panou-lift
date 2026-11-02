@@ -74,6 +74,33 @@ static void parseLine(const char* line) {
         // (parseLine ruleaza acum tot pe core0, sendResponse e sigur aici).
         sendResponse("DBG P0 bootsel-primit");
         cmd.type = Command::Type::EnterBootsel;
+    } else if (strncmp(line, "mb_16", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+        if (!checkServiceMode()) return;
+        char scratch[16];
+        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        char* endPtr = nullptr;
+        long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::ResetDisplay;
+        cmd.argument = static_cast<uint8_t>(value);
+    } else if (strncmp(line, "mb_17", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+        if (!checkServiceMode()) return;
+        char scratch[16];
+        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        char* endPtr = nullptr;
+        long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::StartDisplayTest;
+        cmd.argument = static_cast<uint8_t>(value);
+    } else if (strcmp(line, "mb_18") == 0) {
+        if (!checkServiceMode()) return;
+        cmd.type = Command::Type::StopDisplayTest;
     } else if (strncmp(line, "mb_11", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
         // Etaj panou (Etj) persistent (flash protejat)
         if (!checkServiceMode()) return;
@@ -135,8 +162,28 @@ static void parseLine(const char* line) {
         }
         sendResponse(resp);
         return;
+    } else if (strncmp(line, "mb_15", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+        // Ordine cabine pe LCD-uri (CabOrder) persistentă (flash protejat)
+        if (!checkServiceMode()) return;
+        char resp[48];
+        if (line[5] == '\0') {
+            snprintf(resp, sizeof(resp), "OK CAB ORDER %u", Settings::cabOrderSwapped() ? 1u : 0u);
+        } else {
+            char scratch[16];
+            const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+            char* endPtr = nullptr;
+            long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+            if (arg == nullptr || endPtr == arg || *endPtr != '\0' || (value != 0 && value != 1)) {
+                sendResponse("ERR 08 INVALID_PARAM");
+                return;
+            }
+            Settings::setCabOrderSwapped(value == 1);
+            snprintf(resp, sizeof(resp), "ACK_15 %ld", value);
+        }
+        sendResponse(resp);
+        return;
     } else if (strcmp(line, "mb_30") == 0) {
-        // Revine la default-urile din Config.h (Etj + standby + secondCall) și persistă
+        // Revine la default-urile din Config.h (Etj + standby + secondCall + cabOrder) și persistă
         if (!checkServiceMode()) return;
         Settings::resetDefaults();
         sendResponse("ACK_30");

@@ -19,9 +19,15 @@
        celălalt lift; tracking-ul mașinii de stări comută pe al doilea lift.
    [*] REFACTOR: Reset hardware: apăsare lungă 8 s -> 4 apăsări consecutive în
        2 s ('RESET_PRESS_COUNT' / 'RESET_PRESS_WINDOW_MS'); motiv raportat BTN4P.
-   [!] ATENȚIE: structura 'PersistedData' s-a modificat (câmp secondCall) ->
-       CRC-ul datelor existente invalidează la primul boot după update; Etj
-       revine la default și trebuie re-setat din Service Box pe fiecare panou.
+   [+] FEATURE: Ordine cabine pe LCD configurabilă din Service Box (mb_15,
+       variabila persistentă 'CabOrderSwapped', default 0 = direct): numerotarea
+       LCD-urilor e fixă (LCD1=SPI0, LCD2=SPI1); la 1, cabina 1 se randează pe
+       LCD2 și cabina 2 pe LCD1, pentru corelarea cu numerotarea din teren.
+       Meniul de diagnostic rămâne fix pe LCD1 ('DisplayTarget::Left').
+   [!] ATENȚIE: structura 'PersistedData' s-a modificat (câmpuri secondCall +
+       cabOrderSwapped, SETTINGS_VERSION=2) -> datele existente sunt invalidate
+       la primul boot după update; Etj/standby/secondCall/cabOrder revin la
+       default și trebuie re-setate din Service Box pe fiecare panou.
    ============================================================================ */
 
 /* 

@@ -5,6 +5,7 @@
 // 1. Core definitions loaded via relative subfolder paths
 #include "Pins.h"
 #include "Config.h"
+#include "BuildInfo.h"
 #include "SharedPanel.h"
 #include "Settings.h"
 
@@ -55,20 +56,45 @@ namespace Display
         backlightOn = enabled;
     }
 
+    static void initializeController(Custom_ST7735 &tft) {
+        tft.initR(INITR_BLACKTAB);
+        tft.setRowStart(Config::Display::ROW_START);
+        tft.setColStart(Config::Display::COL_START);
+        tft.setRotation(Config::Display::ROTATION);
+        tft.setSPISpeed(Config::Display::SPI_CLOCK);
+    }
+
     static void initializeControllers() {
-        tft1.initR(INITR_BLACKTAB);
-        tft2.initR(INITR_BLACKTAB);
+        initializeController(tft1);
+        initializeController(tft2);
+    }
 
-        tft1.setRowStart(Config::Display::ROW_START);
-        tft1.setColStart(Config::Display::COL_START);
-        tft2.setRowStart(Config::Display::ROW_START);
-        tft2.setColStart(Config::Display::COL_START);
+    static void drawBootScreen(Adafruit_ST7735 &tft, const char *elevatorName) {
+        char hardwareVersion[16];
+        char firmwareVersion[20];
+        snprintf(hardwareVersion, sizeof(hardwareVersion), "HARDWARE V%u",
+                 static_cast<unsigned>(BuildInfo::HardwareVariant));
+        snprintf(firmwareVersion, sizeof(firmwareVersion), "FIRMWARE V%u.%u",
+                 static_cast<unsigned>(BuildInfo::Major),
+                 static_cast<unsigned>(BuildInfo::Minor));
 
-        tft1.setRotation(Config::Display::ROTATION);
-        tft2.setRotation(Config::Display::ROTATION);
+        tft.fillScreen(COLOR_BLACK);
+        tft.setFont(&universalis12);
+        const auto drawCentered = [&tft](const char *text, int16_t y, uint16_t color) {
+            int16_t x1 = 0;
+            int16_t y1 = 0;
+            uint16_t textWidth = 0;
+            uint16_t textHeight = 0;
+            tft.getTextBounds(text, 0, 0, &x1, &y1, &textWidth, &textHeight);
+            tft.setTextColor(color);
+            tft.setCursor((tft.width() - static_cast<int16_t>(textWidth)) / 2 - x1, y - y1);
+            tft.print(text);
+        };
 
-        tft1.setSPISpeed(Config::Display::SPI_CLOCK);
-        tft2.setSPISpeed(Config::Display::SPI_CLOCK);
+        drawCentered(elevatorName, 39, COLOR_YELLOW);
+        drawCentered("PANOU DUPLEX", 67, COLOR_WHITE);
+        drawCentered(hardwareVersion, 104, COLOR_GREY);
+        drawCentered(firmwareVersion, 131, COLOR_GREEN);
     }
 
     void init()
@@ -102,9 +128,10 @@ namespace Display
 
         initializeControllers();
 
-        // Initial clear
-        tft1.fillScreen(COLOR_BLACK);
-        tft2.fillScreen(COLOR_BLACK);
+        const bool cabOrderSwapped = Settings::cabOrderSwapped();
+        drawBootScreen(tft1, cabOrderSwapped ? "ASCENSOR 2" : "ASCENSOR 1");
+        drawBootScreen(tft2, cabOrderSwapped ? "ASCENSOR 1" : "ASCENSOR 2");
+        delay(5000);
     }
 
     // --- Service Mode control ---
@@ -162,6 +189,38 @@ namespace Display
     void clearTargetScreen(DisplayTarget target) {
         if (target == DisplayTarget::Left) { tft1.fillScreen(COLOR_BLACK); }
         else                               { tft2.fillScreen(COLOR_BLACK); }
+    }
+
+    void reinitializeTarget(DisplayTarget target) {
+        Custom_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
+        initializeController(tft);
+        tft.fillScreen(COLOR_BLACK);
+    }
+
+    void drawColorTestPage(DisplayTarget target, uint8_t colorIndex, bool labelAtTop) {
+        Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
+        static const uint16_t colors[] = {
+            COLOR_RED, COLOR_GREEN, 0x001F, COLOR_WHITE, COLOR_BLACK
+        };
+        static const char* labels[] = {"R", "G", "B", "W", "Black"};
+        const uint8_t index = colorIndex < 5 ? colorIndex : 0;
+        const uint16_t background = colors[index];
+        const uint16_t foreground = (index == 1 || index == 3) ? COLOR_BLACK : COLOR_WHITE;
+
+        tft.fillScreen(background);
+        tft.setFont(&universalis12);
+        tft.setTextSize(1);
+        tft.setTextWrap(false);
+
+        int16_t x1 = 0;
+        int16_t y1 = 0;
+        uint16_t textWidth = 0;
+        uint16_t textHeight = 0;
+        tft.getTextBounds(labels[index], 0, 0, &x1, &y1, &textWidth, &textHeight);
+        const int16_t textTop = labelAtTop ? 8 : static_cast<int16_t>(tft.height()) - 8 - textHeight;
+        tft.setTextColor(foreground);
+        tft.setCursor((tft.width() - static_cast<int16_t>(textWidth)) / 2 - x1, textTop - y1);
+        tft.print(labels[index]);
     }
 
     // ← MODIFICAT: separator configurabil (culoare + grosime)

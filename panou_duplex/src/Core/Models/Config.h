@@ -15,6 +15,7 @@ namespace Config
     {
         constexpr uint8_t PANEL_FLOOR_DEFAULT = 0;   // Default etaj panou (Etj); suprascris din Service
         constexpr bool SECOND_CALL_DEFAULT = false;  // Default al doilea apel: blocat (setabil Service Box, mb_13)
+        constexpr bool CAB_ORDER_DEFAULT = false;    // Default ordine cabine pe LCD: direct (cabina1→LCD1); setabil Service Box, mb_15
         constexpr uint8_t FLOORS = 18;               // Total etaje instalație
         constexpr uint8_t LIFTS = 2;                 // Mod Duplex
 

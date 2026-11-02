@@ -7,6 +7,7 @@
 #include "SharedPanel.h"
 #include "PanelRenderer.h"
 #include "BuildInfo.h"
+#include "Settings.h"
 #include <Arduino.h>
 #include <pico/bootrom.h>
 #include <pico/multicore.h>
@@ -19,15 +20,26 @@ namespace ServiceMenu {
 
 static std::atomic<bool> sInService{false};
 static unsigned long sLastActivityMillis = 0;
+static bool sColorTestActive = false;
+static uint8_t sColorTestTargets = 0;
+static uint8_t sColorTestColorIndex = 0;
+static bool sColorTestLabelAtTop = true;
+static unsigned long sColorTestLastStepMillis = 0;
 
 // Forward declarations
 static void handleCommand(const ServiceProtocol::Command &cmd);
 static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData);
 static bool checkService();
+static bool isColorTestTarget(DisplayTarget target);
+static void drawColorTestPage();
+static void updateColorTest();
+static void stopColorTest();
 
 void init() {
     sInService.store(false, std::memory_order_relaxed);
     sLastActivityMillis = 0;
+    sColorTestActive = false;
+    sColorTestTargets = 0;
 }
 
 bool isInServiceMode() {
@@ -44,12 +56,25 @@ void update() {
     if (sInService.load(std::memory_order_relaxed)) {
         if (haveNewData) {
             Display::update(localPanel);
-            PanelRenderer::render(DisplayTarget::Right, localPanel.lift2, "ASCENSOR 2");
-            PanelRenderer::render(DisplayTarget::Left, localPanel.lift1, "ASCENSOR 1");
+            // CabOrder (mb_15): la swap, cabina1 se randează pe LCD2 și invers
+            const bool swapped = Settings::cabOrderSwapped();
+            const DisplayTarget lift2Target = swapped ? DisplayTarget::Left : DisplayTarget::Right;
+            const DisplayTarget lift1Target = swapped ? DisplayTarget::Right : DisplayTarget::Left;
+            if (!isColorTestTarget(lift2Target)) {
+                PanelRenderer::render(lift2Target, localPanel.lift2, "ASCENSOR 2");
+            }
+            if (!isColorTestTarget(lift1Target)) {
+                PanelRenderer::render(lift1Target, localPanel.lift1, "ASCENSOR 1");
+            }
         }
+        updateColorTest();
         uint16_t overlayColor = getOverlayColor(localPanel, haveNewData);
-        Display::drawServiceOverlay(DisplayTarget::Left, overlayColor);
-        Display::drawServiceOverlay(DisplayTarget::Right, overlayColor);
+        if (!isColorTestTarget(DisplayTarget::Left)) {
+            Display::drawServiceOverlay(DisplayTarget::Left, overlayColor);
+        }
+        if (!isColorTestTarget(DisplayTarget::Right)) {
+            Display::drawServiceOverlay(DisplayTarget::Right, overlayColor);
+        }
     }
 
     // 3. Consuma comenzi de la Core 1 (Magic Box)
@@ -84,6 +109,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             break;
 
         case ServiceProtocol::Command::Type::ExitService:
+            stopColorTest();
             sInService.store(false, std::memory_order_relaxed);
             Display::setServiceMode(false);
             ServiceProtocol::sendResponse("ACK_00");
@@ -118,6 +144,42 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
                 delay(500);
             }
 
+        case ServiceProtocol::Command::Type::ResetDisplay:
+            if (!checkService()) break;
+            if (cmd.argument == 1 || cmd.argument == 3) {
+                Display::reinitializeTarget(DisplayTarget::Left);
+                PanelRenderer::invalidate(DisplayTarget::Left);
+            }
+            if (cmd.argument == 2 || cmd.argument == 3) {
+                Display::reinitializeTarget(DisplayTarget::Right);
+                PanelRenderer::invalidate(DisplayTarget::Right);
+            }
+            char response[16];
+            snprintf(response, sizeof(response), "ACK_16 %u", static_cast<unsigned>(cmd.argument));
+            ServiceProtocol::sendResponse(response);
+            break;
+
+        case ServiceProtocol::Command::Type::StartDisplayTest: {
+            if (!checkService()) break;
+            stopColorTest();
+            sColorTestTargets = cmd.argument;
+            sColorTestColorIndex = 0;
+            sColorTestLabelAtTop = true;
+            sColorTestLastStepMillis = millis();
+            sColorTestActive = true;
+            drawColorTestPage();
+            char testResponse[16];
+            snprintf(testResponse, sizeof(testResponse), "ACK_17 %u", static_cast<unsigned>(cmd.argument));
+            ServiceProtocol::sendResponse(testResponse);
+            break;
+        }
+
+        case ServiceProtocol::Command::Type::StopDisplayTest:
+            if (!checkService()) break;
+            stopColorTest();
+            ServiceProtocol::sendResponse("ACK_18");
+            break;
+
         default:
             ServiceProtocol::sendResponse("ERR 04 UNHANDLED");
             break;
@@ -130,6 +192,40 @@ static bool checkService() {
         return false;
     }
     return true;
+}
+
+static bool isColorTestTarget(DisplayTarget target) {
+    const uint8_t targetBit = (target == DisplayTarget::Left) ? 1u : 2u;
+    return sColorTestActive && (sColorTestTargets & targetBit) != 0;
+}
+
+static void drawColorTestPage() {
+    if (sColorTestTargets & 1u) {
+        Display::drawColorTestPage(DisplayTarget::Left, sColorTestColorIndex, sColorTestLabelAtTop);
+    }
+    if (sColorTestTargets & 2u) {
+        Display::drawColorTestPage(DisplayTarget::Right, sColorTestColorIndex, sColorTestLabelAtTop);
+    }
+}
+
+static void updateColorTest() {
+    if (!sColorTestActive || millis() - sColorTestLastStepMillis < 3000) return;
+
+    sColorTestLastStepMillis = millis();
+    sColorTestColorIndex++;
+    if (sColorTestColorIndex >= 5) {
+        sColorTestColorIndex = 0;
+        sColorTestLabelAtTop = !sColorTestLabelAtTop;
+    }
+    drawColorTestPage();
+}
+
+static void stopColorTest() {
+    if (!sColorTestActive) return;
+    if (sColorTestTargets & 1u) PanelRenderer::invalidate(DisplayTarget::Left);
+    if (sColorTestTargets & 2u) PanelRenderer::invalidate(DisplayTarget::Right);
+    sColorTestActive = false;
+    sColorTestTargets = 0;
 }
 
 } // namespace ServiceMenu

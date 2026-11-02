@@ -1,5 +1,6 @@
 // src/Core/Services/Settings.h
-// Setări persistente per-panou (etaj panou Etj, timeout standby ecran).
+// Setări persistente per-panou (etaj panou Etj, timeout standby ecran,
+// al doilea apel, ordine cabine pe LCD-uri).
 //
 // ZONĂ PROTEJATĂ DE FLASH:
 //   Folosește EEPROM emulat de core-ul earlephilhower, stocat în ultimul
@@ -29,6 +30,11 @@ namespace Settings
     // Al doilea apel (duplex): false = blocat (default), true = permis (apăsare lungă 3 s)
     bool secondCall();
     bool setSecondCall(bool enabled);             // persistă în flash
+
+    // Ordinea cabinelor pe LCD-uri: false = direct (cabina1→LCD1/SPI0, cabina2→LCD2/SPI1),
+    // true = invers (cabina1→LCD2, cabina2→LCD1), pentru corelarea cu numerotarea din teren
+    bool cabOrderSwapped();
+    bool setCabOrderSwapped(bool swapped);        // persistă în flash
 
     // Scrie explicit în flash starea curentă (setterii o fac deja)
     bool save();

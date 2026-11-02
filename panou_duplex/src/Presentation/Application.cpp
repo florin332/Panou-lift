@@ -93,6 +93,16 @@ namespace Application
         ServiceMenu::update();
         const bool returnedFromService = wasInServiceMode && !ServiceMenu::isInServiceMode();
 
+        // Schimbare CabOrder (mb_15): invalidează ambele ecrane ca noul
+        // aranjament să fie redesenat imediat, inclusiv în Service Mode.
+        static bool sLastCabSwapped = Settings::cabOrderSwapped();
+        const bool cabSwapped = Settings::cabOrderSwapped();
+        if (cabSwapped != sLastCabSwapped) {
+            sLastCabSwapped = cabSwapped;
+            PanelRenderer::invalidate(DisplayTarget::Left);
+            PanelRenderer::invalidate(DisplayTarget::Right);
+        }
+
         if (returnedFromService) {
             PanelRenderer::invalidate(DisplayTarget::Left);
             PanelRenderer::invalidate(DisplayTarget::Right);
@@ -118,12 +128,22 @@ namespace Application
             const DiagnosticsNavigator::NavigatorState &nav = DiagnosticsNavigator::getState();
 
             // --- ECRAN PRINCIPAL ---
-            PanelRenderer::render(DisplayTarget::Right, localSnapshot.lift2, "ASCENSOR 2");
+            // CabOrder (mb_15): false = direct (cabina1 pe LCD1/tft1), true = invers.
+            // Meniul de diagnostic rămâne fix pe DisplayTarget::Left (LCD1, SPI0).
+            const DisplayTarget cab1Target = cabSwapped ? DisplayTarget::Right : DisplayTarget::Left;
+            const DisplayTarget cab2Target = cabSwapped ? DisplayTarget::Left : DisplayTarget::Right;
+            const DisplayTarget menuTarget = DisplayTarget::Left;
 
-            if (!nav.isMenuOpen) {
-                PanelRenderer::render(DisplayTarget::Left, localSnapshot.lift1, "ASCENSOR 1");
+            if (!nav.isMenuOpen || cab2Target != menuTarget) {
+                PanelRenderer::render(cab2Target, localSnapshot.lift2, "ASCENSOR 2");
             } else {
-                PanelRenderer::invalidate(DisplayTarget::Left);
+                PanelRenderer::invalidate(cab2Target);
+            }
+
+            if (!nav.isMenuOpen || cab1Target != menuTarget) {
+                PanelRenderer::render(cab1Target, localSnapshot.lift1, "ASCENSOR 1");
+            } else {
+                PanelRenderer::invalidate(cab1Target);
             }
 
             // --- MENIU DIAGNOSTIC ---
