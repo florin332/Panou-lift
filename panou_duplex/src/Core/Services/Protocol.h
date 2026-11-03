@@ -9,7 +9,13 @@ namespace Protocol
 {
     void init();
     void update(SharedPanel &localPanel);
+
+    // Transmisie imediată, fără carrier sense (uz intern / Service Box)
     void trimiteApel(uint8_t ascAlocat);
+
+    // Cerere de apel cu carrier sense (CSMA): apelul este pus în așteptare și
+    // transmis de update() când linia de comandă e liberă (vezi Config::Protocol)
+    void requestCall(uint8_t ascAlocat);
 
     // Contoare RX volatile, controlate separat pentru lifturile 1 si 2.
     bool commCountEnable(uint8_t lift);   // lift 1 sau 2

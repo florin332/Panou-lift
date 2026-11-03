@@ -75,6 +75,12 @@ namespace Config
         constexpr uint32_t RS485_TX_SETTLE_US = 50;
         constexpr uint32_t RS485_TX_RELEASE_US = 50;
         constexpr uint32_t RS485_LISTEN_SETTLE_US = 10;
+
+        // Carrier sense (CSMA) pe linia de comandă (Serial3): apelul se trimite
+        // doar dacă linia a fost liberă cel puțin CALL_CARRIER_QUIET_MS; dacă linia
+        // rămâne ocupată, cererea amânată expiră după CALL_PENDING_TIMEOUT_MS
+        constexpr uint32_t CALL_CARRIER_QUIET_MS = 10;
+        constexpr uint32_t CALL_PENDING_TIMEOUT_MS = 3000;
     }
 
     // =========================================================

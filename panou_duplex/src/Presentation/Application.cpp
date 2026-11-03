@@ -190,7 +190,9 @@ namespace Application
 
         ControllerResult result = LiftController::process(localPanelCore1);
         if (result.transmit) {
-            Protocol::trimiteApel(result.lift);
+            // CSMA: apelul intră în așteptare și e transmis de Protocol::update()
+            // când linia de comandă e liberă (carrier sense)
+            Protocol::requestCall(result.lift);
         }
 
         if (millis() - lastUptimeUpdate >= 1000) {

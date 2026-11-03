@@ -44,6 +44,13 @@ namespace Protocol
     static std::atomic<bool> sCountingEnabled[2] = {{false}, {false}};
     static std::atomic<bool> sResetCountersPending[2] = {{false}, {false}};
     static bool sAnalyzeEnabled = false;
+
+    // Carrier sense (CSMA) pe linia de comandă (Serial3):
+    // sLastCarrierMillis = momentul ultimei activități RX (orice byte = linie ocupată)
+    // sPendingCallLift = cerere de apel amânată (0 = nicio cerere); un singur slot
+    static unsigned long sLastCarrierMillis = 0;
+    static uint8_t sPendingCallLift = 0;
+    static unsigned long sPendingCallMillis = 0;
     static uint32_t sRxFrames[2]      = {0, 0}; // cadre complet delimitate (START...END)
     static uint32_t sRxValid[2]       = {0, 0}; // cadre acceptate (format+CRC+domeniu)
     static uint32_t sRxTimeout[2]     = {0, 0}; // cadru inceput, neterminat in timeout
@@ -297,6 +304,9 @@ namespace Protocol
         Serial1.begin(Config::Protocol::SERIAL_BAUD);
         Serial2.begin(Config::Protocol::SERIAL_BAUD);
         Serial3.begin(Config::Protocol::SERIAL_BAUD);
+        // RX armat permanent: carrier sense-ul din update() monitorizează linia de
+        // comandă și amână trimiterea apelului cât timp există trafic
+        Serial3.listen();
         pinMode(Pins::RS485::TX_ENABLE, OUTPUT);
         digitalWrite(Pins::RS485::TX_ENABLE, LOW);
         memset(&rxLift1, 0, sizeof(RxBuffer));
@@ -322,6 +332,25 @@ namespace Protocol
         for (uint8_t i = 0; i < 2; i++) {
             if (sResetCountersPending[i].exchange(false, std::memory_order_relaxed)) {
                 resetCounters(i);
+            }
+        }
+
+        // Carrier sense: orice byte recepționat pe linia de comandă înseamnă linie
+        // ocupată. Conținutul nu contează — doar activitatea marchează carrier-ul.
+        while (Serial3.available() > 0) {
+            Serial3.read();
+            sLastCarrierMillis = millis();
+        }
+
+        // Apel amânat: se trimite când linia a fost liberă suficient de mult;
+        // dacă linia rămâne ocupată, cererea expiră (nu blocăm la infinit)
+        if (sPendingCallLift != 0) {
+            if (millis() - sLastCarrierMillis >= Config::Protocol::CALL_CARRIER_QUIET_MS) {
+                uint8_t lift = sPendingCallLift;
+                sPendingCallLift = 0;
+                trimiteApel(lift);
+            } else if (millis() - sPendingCallMillis >= Config::Protocol::CALL_PENDING_TIMEOUT_MS) {
+                sPendingCallLift = 0;
             }
         }
 
@@ -433,6 +462,15 @@ namespace Protocol
             emitAnalyzeFrame(rxLift2, 1, false);
             rxLift2.analyzeActive = false;
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Cerere de apel cu carrier sense: pusă în așteptare, servită de update()
+    // -------------------------------------------------------------------------
+    void requestCall(uint8_t ascAlocat) {
+        if (ascAlocat == 0) return;
+        sPendingCallLift = ascAlocat;
+        sPendingCallMillis = millis();
     }
 
     // -------------------------------------------------------------------------
