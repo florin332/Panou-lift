@@ -8,8 +8,8 @@ namespace BuildInfo
     // Identitatea software unică a noii platforme de dezvoltare active
     constexpr uint8_t HardwareVariant = 1;
     constexpr uint8_t Major = 10;
-    constexpr uint8_t Minor = 39;    // <--- V10.39: confirmare preluare apel + al doilea apel (mb_13) + reset 4 apăsări
-    constexpr uint16_t Build = 1039; // Contor binar intern actualizat pentru noul ciclu
+    constexpr uint8_t Minor = 40;    // <--- V10.40 prima varianta pentru testare fizica
+    constexpr uint16_t Build = 1040; // Contor binar intern actualizat pentru noul ciclu
 
     // Amprente de trasabilitate capturate granular la momentul compilării fizice
     constexpr char Date[] = __DATE__;
