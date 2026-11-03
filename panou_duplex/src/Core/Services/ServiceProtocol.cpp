@@ -2,12 +2,14 @@
 #include "Settings.h"
 #include "SystemCounters.h"
 #include "Config.h"
+#include "SharedPanel.h"
 #include "../../Presentation/ServiceMenu.h"
 #include <Arduino.h>
 #include <pico/bootrom.h>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 
 namespace ServiceProtocol {
 
@@ -102,6 +104,54 @@ static void parseLine(const char* line) {
     } else if (strcmp(line, "mb_33") == 0) {
         if (!checkServiceMode()) return;
         cmd.type = Command::Type::StopDisplayTest;
+    } else if (strncmp(line, "mb_61", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+        if (!checkServiceMode()) return;
+        char scratch[16];
+        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        char* endPtr = nullptr;
+        long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::EnterCommunicationDisplay;
+        cmd.argument = static_cast<uint8_t>(value);
+    } else if (strncmp(line, "mb_62", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+        if (!checkServiceMode()) return;
+        char scratch[16];
+        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        char* endPtr = nullptr;
+        long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::ExitCommunicationDisplay;
+        cmd.argument = static_cast<uint8_t>(value);
+    } else if (strncmp(line, "mb_63", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+        if (!checkServiceMode()) return;
+        char scratch[16];
+        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        char* endPtr = nullptr;
+        long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::StartCommunicationCounters;
+        cmd.argument = static_cast<uint8_t>(value);
+    } else if (strncmp(line, "mb_64", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+        if (!checkServiceMode()) return;
+        char scratch[16];
+        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        char* endPtr = nullptr;
+        long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::StopCommunicationCounters;
+        cmd.argument = static_cast<uint8_t>(value);
     } else if (strncmp(line, "mb_11", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
         // Etaj panou (Etj) persistent (flash protejat)
         if (!checkServiceMode()) return;
@@ -188,6 +238,35 @@ static void parseLine(const char* line) {
         if (!checkServiceMode()) return;
         Settings::resetDefaults();
         sendResponse("ACK_30");
+        return;
+    } else if (strcmp(line, "mb_45") == 0) {
+        if (!checkServiceMode()) return;
+        SharedPanel snapshot{};
+        if (!shared_panel_read(gSharedMemory, snapshot)) {
+            sendResponse("ERR 02 BUSY");
+            return;
+        }
+        char resp[48];
+        snprintf(resp, sizeof(resp), "OK UPTIME %lu",
+                 static_cast<unsigned long>(snapshot.system.uptimeSeconds));
+        sendResponse(resp);
+        return;
+    } else if (strcmp(line, "mb_46") == 0) {
+        if (!checkServiceMode()) return;
+        const float temperatureC = analogReadTemp();
+        if (!std::isfinite(temperatureC)) {
+            sendResponse("ERR 10 TEMP_READ_FAILED");
+            return;
+        }
+        const long centiDegrees = std::lround(temperatureC * 100.0f);
+        const unsigned long magnitude = static_cast<unsigned long>(
+            centiDegrees < 0 ? -centiDegrees : centiDegrees);
+        char resp[48];
+        snprintf(resp, sizeof(resp), "OK TEMP %s%lu.%02lu C",
+                 centiDegrees < 0 ? "-" : "",
+                 magnitude / 100,
+                 magnitude % 100);
+        sendResponse(resp);
         return;
     } else if (strncmp(line, "mb_4", 4) == 0 && line[4] >= '1' && line[4] <= '4' &&
                (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {

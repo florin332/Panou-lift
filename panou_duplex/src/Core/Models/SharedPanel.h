@@ -84,7 +84,7 @@ struct CommLineCounters {
 struct CommState {
     CommLineCounters lift1;
     CommLineCounters lift2;
-    uint8_t countingEnabled; // 1 = numarare activa (pornita cu comm_count_enable)
+    uint8_t countingEnabled[2]; // starea numararii pentru lift1 si lift2
 };
 
 struct SharedPanel {

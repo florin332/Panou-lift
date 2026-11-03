@@ -8,6 +8,7 @@
 #include "PanelRenderer.h"
 #include "BuildInfo.h"
 #include "Settings.h"
+#include "Protocol.h"
 #include <Arduino.h>
 #include <pico/bootrom.h>
 #include <pico/multicore.h>
@@ -25,12 +26,17 @@ static uint8_t sColorTestTargets = 0;
 static uint8_t sColorTestColorIndex = 0;
 static bool sColorTestLabelAtTop = true;
 static unsigned long sColorTestLastStepMillis = 0;
+static uint8_t sCommunicationDisplayLifts = 0;
 
 // Forward declarations
 static void handleCommand(const ServiceProtocol::Command &cmd);
 static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData);
 static bool checkService();
 static bool isColorTestTarget(DisplayTarget target);
+static bool isCommunicationDisplayActiveForTarget(DisplayTarget target);
+static DisplayTarget targetForLift(uint8_t lift);
+static void drawCommunicationPages(uint8_t liftMask);
+static void drawCommunicationPage(DisplayTarget target);
 static void drawColorTestPage();
 static void updateColorTest();
 static void stopColorTest();
@@ -40,6 +46,7 @@ void init() {
     sLastActivityMillis = 0;
     sColorTestActive = false;
     sColorTestTargets = 0;
+    sCommunicationDisplayLifts = 0;
 }
 
 bool isInServiceMode() {
@@ -60,10 +67,10 @@ void update() {
             const bool swapped = Settings::cabOrderSwapped();
             const DisplayTarget lift2Target = swapped ? DisplayTarget::Left : DisplayTarget::Right;
             const DisplayTarget lift1Target = swapped ? DisplayTarget::Right : DisplayTarget::Left;
-            if (!isColorTestTarget(lift2Target)) {
+            if (!isCommunicationDisplayActiveForTarget(lift2Target) && !isColorTestTarget(lift2Target)) {
                 PanelRenderer::render(lift2Target, localPanel.lift2, "ASCENSOR 2");
             }
-            if (!isColorTestTarget(lift1Target)) {
+            if (!isCommunicationDisplayActiveForTarget(lift1Target) && !isColorTestTarget(lift1Target)) {
                 PanelRenderer::render(lift1Target, localPanel.lift1, "ASCENSOR 1");
             }
         }
@@ -110,6 +117,9 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 
         case ServiceProtocol::Command::Type::ExitService:
             stopColorTest();
+            sCommunicationDisplayLifts = 0;
+            PanelRenderer::invalidate(DisplayTarget::Left);
+            PanelRenderer::invalidate(DisplayTarget::Right);
             sInService.store(false, std::memory_order_relaxed);
             Display::setServiceMode(false);
             ServiceProtocol::sendResponse("ACK_00");
@@ -154,6 +164,13 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
                 Display::reinitializeTarget(DisplayTarget::Right);
                 PanelRenderer::invalidate(DisplayTarget::Right);
             }
+            for (uint8_t lift = 1; lift <= 2; lift++) {
+                const uint8_t liftMask = static_cast<uint8_t>(1u << (lift - 1));
+                const DisplayTarget target = targetForLift(lift);
+                if ((sCommunicationDisplayLifts & liftMask) && !isColorTestTarget(target)) {
+                    drawCommunicationPage(target);
+                }
+            }
             char response[16];
             snprintf(response, sizeof(response), "ACK_31 %u", static_cast<unsigned>(cmd.argument));
             ServiceProtocol::sendResponse(response);
@@ -177,8 +194,51 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
         case ServiceProtocol::Command::Type::StopDisplayTest:
             if (!checkService()) break;
             stopColorTest();
+            drawCommunicationPages(sCommunicationDisplayLifts);
             ServiceProtocol::sendResponse("ACK_33");
             break;
+
+        case ServiceProtocol::Command::Type::EnterCommunicationDisplay:
+            if (!checkService()) break;
+            stopColorTest();
+            sCommunicationDisplayLifts |= cmd.argument;
+            drawCommunicationPages(sCommunicationDisplayLifts);
+            char commStartResponse[16];
+            snprintf(commStartResponse, sizeof(commStartResponse), "ACK_61 %u",
+                     static_cast<unsigned>(cmd.argument));
+            ServiceProtocol::sendResponse(commStartResponse);
+            break;
+
+        case ServiceProtocol::Command::Type::ExitCommunicationDisplay:
+            if (!checkService()) break;
+            sCommunicationDisplayLifts &= static_cast<uint8_t>(~cmd.argument);
+            for (uint8_t lift = 1; lift <= 2; lift++) {
+                if (cmd.argument & (1u << (lift - 1))) {
+                    PanelRenderer::invalidate(targetForLift(lift));
+                }
+            }
+            char commStopResponse[16];
+            snprintf(commStopResponse, sizeof(commStopResponse), "ACK_62 %u",
+                     static_cast<unsigned>(cmd.argument));
+            ServiceProtocol::sendResponse(commStopResponse);
+            break;
+
+        case ServiceProtocol::Command::Type::StartCommunicationCounters:
+        case ServiceProtocol::Command::Type::StopCommunicationCounters: {
+            if (!checkService()) break;
+            const bool start = cmd.type == ServiceProtocol::Command::Type::StartCommunicationCounters;
+            for (uint8_t lift = 1; lift <= 2; lift++) {
+                if (cmd.argument == 3 || cmd.argument == lift) {
+                    if (start) Protocol::commCountEnable(lift);
+                    else Protocol::commCountDisable(lift);
+                }
+            }
+            char counterResponse[16];
+            snprintf(counterResponse, sizeof(counterResponse), "ACK_%u %u",
+                     start ? 63u : 64u, static_cast<unsigned>(cmd.argument));
+            ServiceProtocol::sendResponse(counterResponse);
+            break;
+        }
 
         default:
             ServiceProtocol::sendResponse("ERR 04 UNHANDLED");
@@ -197,6 +257,32 @@ static bool checkService() {
 static bool isColorTestTarget(DisplayTarget target) {
     const uint8_t targetBit = (target == DisplayTarget::Left) ? 1u : 2u;
     return sColorTestActive && (sColorTestTargets & targetBit) != 0;
+}
+
+static bool isCommunicationDisplayActiveForTarget(DisplayTarget target) {
+    const uint8_t lift = (target == targetForLift(1)) ? 1 : 2;
+    return (sCommunicationDisplayLifts & (1u << (lift - 1))) != 0;
+}
+
+static DisplayTarget targetForLift(uint8_t lift) {
+    const bool swapped = Settings::cabOrderSwapped();
+    if (lift == 1) return swapped ? DisplayTarget::Right : DisplayTarget::Left;
+    return swapped ? DisplayTarget::Left : DisplayTarget::Right;
+}
+
+static void drawCommunicationPages(uint8_t liftMask) {
+    for (uint8_t lift = 1; lift <= 2; lift++) {
+        if (liftMask & (1u << (lift - 1))) {
+            const DisplayTarget target = targetForLift(lift);
+            PanelRenderer::invalidate(target);
+            drawCommunicationPage(target);
+        }
+    }
+}
+
+static void drawCommunicationPage(DisplayTarget target) {
+    Display::clearTargetScreen(target);
+    Display::printMenuHeader(target, "COMM");
 }
 
 static void drawColorTestPage() {

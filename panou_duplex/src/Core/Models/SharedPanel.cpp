@@ -52,7 +52,8 @@ void shared_panel_write(volatile SharedMemory &sharedMem, const SharedPanel &new
     sharedMem.panel.comm.lift2.rxFormatError = newData.comm.lift2.rxFormatError;
     sharedMem.panel.comm.lift2.rxCrcError    = newData.comm.lift2.rxCrcError;
     sharedMem.panel.comm.lift2.rxDataError   = newData.comm.lift2.rxDataError;
-    sharedMem.panel.comm.countingEnabled     = newData.comm.countingEnabled;
+    sharedMem.panel.comm.countingEnabled[0]  = newData.comm.countingEnabled[0];
+    sharedMem.panel.comm.countingEnabled[1]  = newData.comm.countingEnabled[1];
     
     asm volatile("dmb" : : : "memory"); // Asigură scrierea datelor înainte de modificarea seq finală
     sharedMem.seq++; // Pasul 2: Validăm snapshot-ul stabil (Devine PAR)
@@ -105,7 +106,8 @@ bool shared_panel_read(volatile const SharedMemory &sharedMem, SharedPanel &loca
         localCopy.comm.lift2.rxFormatError = sharedMem.panel.comm.lift2.rxFormatError;
         localCopy.comm.lift2.rxCrcError    = sharedMem.panel.comm.lift2.rxCrcError;
         localCopy.comm.lift2.rxDataError   = sharedMem.panel.comm.lift2.rxDataError;
-        localCopy.comm.countingEnabled     = sharedMem.panel.comm.countingEnabled;
+        localCopy.comm.countingEnabled[0]  = sharedMem.panel.comm.countingEnabled[0];
+        localCopy.comm.countingEnabled[1]  = sharedMem.panel.comm.countingEnabled[1];
         
         asm volatile("dmb" : : : "memory"); // Împiedică devansarea citirii contorului final seq
         end_seq = sharedMem.seq;
