@@ -41,6 +41,7 @@ namespace Display
     constexpr uint16_t COLOR_BLACK  = 0x0000;
     constexpr uint16_t COLOR_WHITE  = 0xFFFF;
     constexpr uint16_t COLOR_GREY   = 0x7BEF;
+    constexpr uint16_t COLOR_MUTED  = 0x9DF3;
     constexpr uint16_t COLOR_YELLOW = 0xFFE0;
     constexpr uint16_t COLOR_GREEN  = 0x07E0;
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
@@ -71,16 +72,33 @@ namespace Display
     }
 
     static void drawBootScreen(Adafruit_ST7735 &tft, const char *elevatorName) {
-        char hardwareVersion[16];
-        char firmwareVersion[20];
-        snprintf(hardwareVersion, sizeof(hardwareVersion), "HARDWARE V%u",
-                 static_cast<unsigned>(BuildInfo::HardwareVariant));
-        snprintf(firmwareVersion, sizeof(firmwareVersion), "FIRMWARE V%u.%u",
+        char panelIdentifier[20];
+        char hardwareFirmware[24];
+        char floorText[16];
+        snprintf(panelIdentifier, sizeof(panelIdentifier), "D_%02u_%02u.%02u",
+                 static_cast<unsigned>(BuildInfo::HardwareVariant),
                  static_cast<unsigned>(BuildInfo::Major),
                  static_cast<unsigned>(BuildInfo::Minor));
+        snprintf(hardwareFirmware, sizeof(hardwareFirmware), "F:%02u.%02u  H:%02u",
+                 static_cast<unsigned>(BuildInfo::Major),
+                 static_cast<unsigned>(BuildInfo::Minor),
+                 static_cast<unsigned>(BuildInfo::HardwareVariant));
+        snprintf(floorText, sizeof(floorText), "ETAJ: %u",
+                 static_cast<unsigned>(Settings::panelFloor()));
+        const char *panelType = panelIdentifier[0] == 'D' ? "DUPLEX" : "SIMPLEX";
 
         tft.fillScreen(COLOR_BLACK);
-        tft.setFont(&universalis12);
+        tft.setFont(&FreeSans9pt7b);
+        int16_t boundsX = 0;
+        int16_t boundsY = 0;
+        uint16_t boundsWidth = 0;
+        uint16_t phoneHeight = 0;
+        tft.getTextBounds("0740.317.707", 0, 0, &boundsX, &boundsY, &boundsWidth, &phoneHeight);
+        constexpr int16_t firstTextY = 22;
+        constexpr int16_t lastTextY = 143;
+        const int16_t blockHeight = lastTextY - firstTextY + phoneHeight;
+        const int16_t verticalOffset = (tft.height() - blockHeight) / 2 - firstTextY;
+
         const auto drawCentered = [&tft](const char *text, int16_t y, uint16_t color) {
             int16_t x1 = 0;
             int16_t y1 = 0;
@@ -92,10 +110,12 @@ namespace Display
             tft.print(text);
         };
 
-        drawCentered(elevatorName, 39, COLOR_YELLOW);
-        drawCentered("PANOU DUPLEX", 67, COLOR_WHITE);
-        drawCentered(hardwareVersion, 104, COLOR_GREY);
-        drawCentered(firmwareVersion, 131, COLOR_GREEN);
+        drawCentered("PANOU COM.", firstTextY + verticalOffset, COLOR_WHITE);
+        drawCentered(panelType, 44 + verticalOffset, COLOR_WHITE);
+        drawCentered(hardwareFirmware, 66 + verticalOffset, COLOR_MUTED);
+        drawCentered(elevatorName, 94 + verticalOffset, COLOR_YELLOW);
+        drawCentered(floorText, 118 + verticalOffset, COLOR_GREEN);
+        drawCentered("0740.317.707", lastTextY + verticalOffset, COLOR_MUTED);
     }
 
     void init()
@@ -132,7 +152,7 @@ namespace Display
         const bool cabOrderSwapped = Settings::cabOrderSwapped();
         drawBootScreen(tft1, cabOrderSwapped ? "ASCENSOR 2" : "ASCENSOR 1");
         drawBootScreen(tft2, cabOrderSwapped ? "ASCENSOR 1" : "ASCENSOR 2");
-        delay(5000);
+        delay(Config::Timing::BOOT_TIME_MS);
     }
 
     // --- Service Mode control ---
@@ -370,6 +390,22 @@ namespace Display
         tft.setFont(font);
         tft.setTextColor(color);
         tft.setCursor(x, y);
+        tft.print(text);
+    }
+
+    void drawTextCentered(DisplayTarget target, int16_t topY,
+        const GFXfont* font, const char* text, uint16_t color) {
+        if (!font || !text) return;
+        Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
+        tft.setFont(font);
+
+        int16_t x1 = 0;
+        int16_t y1 = 0;
+        uint16_t textWidth = 0;
+        uint16_t textHeight = 0;
+        tft.getTextBounds(text, 0, 0, &x1, &y1, &textWidth, &textHeight);
+        tft.setTextColor(color);
+        tft.setCursor((tft.width() - static_cast<int16_t>(textWidth)) / 2 - x1, topY - y1);
         tft.print(text);
     }
 

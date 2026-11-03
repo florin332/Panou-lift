@@ -44,6 +44,8 @@ namespace Display
     // Primitivă de bază pentru text. Presentation decide când e erase (BLACK) și când e draw.
     void drawText(DisplayTarget target, int16_t x, int16_t y,
         const GFXfont* font, const char* text, uint16_t color);
+    void drawTextCentered(DisplayTarget target, int16_t topY,
+        const GFXfont* font, const char* text, uint16_t color);
 
     // Primitivă de linie orizontală
     void drawHLine(DisplayTarget target, int16_t x, int16_t y, int16_t w, uint16_t color);

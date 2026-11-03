@@ -23,6 +23,12 @@ namespace Config
         constexpr uint32_t RESET_MAGIC_BUTTON = 0x4C505253UL;  // "LPRS" (buton apel, ReSet)
     }
 
+    namespace Service
+    {
+        constexpr char PHONE_NUMBER_1[] = "0740.317.707";
+        constexpr char PHONE_NUMBER_2[] = "";
+    }
+
     // =========================================================
     // 2. TIMING & TIMEOUT-URI (ms)
     // =========================================================
@@ -40,7 +46,7 @@ namespace Config
         constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat
         constexpr uint32_t LED_BLINK_SLOW = 500;         // Perioadă clipire lentă LED
         constexpr uint32_t LED_BLINK_FAST = 150;         // Perioadă clipire rapidă LED
-        constexpr uint32_t BOOT_TIME_MS = 5000;          // Timp boot
+        constexpr uint32_t BOOT_TIME_MS = 5000;         // Timp boot pentru verificarea ecranului
     }
 
     // =========================================================

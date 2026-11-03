@@ -132,6 +132,9 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
         case ServiceProtocol::Command::Type::ExitService:
             stopColorTest();
             sCommunicationDisplayLifts = 0;
+            Protocol::commCountDisable(1);
+            Protocol::commCountDisable(2);
+            Protocol::setPassThroughEnabled(false);
             PanelRenderer::invalidate(DisplayTarget::Left);
             PanelRenderer::invalidate(DisplayTarget::Right);
             sInService.store(false, std::memory_order_relaxed);

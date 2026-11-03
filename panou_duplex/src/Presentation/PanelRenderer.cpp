@@ -5,6 +5,7 @@
 #include "TextWidget.h"
 #include "Arduino.h"
 #include <cstdio>
+#include <Fonts/FreeSans9pt7b.h>
 
 #include "../Fonts/oneslot30.h"
 #include "../Fonts/oneslot65.h"
@@ -111,29 +112,38 @@ namespace {
 
     void drawDefect(DisplayTarget target, const char* label, const LiftState &lift) {
         const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
-        Display::drawText(target, 8, 25, &universalis12, label, C_YELLOW);
-        Display::drawText(target, 29, 56, &universalis12, "DEFECT", C_YELLOW);
         char codeBuf[16];
         snprintf(codeBuf, sizeof(codeBuf), "( cod: 01-%s )", posStr);
-        Display::drawText(target, 2, 82, &universalis12, codeBuf, C_MAGENTA);
-        Display::drawText(target, 15, 105, &universalis12, "tel. service", C_YELLOW);
-        Display::drawText(target, 3, 130, &universalis12, "0740.317.707", C_YELLOW);
-        Display::drawText(target, 2, 155, &universalis12, "0740.317.707", C_YELLOW);
+        Display::drawTextCentered(target, 15, &FreeSans9pt7b, label, C_YELLOW);
+        Display::drawTextCentered(target, 39, &FreeSans9pt7b, "DEFECT", C_YELLOW);
+        Display::drawTextCentered(target, 63, &FreeSans9pt7b, codeBuf, C_MAGENTA);
+        Display::drawTextCentered(target, 87, &FreeSans9pt7b, "tel. service", C_YELLOW);
+        if (Config::Service::PHONE_NUMBER_2[0] != '\0') {
+            Display::drawTextCentered(target, 111, &FreeSans9pt7b,
+                                      Config::Service::PHONE_NUMBER_1, C_YELLOW);
+            Display::drawTextCentered(target, 135, &FreeSans9pt7b,
+                                      Config::Service::PHONE_NUMBER_2, C_YELLOW);
+        } else {
+            Display::drawTextCentered(target, 123, &FreeSans9pt7b,
+                                      Config::Service::PHONE_NUMBER_1, C_YELLOW);
+        }
     }
 
     void drawRevizie(DisplayTarget target, const char* label) {
-        Display::drawText(target, 10, 40, &universalis12, label, C_YELLOW);
-        Display::drawText(target, 28, 85, &universalis12, "REVIZIE", C_YELLOW);
-        Display::drawText(target, 3, 155, &universalis12, "0740.317.707", C_YELLOW);
+        Display::drawTextCentered(target, 38, &FreeSans9pt7b, label, C_YELLOW);
+        Display::drawTextCentered(target, 74, &FreeSans9pt7b, "REVIZIE", C_YELLOW);
+        Display::drawTextCentered(target, 110, &FreeSans9pt7b,
+                      Config::Service::PHONE_NUMBER_1, C_YELLOW);
     }
 
     void drawNoSerial(DisplayTarget target, const char* label) {
-        Display::drawText(target, 8, 25, &universalis12, label, C_YELLOW);
-        Display::drawText(target, 32, 54, &universalis12, "folositi", C_YELLOW);
-        Display::drawText(target, 6, 75, &universalis12, "comanda de", C_YELLOW);
-        Display::drawText(target, 27, 96, &universalis12, "pe usa", C_YELLOW);
-        Display::drawText(target, 16, 123, &universalis12, "( cod: 03 )", C_MAGENTA);
-        Display::drawText(target, 2, 155, &universalis12, "0740.317.707", C_YELLOW);
+        Display::drawTextCentered(target, 15, &FreeSans9pt7b, label, C_YELLOW);
+        Display::drawTextCentered(target, 39, &FreeSans9pt7b, "folositi", C_YELLOW);
+        Display::drawTextCentered(target, 63, &FreeSans9pt7b, "comanda de", C_YELLOW);
+        Display::drawTextCentered(target, 87, &FreeSans9pt7b, "pe usa", C_YELLOW);
+        Display::drawTextCentered(target, 111, &FreeSans9pt7b, "( cod: 03 )", C_MAGENTA);
+        Display::drawTextCentered(target, 135, &FreeSans9pt7b,
+                      Config::Service::PHONE_NUMBER_1, C_YELLOW);
     }
 
     void drawStop(DisplayTarget target, const LayoutCoords &cfg,
