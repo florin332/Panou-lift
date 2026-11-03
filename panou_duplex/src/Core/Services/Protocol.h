@@ -17,6 +17,10 @@ namespace Protocol
     // transmis de update() când linia de comandă e liberă (vezi Config::Protocol)
     void requestCall(uint8_t ascAlocat);
 
+    void setPassThroughEnabled(bool enabled);
+    bool isPassThroughEnabled();
+    bool queuePassThroughFrame(const char* frame, uint8_t length);
+
     // Contoare RX volatile, controlate separat pentru lifturile 1 si 2.
     bool commCountEnable(uint8_t lift);   // lift 1 sau 2
     bool commCountDisable(uint8_t lift); // opreste fara sa stearga valorile

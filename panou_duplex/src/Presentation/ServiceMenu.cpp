@@ -51,6 +51,7 @@ void init() {
     sColorTestActive = false;
     sColorTestTargets = 0;
     sCommunicationDisplayLifts = 0;
+    Protocol::setPassThroughEnabled(false);
     sCommunicationValuesDirty[0] = true;
     sCommunicationValuesDirty[1] = true;
 }
@@ -118,6 +119,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
     switch (cmd.type) {
         case ServiceProtocol::Command::Type::EnterService:
             sInService.store(true, std::memory_order_relaxed);
+            Protocol::setPassThroughEnabled(false);
             Display::setServiceMode(true);
             char panelId[16];
             snprintf(panelId, sizeof(panelId), "D_%02u_%02u.%02u",

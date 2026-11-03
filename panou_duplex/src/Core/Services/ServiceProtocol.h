@@ -17,7 +17,9 @@ struct Command {
         EnterCommunicationDisplay, // mb_61 <x>
         ExitCommunicationDisplay,  // mb_62 <x>
         StartCommunicationCounters, // mb_63 <x>
-        StopCommunicationCounters   // mb_64 <x>
+        StopCommunicationCounters,  // mb_64 <x>
+        EnablePassThrough,          // mb_81
+        DisablePassThrough          // mb_82
     } type = Type::None;
 
     uint8_t argument = 0;

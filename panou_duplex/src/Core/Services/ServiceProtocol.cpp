@@ -2,6 +2,7 @@
 #include "Settings.h"
 #include "SystemCounters.h"
 #include "Config.h"
+#include "Protocol.h"
 #include "SharedPanel.h"
 #include "../../Presentation/ServiceMenu.h"
 #include <Arduino.h>
@@ -16,21 +17,17 @@ namespace ServiceProtocol {
 static Command sPendingCmd;
 static char sRxBuffer[64];
 static uint8_t sRxIndex = 0;
+static char sRawFrameBuffer[40];
+static uint8_t sRawFrameIndex = 0;
+static bool sReceivingRawFrame = false;
+static bool sRawFrameOverflow = false;
 
 static void parseLine(const char* line);
 
-// Extrage argumentul numeric: acceptă fie text simplu ("mb_11 3"),
-// fie încadrat de markerele protocolului ("mb_11 <3>" / "mb_11<3>").
-static const char* numericArg(const char* raw, char* scratch, size_t scratchLen) {
+// Argumentele numerice folosesc forma simpla "mb_11 3".
+static const char* numericArg(const char* raw) {
     while (*raw == ' ') raw++;
-    if (*raw != '<') return raw;
-    const char* end = strchr(raw + 1, '>');
-    if (end == nullptr) return nullptr;
-    size_t n = static_cast<size_t>(end - (raw + 1));
-    if (n == 0 || n >= scratchLen) return nullptr;
-    memcpy(scratch, raw + 1, n);
-    scratch[n] = '\0';
-    return scratch;
+    return raw;
 }
 
 static bool checkServiceMode() {
@@ -43,12 +40,72 @@ static bool checkServiceMode() {
 
 void init() {
     sRxIndex = 0;
+    sRawFrameIndex = 0;
+    sReceivingRawFrame = false;
+    sRawFrameOverflow = false;
     sPendingCmd = Command{};
+    Protocol::setPassThroughEnabled(false);
+}
+
+static void handleRawFrame() {
+    if (!ServiceMenu::isInServiceMode()) {
+        sendResponse("ERR 03 NOT_IN_SERVICE");
+    } else if (!Protocol::isPassThroughEnabled()) {
+        sendResponse("ERR 11 PASSTHROUGH_DISABLED");
+    } else if (!Protocol::queuePassThroughFrame(sRawFrameBuffer, sRawFrameIndex)) {
+        sendResponse("ERR 02 BUSY");
+    } else {
+        sendResponse("ACK_PT");
+    }
+    sRawFrameIndex = 0;
 }
 
 void poll() {
     while (Serial.available()) {
         char c = static_cast<char>(Serial.read());
+
+        if (sReceivingRawFrame) {
+            if (sRawFrameOverflow) {
+                if (c == '>') {
+                    sReceivingRawFrame = false;
+                    sRawFrameOverflow = false;
+                    sRawFrameIndex = 0;
+                    sendResponse("ERR 08 INVALID_PARAM");
+                }
+                continue;
+            }
+            if (c == '\n' || c == '\r') {
+                sReceivingRawFrame = false;
+                sRawFrameIndex = 0;
+                sendResponse("ERR 08 INVALID_PARAM");
+                continue;
+            }
+            if (sRawFrameIndex >= sizeof(sRawFrameBuffer) - 1) {
+                sRawFrameOverflow = true;
+                if (c == '>') {
+                    sReceivingRawFrame = false;
+                    sRawFrameOverflow = false;
+                    sRawFrameIndex = 0;
+                    sendResponse("ERR 08 INVALID_PARAM");
+                }
+                continue;
+            }
+            sRawFrameBuffer[sRawFrameIndex++] = c;
+            if (c == '>') {
+                sReceivingRawFrame = false;
+                handleRawFrame();
+            }
+            continue;
+        }
+
+        if (sRxIndex == 0 && c == '<') {
+            sReceivingRawFrame = true;
+            sRawFrameIndex = 0;
+            sRawFrameOverflow = false;
+            sRawFrameBuffer[sRawFrameIndex++] = c;
+            continue;
+        }
+
         if (c == '\n' || c == '\r') {
             if (sRxIndex > 0) {
                 sRxBuffer[sRxIndex] = '\0';
@@ -77,10 +134,15 @@ static void parseLine(const char* line) {
         // (parseLine ruleaza acum tot pe core0, sendResponse e sigur aici).
         sendResponse("DBG P0 bootsel-primit");
         cmd.type = Command::Type::EnterBootsel;
-    } else if (strncmp(line, "mb_31", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strcmp(line, "mb_81") == 0) {
         if (!checkServiceMode()) return;
-        char scratch[16];
-        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        cmd.type = Command::Type::EnablePassThrough;
+    } else if (strcmp(line, "mb_82") == 0) {
+        if (!checkServiceMode()) return;
+        cmd.type = Command::Type::DisablePassThrough;
+    } else if (strncmp(line, "mb_31", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
         char* endPtr = nullptr;
         long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
         if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
@@ -89,10 +151,9 @@ static void parseLine(const char* line) {
         }
         cmd.type = Command::Type::ResetDisplay;
         cmd.argument = static_cast<uint8_t>(value);
-    } else if (strncmp(line, "mb_32", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_32", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;
-        char scratch[16];
-        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        const char* arg = numericArg(line + 5);
         char* endPtr = nullptr;
         long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
         if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
@@ -104,10 +165,9 @@ static void parseLine(const char* line) {
     } else if (strcmp(line, "mb_33") == 0) {
         if (!checkServiceMode()) return;
         cmd.type = Command::Type::StopDisplayTest;
-    } else if (strncmp(line, "mb_61", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_61", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;
-        char scratch[16];
-        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        const char* arg = numericArg(line + 5);
         char* endPtr = nullptr;
         long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
         if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
@@ -116,10 +176,9 @@ static void parseLine(const char* line) {
         }
         cmd.type = Command::Type::EnterCommunicationDisplay;
         cmd.argument = static_cast<uint8_t>(value);
-    } else if (strncmp(line, "mb_62", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_62", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;
-        char scratch[16];
-        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        const char* arg = numericArg(line + 5);
         char* endPtr = nullptr;
         long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
         if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
@@ -128,10 +187,9 @@ static void parseLine(const char* line) {
         }
         cmd.type = Command::Type::ExitCommunicationDisplay;
         cmd.argument = static_cast<uint8_t>(value);
-    } else if (strncmp(line, "mb_63", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_63", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;
-        char scratch[16];
-        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        const char* arg = numericArg(line + 5);
         char* endPtr = nullptr;
         long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
         if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
@@ -140,10 +198,9 @@ static void parseLine(const char* line) {
         }
         cmd.type = Command::Type::StartCommunicationCounters;
         cmd.argument = static_cast<uint8_t>(value);
-    } else if (strncmp(line, "mb_64", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_64", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;
-        char scratch[16];
-        const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+        const char* arg = numericArg(line + 5);
         char* endPtr = nullptr;
         long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
         if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
@@ -152,15 +209,14 @@ static void parseLine(const char* line) {
         }
         cmd.type = Command::Type::StopCommunicationCounters;
         cmd.argument = static_cast<uint8_t>(value);
-    } else if (strncmp(line, "mb_11", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_11", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         // Etaj panou (Etj) persistent (flash protejat)
         if (!checkServiceMode()) return;
         char resp[48];
         if (line[5] == '\0') {
             snprintf(resp, sizeof(resp), "OK ETJ %u", Settings::panelFloor());
         } else {
-            char scratch[16];
-            const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+            const char* arg = numericArg(line + 5);
             char* endPtr = nullptr;
             long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' ||
@@ -173,15 +229,14 @@ static void parseLine(const char* line) {
         }
         sendResponse(resp);
         return;
-    } else if (strncmp(line, "mb_13", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_13", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         // Permisiune al doilea apel (SecondCall) persistentă (flash protejat)
         if (!checkServiceMode()) return;
         char resp[48];
         if (line[5] == '\0') {
             snprintf(resp, sizeof(resp), "OK SECOND CALL %u", Settings::secondCall() ? 1u : 0u);
         } else {
-            char scratch[16];
-            const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+            const char* arg = numericArg(line + 5);
             char* endPtr = nullptr;
             long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' || (value != 0 && value != 1)) {
@@ -193,15 +248,14 @@ static void parseLine(const char* line) {
         }
         sendResponse(resp);
         return;
-    } else if (strncmp(line, "mb_14", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_14", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         // Timeout standby ecran persistent (flash protejat)
         if (!checkServiceMode()) return;
         char resp[48];
         if (line[5] == '\0') {
             snprintf(resp, sizeof(resp), "OK STANDBY %lu", static_cast<unsigned long>(Settings::standbyTimeoutMs()));
         } else {
-            char scratch[16];
-            const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+            const char* arg = numericArg(line + 5);
             char* endPtr = nullptr;
             long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' ||
@@ -213,15 +267,14 @@ static void parseLine(const char* line) {
         }
         sendResponse(resp);
         return;
-    } else if (strncmp(line, "mb_15", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+    } else if (strncmp(line, "mb_15", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         // Ordine cabine pe LCD-uri (CabOrder) persistentă (flash protejat)
         if (!checkServiceMode()) return;
         char resp[48];
         if (line[5] == '\0') {
             snprintf(resp, sizeof(resp), "OK CAB ORDER %u", Settings::cabOrderSwapped() ? 1u : 0u);
         } else {
-            char scratch[16];
-            const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+            const char* arg = numericArg(line + 5);
             char* endPtr = nullptr;
             long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' || (value != 0 && value != 1)) {
@@ -269,7 +322,7 @@ static void parseLine(const char* line) {
         sendResponse(resp);
         return;
     } else if (strncmp(line, "mb_4", 4) == 0 && line[4] >= '1' && line[4] <= '4' &&
-               (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
+               (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;
         const uint8_t category = static_cast<uint8_t>(line[4] - '0');
         char resp[96];
@@ -280,8 +333,7 @@ static void parseLine(const char* line) {
                      static_cast<unsigned>(category),
                      static_cast<unsigned long>(counts[category - 1]));
         } else {
-            char scratch[16];
-            const char* arg = numericArg(line + 5, scratch, sizeof(scratch));
+            const char* arg = numericArg(line + 5);
             char* endPtr = nullptr;
             long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value != 0) {

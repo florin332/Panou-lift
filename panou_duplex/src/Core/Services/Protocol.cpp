@@ -47,16 +47,25 @@ namespace Protocol
 
     // Carrier sense (CSMA) pe linia de comandă (Serial3):
     // sLastCarrierMillis = momentul ultimei activități RX (orice byte = linie ocupată)
-    // sPendingCallLift = cerere de apel amânată (0 = nicio cerere); un singur slot
+    // Cererile locale și USB au sloturi separate; arbiterul le transmite în ordinea
+    // sosirii, numai după perioada de liniște comună.
     static unsigned long sLastCarrierMillis = 0;
     static uint8_t sPendingCallLift = 0;
     static unsigned long sPendingCallMillis = 0;
+    static std::atomic<bool> sPassThroughEnabled{false};
+    enum class RawFrameState : uint8_t { Empty, Writing, Ready, Reading };
+    static std::atomic<RawFrameState> sRawFrameState{RawFrameState::Empty};
+    static char sPendingRawFrame[FRAME_BUFFER_SIZE];
+    static uint8_t sPendingRawFrameLength = 0;
+    static unsigned long sPendingRawFrameMillis = 0;
     static uint32_t sRxFrames[2]      = {0, 0}; // cadre complet delimitate (START...END)
     static uint32_t sRxValid[2]       = {0, 0}; // cadre acceptate (format+CRC+domeniu)
     static uint32_t sRxTimeout[2]     = {0, 0}; // cadru inceput, neterminat in timeout
     static uint32_t sRxFormatError[2] = {0, 0}; // delimitatori/campuri/format invalide
     static uint32_t sRxCrcError[2]    = {0, 0}; // CRC prezent, dar incorect
     static uint32_t sRxDataError[2]   = {0, 0}; // format corect, valori imposibile
+
+    static void transmitFrame(const char* frame, uint8_t length);
 
     static bool liftToIndex(uint8_t lift, uint8_t &index) {
         if (lift < 1 || lift > 2) return false;
@@ -321,6 +330,10 @@ namespace Protocol
         sAnalyzeEnabled = false;
         resetCounters(0);
         resetCounters(1);
+        sPassThroughEnabled.store(false, std::memory_order_relaxed);
+        sRawFrameState.store(RawFrameState::Empty, std::memory_order_relaxed);
+        sPendingCallLift = 0;
+        sPendingRawFrameLength = 0;
     }
 
     // -------------------------------------------------------------------------
@@ -342,15 +355,48 @@ namespace Protocol
             sLastCarrierMillis = millis();
         }
 
-        // Apel amânat: se trimite când linia a fost liberă suficient de mult;
-        // dacă linia rămâne ocupată, cererea expiră (nu blocăm la infinit)
+        const unsigned long now = millis();
         if (sPendingCallLift != 0) {
-            if (millis() - sLastCarrierMillis >= Config::Protocol::CALL_CARRIER_QUIET_MS) {
-                uint8_t lift = sPendingCallLift;
+            if (now - sPendingCallMillis >= Config::Protocol::CALL_PENDING_TIMEOUT_MS) {
+                sPendingCallLift = 0;
+            }
+        }
+
+        RawFrameState rawState = sRawFrameState.load(std::memory_order_acquire);
+        if (rawState == RawFrameState::Ready && !sPassThroughEnabled.load(std::memory_order_acquire)) {
+            sRawFrameState.compare_exchange_strong(rawState, RawFrameState::Empty,
+                                                   std::memory_order_acq_rel);
+            rawState = sRawFrameState.load(std::memory_order_acquire);
+        }
+        if (rawState == RawFrameState::Ready &&
+            now - sPendingRawFrameMillis >= Config::Protocol::CALL_PENDING_TIMEOUT_MS) {
+            sRawFrameState.compare_exchange_strong(rawState, RawFrameState::Empty,
+                                                   std::memory_order_acq_rel);
+            rawState = sRawFrameState.load(std::memory_order_acquire);
+        }
+
+        const bool localPending = sPendingCallLift != 0;
+        const bool rawPending = rawState == RawFrameState::Ready;
+        if ((localPending || rawPending) &&
+            now - sLastCarrierMillis >= Config::Protocol::CALL_CARRIER_QUIET_MS) {
+            const bool rawFirst = rawPending && (!localPending ||
+                static_cast<int32_t>(sPendingCallMillis - sPendingRawFrameMillis) >= 0);
+            if (rawFirst) {
+                RawFrameState expected = RawFrameState::Ready;
+                if (sRawFrameState.compare_exchange_strong(expected, RawFrameState::Reading,
+                                                           std::memory_order_acq_rel)) {
+                    char frame[FRAME_BUFFER_SIZE];
+                    const uint8_t length = sPendingRawFrameLength;
+                    memcpy(frame, sPendingRawFrame, length);
+                    sRawFrameState.store(RawFrameState::Empty, std::memory_order_release);
+                    if (sPassThroughEnabled.load(std::memory_order_acquire)) {
+                        transmitFrame(frame, length);
+                    }
+                }
+            } else if (localPending) {
+                const uint8_t lift = sPendingCallLift;
                 sPendingCallLift = 0;
                 trimiteApel(lift);
-            } else if (millis() - sPendingCallMillis >= Config::Protocol::CALL_PENDING_TIMEOUT_MS) {
-                sPendingCallLift = 0;
             }
         }
 
@@ -473,9 +519,60 @@ namespace Protocol
         sPendingCallMillis = millis();
     }
 
+    void setPassThroughEnabled(bool enabled) {
+        sPassThroughEnabled.store(enabled, std::memory_order_release);
+        if (!enabled) {
+            RawFrameState expected = RawFrameState::Ready;
+            sRawFrameState.compare_exchange_strong(expected, RawFrameState::Empty,
+                                                   std::memory_order_acq_rel);
+        }
+    }
+
+    bool isPassThroughEnabled() {
+        return sPassThroughEnabled.load(std::memory_order_acquire);
+    }
+
+    bool queuePassThroughFrame(const char* frame, uint8_t length) {
+        if (frame == nullptr || length < 2 || length >= FRAME_BUFFER_SIZE ||
+            frame[0] != Config::Protocol::START_MARKER ||
+            frame[length - 1] != Config::Protocol::END_MARKER ||
+            !sPassThroughEnabled.load(std::memory_order_acquire)) {
+            return false;
+        }
+
+        RawFrameState expected = RawFrameState::Empty;
+        if (!sRawFrameState.compare_exchange_strong(expected, RawFrameState::Writing,
+                                                    std::memory_order_acq_rel)) {
+            return false;
+        }
+
+        memcpy(sPendingRawFrame, frame, length);
+        sPendingRawFrameLength = length;
+        sPendingRawFrameMillis = millis();
+        if (!sPassThroughEnabled.load(std::memory_order_acquire)) {
+            sRawFrameState.store(RawFrameState::Empty, std::memory_order_release);
+            return false;
+        }
+        sRawFrameState.store(RawFrameState::Ready, std::memory_order_release);
+        return true;
+    }
+
     // -------------------------------------------------------------------------
     // Transmisie apel cu acelasi format <payload*CC>
     // -------------------------------------------------------------------------
+    static void transmitFrame(const char* frame, uint8_t length) {
+        if (frame == nullptr || length == 0) return;
+        Serial3.listen();
+        delayMicroseconds(Config::Protocol::RS485_LISTEN_SETTLE_US);
+        digitalWrite(Pins::RS485::TX_ENABLE, HIGH);
+        delayMicroseconds(Config::Protocol::RS485_TX_SETTLE_US);
+        Serial3.write(reinterpret_cast<const uint8_t*>(frame), length);
+        Serial3.flush();
+        delayMicroseconds(Config::Protocol::RS485_TX_RELEASE_US);
+        digitalWrite(Pins::RS485::TX_ENABLE, LOW);
+        sLastCarrierMillis = millis();
+    }
+
     void trimiteApel(uint8_t ascAlocat) {
         if (ascAlocat == 0) return;
 
@@ -484,20 +581,12 @@ namespace Protocol
         uint8_t crc = crc8_ccitt(payload);
         char crcStr[3];
         byteToHexUpper(crc, crcStr);
-
-        Serial3.listen();
-        delayMicroseconds(Config::Protocol::RS485_LISTEN_SETTLE_US);
-        digitalWrite(Pins::RS485::TX_ENABLE, HIGH);
-        delayMicroseconds(Config::Protocol::RS485_TX_SETTLE_US);
-
-        Serial3.print(Config::Protocol::START_MARKER);
-        Serial3.print(payload);
-        Serial3.print(CRC_SEPARATOR);
-        Serial3.print(crcStr);
-        Serial3.print(Config::Protocol::END_MARKER);
-
-        Serial3.flush();
-        delayMicroseconds(Config::Protocol::RS485_TX_RELEASE_US);
-        digitalWrite(Pins::RS485::TX_ENABLE, LOW);
+        char frame[FRAME_BUFFER_SIZE];
+        const int length = snprintf(frame, sizeof(frame), "%c%s*%s%c",
+                                    Config::Protocol::START_MARKER, payload, crcStr,
+                                    Config::Protocol::END_MARKER);
+        if (length > 0 && length < static_cast<int>(sizeof(frame))) {
+            transmitFrame(frame, static_cast<uint8_t>(length));
+        }
     }
 }
