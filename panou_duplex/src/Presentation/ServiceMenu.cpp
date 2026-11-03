@@ -27,6 +27,8 @@ static uint8_t sColorTestColorIndex = 0;
 static bool sColorTestLabelAtTop = true;
 static unsigned long sColorTestLastStepMillis = 0;
 static uint8_t sCommunicationDisplayLifts = 0;
+static uint32_t sLastCommunicationValues[2][6] = {};
+static bool sCommunicationValuesDirty[2] = {true, true};
 
 // Forward declarations
 static void handleCommand(const ServiceProtocol::Command &cmd);
@@ -37,6 +39,8 @@ static bool isCommunicationDisplayActiveForTarget(DisplayTarget target);
 static DisplayTarget targetForLift(uint8_t lift);
 static void drawCommunicationPages(uint8_t liftMask);
 static void drawCommunicationPage(DisplayTarget target);
+static void renderCommunicationCounters(DisplayTarget target, uint8_t lift,
+                                        const CommLineCounters &counters);
 static void drawColorTestPage();
 static void updateColorTest();
 static void stopColorTest();
@@ -47,6 +51,8 @@ void init() {
     sColorTestActive = false;
     sColorTestTargets = 0;
     sCommunicationDisplayLifts = 0;
+    sCommunicationValuesDirty[0] = true;
+    sCommunicationValuesDirty[1] = true;
 }
 
 bool isInServiceMode() {
@@ -72,6 +78,12 @@ void update() {
             }
             if (!isCommunicationDisplayActiveForTarget(lift1Target) && !isColorTestTarget(lift1Target)) {
                 PanelRenderer::render(lift1Target, localPanel.lift1, "ASCENSOR 1");
+            }
+            if (sCommunicationDisplayLifts & 0x01u) {
+                renderCommunicationCounters(targetForLift(1), 1, localPanel.comm.lift1);
+            }
+            if (sCommunicationDisplayLifts & 0x02u) {
+                renderCommunicationCounters(targetForLift(2), 2, localPanel.comm.lift2);
             }
         }
         updateColorTest();
@@ -282,7 +294,36 @@ static void drawCommunicationPages(uint8_t liftMask) {
 
 static void drawCommunicationPage(DisplayTarget target) {
     Display::clearTargetScreen(target);
-    Display::printMenuHeader(target, "COMM");
+    const uint8_t lift = (target == targetForLift(1)) ? 1 : 2;
+    static const char *labels[] = {"Total", "Valid", "Timeout", "Format", "CRC", "Data"};
+    static const uint16_t labelColors[] = {0xFFFF, 0xFFFF, 0xFFE0, 0xFFE0, 0xFFE0, 0xFFE0};
+    for (uint8_t row = 0; row < 6; row++) {
+        Display::printCommLabel(target, row, labels[row], labelColors[row]);
+        Display::printCommValue(target, row, 0, 0, 0x07E0);
+        sLastCommunicationValues[lift - 1][row] = 0;
+    }
+    sCommunicationValuesDirty[lift - 1] = true;
+}
+
+static void renderCommunicationCounters(DisplayTarget target, uint8_t lift,
+                                        const CommLineCounters &counters) {
+    const uint32_t values[] = {
+        counters.rxFrames,
+        counters.rxValid,
+        counters.rxTimeout,
+        counters.rxFormatError,
+        counters.rxCrcError,
+        counters.rxDataError
+    };
+    const uint8_t index = lift - 1;
+
+    for (uint8_t row = 0; row < 6; row++) {
+        if (sCommunicationValuesDirty[index] || sLastCommunicationValues[index][row] != values[row]) {
+            Display::printCommValue(target, row, sLastCommunicationValues[index][row], values[row], 0x07E0);
+            sLastCommunicationValues[index][row] = values[row];
+        }
+    }
+    sCommunicationValuesDirty[index] = false;
 }
 
 static void drawColorTestPage() {

@@ -35,8 +35,9 @@ namespace Display
     // Extinderile cerute pentru randarea de Service și Developer
     void printMenuLineExt(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare);
     void printMenuLineExt(DisplayTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare);
-    void printCommLine(DisplayTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare);
-    void printCommLine(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare);
+    void printCommLabel(DisplayTarget target, uint8_t linie, const char* eticheta, uint16_t culoareEticheta);
+    void printCommValue(DisplayTarget target, uint8_t linie, uint32_t valoareVeche,
+                        uint32_t valoareNoua, uint16_t culoareValoare);
     void printMenuLineHex(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoareHex);
     void printMenuFooterDecoration(DisplayTarget target, const char* numarPaginaText);
 

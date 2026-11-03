@@ -11,6 +11,7 @@
 
 #include "Arduino.h"
 #include <Adafruit_GFX.h>
+#include <Fonts/FreeSans9pt7b.h>
 #include "Custom_ST7735.h"
 #include <SPI.h>
 
@@ -285,32 +286,46 @@ namespace Display
         tft.print(valoareText);
     }
 
-    void printCommLine(DisplayTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare) {
+    void printCommLabel(DisplayTarget target, uint8_t linie, const char* eticheta, uint16_t culoareEticheta) {
         Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
-        tft.setFont(&universalis12);
-        const uint8_t yPos = 53 + (linie * 21);
+        tft.setFont(&FreeSans9pt7b);
+        const uint8_t yPos = 22 + (linie * 25);
 
-        tft.setTextColor(COLOR_WHITE);
+        tft.setTextColor(culoareEticheta);
         tft.setCursor(4, yPos);
         tft.print(eticheta);
-
-        tft.setTextColor(culoareValoare);
-        tft.setCursor(58, yPos);
-        tft.print(valoareText);
     }
 
-    void printCommLine(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare) {
+    void printCommValue(DisplayTarget target, uint8_t linie, uint32_t valoareVeche,
+                        uint32_t valoareNoua, uint16_t culoareValoare) {
         Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
-        tft.setFont(&universalis12);
-        const uint8_t yPos = 53 + (linie * 21);
+        tft.setFont(&FreeSans9pt7b);
+        const uint8_t yPos = 22 + (linie * 25);
 
-        tft.setTextColor(COLOR_WHITE);
-        tft.setCursor(4, yPos);
-        tft.print(eticheta);
+        char oldText[11];
+        char valueText[11];
+        snprintf(oldText, sizeof(oldText), "%lu", static_cast<unsigned long>(valoareVeche));
+        snprintf(valueText, sizeof(valueText), "%lu", static_cast<unsigned long>(valoareNoua));
+
+        int16_t oldX1 = 0;
+        int16_t oldY1 = 0;
+        uint16_t oldWidth = 0;
+        uint16_t oldHeight = 0;
+        tft.getTextBounds(oldText, 0, 0, &oldX1, &oldY1, &oldWidth, &oldHeight);
+
+        int16_t newX1 = 0;
+        int16_t newY1 = 0;
+        uint16_t newWidth = 0;
+        uint16_t newHeight = 0;
+        tft.getTextBounds(valueText, 0, 0, &newX1, &newY1, &newWidth, &newHeight);
+
+        tft.setTextColor(COLOR_BLACK);
+        tft.setCursor(123 - oldX1 - static_cast<int16_t>(oldWidth), yPos);
+        tft.print(oldText);
 
         tft.setTextColor(culoareValoare);
-        tft.setCursor(58, yPos);
-        tft.print(valoare);
+        tft.setCursor(123 - newX1 - static_cast<int16_t>(newWidth), yPos);
+        tft.print(valueText);
     }
 
     void printMenuLineHex(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoareHex) {
