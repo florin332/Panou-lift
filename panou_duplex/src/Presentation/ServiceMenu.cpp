@@ -119,7 +119,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
     switch (cmd.type) {
         case ServiceProtocol::Command::Type::EnterService:
             sInService.store(true, std::memory_order_relaxed);
-            Protocol::setPassThroughEnabled(false);
+            Protocol::setPassThroughEnabled(true);
             Display::setServiceMode(true);
             char panelId[16];
             snprintf(panelId, sizeof(panelId), "D_%02u_%02u.%02u",
@@ -127,6 +127,18 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
                      static_cast<unsigned>(BuildInfo::Major),
                      static_cast<unsigned>(BuildInfo::Minor));
             ServiceProtocol::sendResponse(panelId);
+            break;
+
+        case ServiceProtocol::Command::Type::EnablePassThrough:
+            if (!checkService()) break;
+            Protocol::setPassThroughEnabled(true);
+            ServiceProtocol::sendResponse("ACK_81");
+            break;
+
+        case ServiceProtocol::Command::Type::DisablePassThrough:
+            if (!checkService()) break;
+            Protocol::setPassThroughEnabled(false);
+            ServiceProtocol::sendResponse("ACK_82");
             break;
 
         case ServiceProtocol::Command::Type::ExitService:
