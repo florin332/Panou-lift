@@ -269,6 +269,49 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             break;
         }
 
+        case ServiceProtocol::Command::Type::ResetCommunicationCounters: {
+            if (!checkService()) break;
+            bool resetQueued = true;
+            for (uint8_t lift = 1; lift <= 2; lift++) {
+                if ((cmd.argument == 3 || cmd.argument == lift) &&
+                    !Protocol::commCountReset(lift)) {
+                    resetQueued = false;
+                }
+            }
+            if (!resetQueued) {
+                ServiceProtocol::sendResponse("ERR 08 INVALID_PARAM");
+                break;
+            }
+            char resetResponse[16];
+            snprintf(resetResponse, sizeof(resetResponse), "ACK_65 %u",
+                     static_cast<unsigned>(cmd.argument));
+            ServiceProtocol::sendResponse(resetResponse);
+            break;
+        }
+
+        case ServiceProtocol::Command::Type::QueryCommunicationDisplay: {
+            char response[32];
+            snprintf(response, sizeof(response), "OK COMM DISPLAY %u",
+                     static_cast<unsigned>(sCommunicationDisplayLifts));
+            ServiceProtocol::sendResponse(response);
+            break;
+        }
+
+        case ServiceProtocol::Command::Type::QueryCommunicationCounters: {
+            if (!checkService()) break;
+            uint8_t enabledMask = 0;
+            for (uint8_t lift = 1; lift <= 2; lift++) {
+                if (Protocol::commCountIsEnabled(lift)) {
+                    enabledMask |= static_cast<uint8_t>(1u << (lift - 1));
+                }
+            }
+            char response[32];
+            snprintf(response, sizeof(response), "OK COMM COUNTERS %u",
+                     static_cast<unsigned>(enabledMask));
+            ServiceProtocol::sendResponse(response);
+            break;
+        }
+
         default:
             ServiceProtocol::sendResponse("ERR 04 UNHANDLED");
             break;

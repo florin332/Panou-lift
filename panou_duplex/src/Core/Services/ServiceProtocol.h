@@ -18,6 +18,9 @@ struct Command {
         ExitCommunicationDisplay,  // mb_62 <x>
         StartCommunicationCounters, // mb_63 <x>
         StopCommunicationCounters,  // mb_64 <x>
+        ResetCommunicationCounters, // mb_65 <x>
+        QueryCommunicationDisplay, // mb_67
+        QueryCommunicationCounters, // mb_68
         EnablePassThrough,          // mb_81
         DisablePassThrough          // mb_82
     } type = Type::None;

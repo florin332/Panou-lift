@@ -209,6 +209,23 @@ static void parseLine(const char* line) {
         }
         cmd.type = Command::Type::StopCommunicationCounters;
         cmd.argument = static_cast<uint8_t>(value);
+    } else if (strncmp(line, "mb_65", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 3) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::ResetCommunicationCounters;
+        cmd.argument = static_cast<uint8_t>(value);
+    } else if (strcmp(line, "mb_67") == 0) {
+        if (!checkServiceMode()) return;
+        cmd.type = Command::Type::QueryCommunicationDisplay;
+    } else if (strcmp(line, "mb_68") == 0) {
+        if (!checkServiceMode()) return;
+        cmd.type = Command::Type::QueryCommunicationCounters;
     } else if (strncmp(line, "mb_11", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         // Etaj panou (Etj) persistent (flash protejat)
         if (!checkServiceMode()) return;
