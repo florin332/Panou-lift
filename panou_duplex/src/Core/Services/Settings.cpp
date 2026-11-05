@@ -13,7 +13,8 @@
 namespace
 {
     constexpr uint32_t SETTINGS_MAGIC   = 0x44504C58UL;  // "DPLX"
-    constexpr uint16_t SETTINGS_VERSION = 2;     // v2: + cabOrderSwapped (datele v1 sunt invalidate la boot)
+    constexpr uint16_t SETTINGS_VERSION = 3;
+    constexpr uint16_t LEGACY_SETTINGS_VERSION = 2;
     constexpr size_t   EEPROM_SIZE      = 256;   // rezervat în sectorul de 4 KB
     constexpr int      SETTINGS_OFFSET  = 4;     // 0..3 = bootCounter (Application.cpp)
 
@@ -28,12 +29,27 @@ namespace
         uint8_t  secondCall;        // 0 = al doilea apel blocat (default), 1 = permis
         uint8_t  cabOrderSwapped;   // 0 = direct: cabina1→LCD1, cabina2→LCD2 (default); 1 = invers
         uint32_t standbyTimeoutMs;
+        uint8_t  floorMin;
+        uint8_t  floorMax;
+        uint8_t  floorRangeWasSet;
+        uint32_t crc32;
+    };
+
+    struct LegacyPersistedData
+    {
+        uint32_t magic;
+        uint16_t version;
+        uint8_t  panelFloor;
+        uint8_t  secondCall;
+        uint8_t  cabOrderSwapped;
+        uint32_t standbyTimeoutMs;
         uint32_t crc32;
     };
 
     // Orice modificare de layout trebuie însoțită de bump SETTINGS_VERSION
     // și de actualizarea acestei dimensiuni.
-    static_assert(sizeof(PersistedData) == 20, "Layout flash modificat: bump SETTINGS_VERSION + ajusteaza assert-ul");
+    static_assert(sizeof(LegacyPersistedData) == 20, "Legacy settings layout changed");
+    static_assert(sizeof(PersistedData) == 24, "Layout flash modificat: bump SETTINGS_VERSION + ajusteaza assert-ul");
 
     PersistedData data{};
     bool loaded = false;
@@ -67,6 +83,11 @@ namespace
                timeoutMs <= Config::Timing::STANDBY_TIMEOUT_MAX_MS;
     }
 
+    bool floorRangeIsValid(uint8_t floorMin, uint8_t floorMax)
+    {
+        return floorMin <= floorMax && floorMax < Config::Hardware::FLOORS;
+    }
+
     void loadDefaults()
     {
         data.magic            = SETTINGS_MAGIC;
@@ -75,6 +96,9 @@ namespace
         data.secondCall       = Config::Hardware::SECOND_CALL_DEFAULT ? 1 : 0;
         data.cabOrderSwapped  = Config::Hardware::CAB_ORDER_DEFAULT ? 1 : 0;
         data.standbyTimeoutMs = Config::Timing::STANDBY_TIMEOUT_DEFAULT_MS;
+        data.floorMin         = Config::Hardware::FLOOR_MIN_DEFAULT;
+        data.floorMax         = Config::Hardware::FLOOR_MAX_DEFAULT;
+        data.floorRangeWasSet = 0;
     }
 
     bool dataIsValid(const PersistedData &d)
@@ -85,7 +109,30 @@ namespace
                d.secondCall <= 1 &&
                d.cabOrderSwapped <= 1 &&
                standbyIsValid(d.standbyTimeoutMs) &&
+               floorRangeIsValid(d.floorMin, d.floorMax) &&
+               d.floorRangeWasSet <= 1 &&
                computeCrc(d) == d.crc32;
+    }
+
+    bool legacyDataIsValid(const LegacyPersistedData &d)
+    {
+        return d.magic == SETTINGS_MAGIC &&
+               d.version == LEGACY_SETTINGS_VERSION &&
+               floorIsValid(d.panelFloor) &&
+               d.secondCall <= 1 &&
+               d.cabOrderSwapped <= 1 &&
+               standbyIsValid(d.standbyTimeoutMs) &&
+               crc32(reinterpret_cast<const uint8_t *>(&d),
+                     offsetof(LegacyPersistedData, crc32)) == d.crc32;
+    }
+
+    void migrateLegacyData(const LegacyPersistedData &legacy)
+    {
+        loadDefaults();
+        data.panelFloor = legacy.panelFloor;
+        data.secondCall = legacy.secondCall;
+        data.cabOrderSwapped = legacy.cabOrderSwapped;
+        data.standbyTimeoutMs = legacy.standbyTimeoutMs;
     }
 }
 
@@ -101,7 +148,12 @@ namespace Settings
 
         if (!dataIsValid(data))
         {
-            loadDefaults();
+            LegacyPersistedData legacy{};
+            EEPROM.get(SETTINGS_OFFSET, legacy);
+            if (legacyDataIsValid(legacy))
+                migrateLegacyData(legacy);
+            else
+                loadDefaults();
             save();
         }
 
@@ -165,6 +217,40 @@ namespace Settings
     {
         data.cabOrderSwapped = swapped ? 1 : 0;
         return save();
+    }
+
+    uint8_t floorMin()
+    {
+        return data.floorMin;
+    }
+
+    uint8_t floorMax()
+    {
+        return data.floorMax;
+    }
+
+    bool floorRangeWasSet()
+    {
+        return data.floorRangeWasSet != 0;
+    }
+
+    bool setFloorRange(uint8_t floorMin, uint8_t floorMax)
+    {
+        if (floorRangeWasSet() || !floorRangeIsValid(floorMin, floorMax))
+            return false;
+
+        const uint8_t previousMin = data.floorMin;
+        const uint8_t previousMax = data.floorMax;
+        data.floorMin = floorMin;
+        data.floorMax = floorMax;
+        data.floorRangeWasSet = 1;
+        if (save())
+            return true;
+
+        data.floorMin = previousMin;
+        data.floorMax = previousMax;
+        data.floorRangeWasSet = 0;
+        return false;
     }
 
     bool resetDefaults()

@@ -303,6 +303,34 @@ static void parseLine(const char* line) {
         }
         sendResponse(resp);
         return;
+    } else if (strncmp(line, "mb_16", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        // Intervalul de etaje este persistent și poate fi configurat o singură dată.
+        if (!checkServiceMode()) return;
+        char resp[64];
+        if (line[5] == '\0') {
+            snprintf(resp, sizeof(resp), "OK FLOOR RANGE %u %u %u",
+                     Settings::floorMin(), Settings::floorMax(),
+                     Settings::floorRangeWasSet() ? 1u : 0u);
+        } else {
+            const char* arg = numericArg(line + 5);
+            char* endPtr = nullptr;
+            long floorMin = strtol(arg, &endPtr, 10);
+            if (endPtr == arg || (*endPtr != ' ' && *endPtr != '\t')) {
+                sendResponse("ERR 08 INVALID_PARAM");
+                return;
+            }
+            arg = numericArg(endPtr);
+            long floorMax = strtol(arg, &endPtr, 10);
+            if (endPtr == arg || *endPtr != '\0' || floorMin < 0 || floorMin > 255 ||
+                floorMax < 0 || floorMax > 255 ||
+                !Settings::setFloorRange(static_cast<uint8_t>(floorMin), static_cast<uint8_t>(floorMax))) {
+                sendResponse("ERR 08 INVALID_PARAM");
+                return;
+            }
+            snprintf(resp, sizeof(resp), "ACK_16 %ld %ld", floorMin, floorMax);
+        }
+        sendResponse(resp);
+        return;
     } else if (strcmp(line, "mb_30") == 0) {
         // Revine la default-urile din Config.h (Etj + standby + secondCall + cabOrder) și persistă
         if (!checkServiceMode()) return;
