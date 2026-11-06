@@ -1,5 +1,7 @@
 # Alocarea Pinilor GPIO - Panou Cabina
 
+> Revizie W5500: pinii LCD pe SPI0 sunt pastrati. GP0/GP1/GP4/GP5, folositi anterior pentru CH9121 local, sunt eliberati; W5500 este alocat pe SPI1.
+
 ## Rezumat
 Maparea fizică pentru panoul de cabină cu un singur ecran ILI9341 pe Raspberry Pi Pico.
 
@@ -17,23 +19,39 @@ Maparea fizică pentru panoul de cabină cu un singur ecran ILI9341 pe Raspberry
 ---
 
 ## 2. UI - Interfață Utilizator
+## 2. Ethernet W5500 (SPI1) - NOU
+| Pin | GPIO | Funcție |
+|-----|------|---------|
+| MISO | 12 | SPI1 RX |
+| CS | 13 | Chip Select |
+| SCK | 14 | SPI1 SCK |
+| MOSI | 15 | SPI1 TX |
+
+RESET si INT raman nealocate pana la confirmarea modulului W5500 ales.
+
+### Verificare conflicte
+- **Fara conflict** cu LCD-ul: ILI9341 ramane pe SPI0; W5500 foloseste SPI1.
+- **Fara conflict** cu I2S: semnalele audio raman pe GP8-GP10.
+- **Modificare:** conexiunile UART locale CH9121 (GP0/GP1/GP4/GP5) sunt eliminate si pinii devin liberi. CH9121-urile echipamentelor remote nu ocupa GPIO pe panou.
+
+## 3. UI - Interfață Utilizator
 | Funcție | GPIO | Descriere |
 |---------|------|-----------|
 | BACKLIGHT | 26 | Control iluminare spate ecran |
 
 ---
 
-## 3. UART - Comunicație Serie
+## 4. UART - Comunicație Serie
 | Funcție | GPIO | Descriere |
 |---------|------|-----------|
-| ALARM_TX | 0 | Transmisie alarme |
-| UART1_RX | 1 | Recepție UART1 |
-| UART2_TX | 4 | Transmisie UART2 |
-| DATA_RX | 5 | Recepție date |
+| UART1_TX | 0 | Liber - UART CH9121 local eliminat |
+| UART1_RX | 1 | Liber - UART CH9121 local eliminat |
+| UART2_TX | 4 | Liber - UART CH9121 local eliminat |
+| DATA_RX | 5 | Liber - UART CH9121 local eliminat |
 
 ---
 
-## 4. Intrări Digitale (Inputs)
+## 5. Intrări Digitale (Inputs)
 | Funcție | GPIO | Descriere |
 |---------|------|-----------|
 | ALARM | 7 | Intrare semnal alarmă |
@@ -41,7 +59,7 @@ Maparea fizică pentru panoul de cabină cu un singur ecran ILI9341 pe Raspberry
 
 ---
 
-## 5. Audio (I2S)
+## 6. Audio (I2S)
 | Funcție | GPIO | Descriere |
 |---------|------|-----------|
 | I2S_BCLK  | 8  | Bit Clock |
@@ -55,7 +73,7 @@ Maparea fizică pentru panoul de cabină cu un singur ecran ILI9341 pe Raspberry
 - **Pinuri libere (teoretic):** 15 (pe Raspberry Pi Pico care are 30 GPIO în total)
 
 ### Pinuri alocate
-0, 1, 4, 5, 6, 7, 8, 9, 10, 18, 19, 20, 21, 22, 26
+6, 7, 8, 9, 10, 12, 13, 14, 15, 18, 19, 20, 21, 22, 26
 
 ### Pinuri disponibile
-2, 3, 11, 12, 13, 14, 15, 16, 17, 23, 24, 25, 27, 28, 29
+0, 1, 2, 3, 4, 5, 11, 16, 17, 23, 24, 25, 27, 28, 29

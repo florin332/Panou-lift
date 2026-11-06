@@ -5,7 +5,6 @@
 
 // 1. Rute către folderul src/ (Urcat un nivel)
 #include "SharedPanel.h"
-#include "BuildInfo.h"
 #include "Pins.h"
 
 // 2. Rute interne în cadrul aceluiași folder src/Presentation/
