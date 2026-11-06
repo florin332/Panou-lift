@@ -134,6 +134,7 @@ static void restoreServiceMain() {
 static void handleCommand(const ServiceProtocol::Command &cmd) {
     switch (cmd.type) {
         case ServiceProtocol::Command::Type::EnterService:
+            if (sInService.load(std::memory_order_relaxed)) break;
             sInService.store(true, std::memory_order_relaxed);
             sDisplayTestActive = false;
             Display::setServiceMode(true);

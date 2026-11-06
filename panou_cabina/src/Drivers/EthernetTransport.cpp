@@ -110,7 +110,8 @@ void flushTx(EthernetClient &client, ByteQueue &queue, TxCursor &pending) {
     if (writable <= 0) return;
     const size_t remaining = pending.length - pending.offset;
     const size_t count = remaining < static_cast<size_t>(writable) ? remaining : static_cast<size_t>(writable);
-    pending.offset += client.write(pending.bytes + pending.offset, count);
+        client.write(pending.bytes + pending.offset, count);
+        pending.offset += count;
     if (pending.offset == pending.length) pending.length = pending.offset = 0;
 }
 

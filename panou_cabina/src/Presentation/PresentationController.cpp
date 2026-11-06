@@ -31,8 +31,8 @@ namespace PresentationController
             Transport::IByteTransport &transport = Transport::instance();
             transport.write(Transport::Channel::Service,
                             reinterpret_cast<const uint8_t *>(response), strlen(response));
-            const uint8_t newline = '\n';
-            transport.write(Transport::Channel::Service, &newline, 1);
+            const uint8_t lineEnding[] = {'\r', '\n'};
+            transport.write(Transport::Channel::Service, lineEnding, sizeof(lineEnding));
         }
 
         void consumeServiceByte(ServiceInputBuffer &input, char value) {
