@@ -21,6 +21,7 @@ struct Command {
         ResetCommunicationCounters, // mb_65 <x>
         QueryCommunicationDisplay, // mb_67
         QueryCommunicationCounters, // mb_68
+        ShowLiftAssignments,        // mb_17
         EnablePassThrough,          // mb_81
         DisablePassThrough          // mb_82
     } type = Type::None;

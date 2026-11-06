@@ -26,6 +26,7 @@ static uint8_t sColorTestTargets = 0;
 static uint8_t sColorTestColorIndex = 0;
 static bool sColorTestLabelAtTop = true;
 static unsigned long sColorTestLastStepMillis = 0;
+static bool sLiftAssignmentDisplayActive = false;
 static uint8_t sCommunicationDisplayLifts = 0;
 static uint32_t sLastCommunicationValues[2][6] = {};
 static bool sCommunicationValuesDirty[2] = {true, true};
@@ -44,12 +45,14 @@ static void renderCommunicationCounters(DisplayTarget target, uint8_t lift,
 static void drawColorTestPage();
 static void updateColorTest();
 static void stopColorTest();
+static void stopLiftAssignmentDisplay();
 
 void init() {
     sInService.store(false, std::memory_order_relaxed);
     sLastActivityMillis = 0;
     sColorTestActive = false;
     sColorTestTargets = 0;
+    sLiftAssignmentDisplayActive = false;
     sCommunicationDisplayLifts = 0;
     Protocol::setPassThroughEnabled(false);
     sCommunicationValuesDirty[0] = true;
@@ -71,14 +74,16 @@ void update() {
         if (haveNewData) {
             Display::update(localPanel);
             // CabOrder (mb_15): la swap, cabina1 se randează pe LCD2 și invers
-            const bool swapped = Settings::cabOrderSwapped();
-            const DisplayTarget lift2Target = swapped ? DisplayTarget::Left : DisplayTarget::Right;
-            const DisplayTarget lift1Target = swapped ? DisplayTarget::Right : DisplayTarget::Left;
-            if (!isCommunicationDisplayActiveForTarget(lift2Target) && !isColorTestTarget(lift2Target)) {
-                PanelRenderer::render(lift2Target, localPanel.lift2, "ASCENSOR 2");
-            }
-            if (!isCommunicationDisplayActiveForTarget(lift1Target) && !isColorTestTarget(lift1Target)) {
-                PanelRenderer::render(lift1Target, localPanel.lift1, "ASCENSOR 1");
+            if (!sLiftAssignmentDisplayActive) {
+                const bool swapped = Settings::cabOrderSwapped();
+                const DisplayTarget lift2Target = swapped ? DisplayTarget::Left : DisplayTarget::Right;
+                const DisplayTarget lift1Target = swapped ? DisplayTarget::Right : DisplayTarget::Left;
+                if (!isCommunicationDisplayActiveForTarget(lift2Target) && !isColorTestTarget(lift2Target)) {
+                    PanelRenderer::render(lift2Target, localPanel.lift2, "ASCENSOR 2");
+                }
+                if (!isCommunicationDisplayActiveForTarget(lift1Target) && !isColorTestTarget(lift1Target)) {
+                    PanelRenderer::render(lift1Target, localPanel.lift1, "ASCENSOR 1");
+                }
             }
             if (sCommunicationDisplayLifts & 0x01u) {
                 renderCommunicationCounters(targetForLift(1), 1, localPanel.comm.lift1);
@@ -143,6 +148,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 
         case ServiceProtocol::Command::Type::ExitService:
             stopColorTest();
+            stopLiftAssignmentDisplay();
             sCommunicationDisplayLifts = 0;
             Protocol::commCountDisable(1);
             Protocol::commCountDisable(2);
@@ -185,6 +191,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 
         case ServiceProtocol::Command::Type::ResetDisplay:
             if (!checkService()) break;
+            stopLiftAssignmentDisplay();
             if (cmd.argument == 1 || cmd.argument == 3) {
                 Display::reinitializeTarget(DisplayTarget::Left);
                 PanelRenderer::invalidate(DisplayTarget::Left);
@@ -207,6 +214,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 
         case ServiceProtocol::Command::Type::StartDisplayTest: {
             if (!checkService()) break;
+            stopLiftAssignmentDisplay();
             stopColorTest();
             sColorTestTargets = cmd.argument;
             sColorTestColorIndex = 0;
@@ -222,6 +230,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 
         case ServiceProtocol::Command::Type::StopDisplayTest:
             if (!checkService()) break;
+            stopLiftAssignmentDisplay();
             stopColorTest();
             drawCommunicationPages(sCommunicationDisplayLifts);
             ServiceProtocol::sendResponse("ACK_33");
@@ -229,6 +238,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 
         case ServiceProtocol::Command::Type::EnterCommunicationDisplay:
             if (!checkService()) break;
+            stopLiftAssignmentDisplay();
             stopColorTest();
             sCommunicationDisplayLifts |= cmd.argument;
             drawCommunicationPages(sCommunicationDisplayLifts);
@@ -240,6 +250,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 
         case ServiceProtocol::Command::Type::ExitCommunicationDisplay:
             if (!checkService()) break;
+            stopLiftAssignmentDisplay();
             sCommunicationDisplayLifts &= static_cast<uint8_t>(~cmd.argument);
             for (uint8_t lift = 1; lift <= 2; lift++) {
                 if (cmd.argument & (1u << (lift - 1))) {
@@ -294,6 +305,27 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             snprintf(response, sizeof(response), "OK COMM DISPLAY %u",
                      static_cast<unsigned>(sCommunicationDisplayLifts));
             ServiceProtocol::sendResponse(response);
+            break;
+        }
+
+        case ServiceProtocol::Command::Type::ShowLiftAssignments: {
+            if (!checkService()) break;
+            if (cmd.argument == 0) {
+                stopLiftAssignmentDisplay();
+                ServiceProtocol::sendResponse("ACK_17 0");
+                break;
+            }
+            stopColorTest();
+            sCommunicationDisplayLifts = 0;
+            const bool swapped = Settings::cabOrderSwapped();
+            Display::drawLiftAssignmentPage(DisplayTarget::Left, "LCD1 / SPI0",
+                                             swapped ? "ASC. 2" : "ASC. 1",
+                                             "Ser.2 / GP 9");
+            Display::drawLiftAssignmentPage(DisplayTarget::Right, "LCD2 / SPI1",
+                                             swapped ? "ASC. 1" : "ASC. 2",
+                                             "Ser.1 / GP 17");
+            sLiftAssignmentDisplayActive = true;
+            ServiceProtocol::sendResponse("ACK_17 1");
             break;
         }
 
@@ -413,6 +445,13 @@ static void stopColorTest() {
     if (sColorTestTargets & 2u) PanelRenderer::invalidate(DisplayTarget::Right);
     sColorTestActive = false;
     sColorTestTargets = 0;
+}
+
+static void stopLiftAssignmentDisplay() {
+    if (!sLiftAssignmentDisplayActive) return;
+    sLiftAssignmentDisplayActive = false;
+    PanelRenderer::invalidate(DisplayTarget::Left);
+    PanelRenderer::invalidate(DisplayTarget::Right);
 }
 
 } // namespace ServiceMenu

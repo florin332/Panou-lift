@@ -244,6 +244,33 @@ namespace Display
         tft.print(labels[index]);
     }
 
+    void drawLiftAssignmentPage(DisplayTarget target, const char* displayLabel,
+                                const char* elevatorLabel, const char* serialLabel) {
+        Adafruit_ST7735 &tft = (target == DisplayTarget::Left) ? tft1 : tft2;
+        tft.fillScreen(COLOR_BLACK);
+        tft.setFont(&FreeSans9pt7b);
+        tft.setTextWrap(false);
+
+        const auto drawCentered = [&tft](const char* text, int16_t y, uint16_t color) {
+            int16_t x1 = 0;
+            int16_t y1 = 0;
+            uint16_t textWidth = 0;
+            uint16_t textHeight = 0;
+            tft.getTextBounds(text, 0, 0, &x1, &y1, &textWidth, &textHeight);
+            tft.setTextColor(color);
+            tft.setCursor((tft.width() - static_cast<int16_t>(textWidth)) / 2 - x1, y - y1);
+            tft.print(text);
+        };
+
+        constexpr int16_t blockHeight = 110;
+        const int16_t blockTop = (static_cast<int16_t>(tft.height()) - blockHeight) / 2;
+        drawCentered("ALLOC.", blockTop, COLOR_WHITE);
+        tft.drawFastHLine(18, blockTop + 15, 92, COLOR_GREY);
+        drawCentered(displayLabel, blockTop + 36, COLOR_MUTED);
+        drawCentered(serialLabel, blockTop + 59, COLOR_WHITE);
+        drawCentered(elevatorLabel, blockTop + 94, COLOR_YELLOW);
+    }
+
     // ← MODIFICAT: separator configurabil (culoare + grosime)
     void printMenuHeader(DisplayTarget target, const char* titluPagina,
                          uint16_t sepColor, uint8_t sepThickness) {

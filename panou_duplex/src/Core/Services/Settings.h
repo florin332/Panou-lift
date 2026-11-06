@@ -36,10 +36,10 @@ namespace Settings
     bool cabOrderSwapped();
     bool setCabOrderSwapped(bool swapped);        // persistă în flash
 
-    uint8_t floorMin();
-    uint8_t floorMax();
-    bool floorRangeWasSet();
-    bool setFloorRange(uint8_t floorMin, uint8_t floorMax); // permite o singură configurare
+    uint8_t totalStations();
+    uint8_t groundStation();
+    bool stationConfigWasSet();
+    bool setStationConfig(uint8_t totalStations, uint8_t groundStation); // permite o singură configurare
 
     // Scrie explicit în flash starea curentă (setterii o fac deja)
     bool save();

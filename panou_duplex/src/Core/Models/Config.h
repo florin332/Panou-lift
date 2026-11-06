@@ -1,5 +1,6 @@
 // src/Core/Models/Config.h
 // Parametrii instalației și ai hardware-ului — MODIFICĂ DOAR AICI
+// Perechi hardware și setări implicite pentru instalație  LCD1 / SPI0 & SERIAL2 / GPIO9 ; LCD2 / SPI1 & SERIAL2 / GPIO17
 
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -17,8 +18,6 @@ namespace Config
         constexpr bool SECOND_CALL_DEFAULT = false;  // Default al doilea apel: blocat (setabil Service Box, mb_13)
         constexpr bool CAB_ORDER_DEFAULT = false;    // Default ordine cabine pe LCD: direct (cabina1→LCD1); setabil Service Box, mb_15
         constexpr uint8_t FLOORS = 18;               // Total etaje instalație
-        constexpr uint8_t FLOOR_MIN_DEFAULT = 0;
-        constexpr uint8_t FLOOR_MAX_DEFAULT = 17;
         constexpr uint8_t LIFTS = 2;                 // Mod Duplex
 
         // Marcă persistență prin watchdog scratch: reset declanșat de apăsări rapide buton

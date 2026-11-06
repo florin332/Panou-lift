@@ -13,10 +13,12 @@
 namespace
 {
     constexpr uint32_t SETTINGS_MAGIC   = 0x44504C58UL;  // "DPLX"
-    constexpr uint16_t SETTINGS_VERSION = 3;
-    constexpr uint16_t LEGACY_SETTINGS_VERSION = 2;
+    constexpr uint16_t SETTINGS_VERSION = 4;
+    constexpr uint16_t LEGACY_SETTINGS_VERSION_V3 = 3;
+    constexpr uint16_t LEGACY_SETTINGS_VERSION_V2 = 2;
     constexpr size_t   EEPROM_SIZE      = 256;   // rezervat în sectorul de 4 KB
     constexpr int      SETTINGS_OFFSET  = 4;     // 0..3 = bootCounter (Application.cpp)
+    constexpr uint8_t  UNSET_STATION_VALUE = 0xFF;
 
     // REGULĂ CRC: structura se scrie exclusiv câmp-cu-câmp (fără assignment pe
     // tot obiectul) și pornește din 'data{}' zero-inițializat static — padding-ul
@@ -29,13 +31,27 @@ namespace
         uint8_t  secondCall;        // 0 = al doilea apel blocat (default), 1 = permis
         uint8_t  cabOrderSwapped;   // 0 = direct: cabina1→LCD1, cabina2→LCD2 (default); 1 = invers
         uint32_t standbyTimeoutMs;
+        uint8_t  totalStations;
+        uint8_t  groundStation;
+        uint8_t  stationConfigWasSet;
+        uint32_t crc32;
+    };
+
+    struct LegacyPersistedDataV3
+    {
+        uint32_t magic;
+        uint16_t version;
+        uint8_t  panelFloor;
+        uint8_t  secondCall;
+        uint8_t  cabOrderSwapped;
+        uint32_t standbyTimeoutMs;
         uint8_t  floorMin;
         uint8_t  floorMax;
         uint8_t  floorRangeWasSet;
         uint32_t crc32;
     };
 
-    struct LegacyPersistedData
+    struct LegacyPersistedDataV2
     {
         uint32_t magic;
         uint16_t version;
@@ -48,7 +64,8 @@ namespace
 
     // Orice modificare de layout trebuie însoțită de bump SETTINGS_VERSION
     // și de actualizarea acestei dimensiuni.
-    static_assert(sizeof(LegacyPersistedData) == 20, "Legacy settings layout changed");
+    static_assert(sizeof(LegacyPersistedDataV2) == 20, "Legacy v2 settings layout changed");
+    static_assert(sizeof(LegacyPersistedDataV3) == 24, "Legacy v3 settings layout changed");
     static_assert(sizeof(PersistedData) == 24, "Layout flash modificat: bump SETTINGS_VERSION + ajusteaza assert-ul");
 
     PersistedData data{};
@@ -83,9 +100,9 @@ namespace
                timeoutMs <= Config::Timing::STANDBY_TIMEOUT_MAX_MS;
     }
 
-    bool floorRangeIsValid(uint8_t floorMin, uint8_t floorMax)
+    bool stationConfigIsValid(uint8_t totalStations, uint8_t groundStation)
     {
-        return floorMin <= floorMax && floorMax < Config::Hardware::FLOORS;
+        return totalStations >= 1 && totalStations <= 30 && groundStation < totalStations;
     }
 
     void loadDefaults()
@@ -96,9 +113,9 @@ namespace
         data.secondCall       = Config::Hardware::SECOND_CALL_DEFAULT ? 1 : 0;
         data.cabOrderSwapped  = Config::Hardware::CAB_ORDER_DEFAULT ? 1 : 0;
         data.standbyTimeoutMs = Config::Timing::STANDBY_TIMEOUT_DEFAULT_MS;
-        data.floorMin         = Config::Hardware::FLOOR_MIN_DEFAULT;
-        data.floorMax         = Config::Hardware::FLOOR_MAX_DEFAULT;
-        data.floorRangeWasSet = 0;
+        data.totalStations       = UNSET_STATION_VALUE;
+        data.groundStation       = UNSET_STATION_VALUE;
+        data.stationConfigWasSet = 0;
     }
 
     bool dataIsValid(const PersistedData &d)
@@ -109,24 +126,37 @@ namespace
                d.secondCall <= 1 &&
                d.cabOrderSwapped <= 1 &&
                standbyIsValid(d.standbyTimeoutMs) &&
-               floorRangeIsValid(d.floorMin, d.floorMax) &&
-               d.floorRangeWasSet <= 1 &&
+               d.stationConfigWasSet <= 1 &&
+               (d.stationConfigWasSet == 0 || stationConfigIsValid(d.totalStations, d.groundStation)) &&
                computeCrc(d) == d.crc32;
     }
 
-    bool legacyDataIsValid(const LegacyPersistedData &d)
+    bool legacyDataIsValid(const LegacyPersistedDataV3 &d)
     {
         return d.magic == SETTINGS_MAGIC &&
-               d.version == LEGACY_SETTINGS_VERSION &&
+               d.version == LEGACY_SETTINGS_VERSION_V3 &&
                floorIsValid(d.panelFloor) &&
                d.secondCall <= 1 &&
                d.cabOrderSwapped <= 1 &&
                standbyIsValid(d.standbyTimeoutMs) &&
                crc32(reinterpret_cast<const uint8_t *>(&d),
-                     offsetof(LegacyPersistedData, crc32)) == d.crc32;
+                     offsetof(LegacyPersistedDataV3, crc32)) == d.crc32;
     }
 
-    void migrateLegacyData(const LegacyPersistedData &legacy)
+    bool legacyDataIsValid(const LegacyPersistedDataV2 &d)
+    {
+        return d.magic == SETTINGS_MAGIC &&
+               d.version == LEGACY_SETTINGS_VERSION_V2 &&
+               floorIsValid(d.panelFloor) &&
+               d.secondCall <= 1 &&
+               d.cabOrderSwapped <= 1 &&
+               standbyIsValid(d.standbyTimeoutMs) &&
+               crc32(reinterpret_cast<const uint8_t *>(&d),
+                     offsetof(LegacyPersistedDataV2, crc32)) == d.crc32;
+    }
+
+    template <typename LegacyData>
+    void migrateCommonSettings(const LegacyData &legacy)
     {
         loadDefaults();
         data.panelFloor = legacy.panelFloor;
@@ -134,6 +164,7 @@ namespace
         data.cabOrderSwapped = legacy.cabOrderSwapped;
         data.standbyTimeoutMs = legacy.standbyTimeoutMs;
     }
+
 }
 
 namespace Settings
@@ -148,12 +179,19 @@ namespace Settings
 
         if (!dataIsValid(data))
         {
-            LegacyPersistedData legacy{};
-            EEPROM.get(SETTINGS_OFFSET, legacy);
-            if (legacyDataIsValid(legacy))
-                migrateLegacyData(legacy);
+            LegacyPersistedDataV3 legacyV3{};
+            EEPROM.get(SETTINGS_OFFSET, legacyV3);
+            if (legacyDataIsValid(legacyV3))
+                migrateCommonSettings(legacyV3);
             else
-                loadDefaults();
+            {
+                LegacyPersistedDataV2 legacyV2{};
+                EEPROM.get(SETTINGS_OFFSET, legacyV2);
+                if (legacyDataIsValid(legacyV2))
+                    migrateCommonSettings(legacyV2);
+                else
+                    loadDefaults();
+            }
             save();
         }
 
@@ -219,37 +257,37 @@ namespace Settings
         return save();
     }
 
-    uint8_t floorMin()
+    uint8_t totalStations()
     {
-        return data.floorMin;
+        return data.totalStations;
     }
 
-    uint8_t floorMax()
+    uint8_t groundStation()
     {
-        return data.floorMax;
+        return data.groundStation;
     }
 
-    bool floorRangeWasSet()
+    bool stationConfigWasSet()
     {
-        return data.floorRangeWasSet != 0;
+        return data.stationConfigWasSet != 0;
     }
 
-    bool setFloorRange(uint8_t floorMin, uint8_t floorMax)
+    bool setStationConfig(uint8_t totalStations, uint8_t groundStation)
     {
-        if (floorRangeWasSet() || !floorRangeIsValid(floorMin, floorMax))
+        if (stationConfigWasSet() || !stationConfigIsValid(totalStations, groundStation))
             return false;
 
-        const uint8_t previousMin = data.floorMin;
-        const uint8_t previousMax = data.floorMax;
-        data.floorMin = floorMin;
-        data.floorMax = floorMax;
-        data.floorRangeWasSet = 1;
+        const uint8_t previousTotalStations = data.totalStations;
+        const uint8_t previousGroundStation = data.groundStation;
+        data.totalStations = totalStations;
+        data.groundStation = groundStation;
+        data.stationConfigWasSet = 1;
         if (save())
             return true;
 
-        data.floorMin = previousMin;
-        data.floorMax = previousMax;
-        data.floorRangeWasSet = 0;
+        data.totalStations = previousTotalStations;
+        data.groundStation = previousGroundStation;
+        data.stationConfigWasSet = 0;
         return false;
     }
 

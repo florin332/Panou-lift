@@ -304,33 +304,45 @@ static void parseLine(const char* line) {
         sendResponse(resp);
         return;
     } else if (strncmp(line, "mb_16", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
-        // Intervalul de etaje este persistent și poate fi configurat o singură dată.
+        // Configurația stațiilor este persistentă și poate fi setată o singură dată.
         if (!checkServiceMode()) return;
         char resp[64];
         if (line[5] == '\0') {
-            snprintf(resp, sizeof(resp), "OK FLOOR RANGE %u %u %u",
-                     Settings::floorMin(), Settings::floorMax(),
-                     Settings::floorRangeWasSet() ? 1u : 0u);
+            snprintf(resp, sizeof(resp), "OK STATIONS %u %u %u",
+                     Settings::totalStations(), Settings::groundStation(),
+                     Settings::stationConfigWasSet() ? 1u : 0u);
         } else {
             const char* arg = numericArg(line + 5);
             char* endPtr = nullptr;
-            long floorMin = strtol(arg, &endPtr, 10);
-            if (endPtr == arg || (*endPtr != ' ' && *endPtr != '\t')) {
+            long totalStations = strtol(arg, &endPtr, 10);
+            if (endPtr == arg || *endPtr != ' ') {
                 sendResponse("ERR 08 INVALID_PARAM");
                 return;
             }
             arg = numericArg(endPtr);
-            long floorMax = strtol(arg, &endPtr, 10);
-            if (endPtr == arg || *endPtr != '\0' || floorMin < 0 || floorMin > 255 ||
-                floorMax < 0 || floorMax > 255 ||
-                !Settings::setFloorRange(static_cast<uint8_t>(floorMin), static_cast<uint8_t>(floorMax))) {
+            long groundStation = strtol(arg, &endPtr, 10);
+            if (endPtr == arg || *endPtr != '\0' || totalStations < 1 || totalStations > 30 ||
+                groundStation < 0 || groundStation > 255 ||
+                !Settings::setStationConfig(static_cast<uint8_t>(totalStations),
+                                            static_cast<uint8_t>(groundStation))) {
                 sendResponse("ERR 08 INVALID_PARAM");
                 return;
             }
-            snprintf(resp, sizeof(resp), "ACK_16 %ld %ld", floorMin, floorMax);
+            snprintf(resp, sizeof(resp), "ACK_16 %ld %ld", totalStations, groundStation);
         }
         sendResponse(resp);
         return;
+    } else if (strncmp(line, "mb_17", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || (value != 0 && value != 1)) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::ShowLiftAssignments;
+        cmd.argument = static_cast<uint8_t>(value);
     } else if (strcmp(line, "mb_30") == 0) {
         // Revine la default-urile din Config.h (Etj + standby + secondCall + cabOrder) și persistă
         if (!checkServiceMode()) return;
