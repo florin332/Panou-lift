@@ -41,7 +41,7 @@ namespace Config
     {
         constexpr uint32_t SPI_CLOCK = 8000000UL;   // Viteză SPI (8 MHz)
 
-        constexpr uint8_t ROTATION = 0;    // 0=portrait, 1=landscape, etc.
+        constexpr uint8_t ROTATION = 2;    // 0=portrait, 1=landscape, etc.
     }
 
     // =========================================================
