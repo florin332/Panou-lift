@@ -1,5 +1,5 @@
 #include "PanelRenderer.h"
-#include "Display.h"
+#include "Graphics.h"
 #include "DisplayGeometry.h"
 #include "Config.h"
 #include "TextWidget.h"
@@ -64,21 +64,21 @@ namespace {
             || l == PanelLayout::NoSerial;
     }
 
-    inline void eraseWidget(DisplayTarget target, TextWidget &widget) {
+    inline void eraseWidget(GraphicsTarget target, TextWidget &widget) {
         if (widget.drawn) {
-            Display::drawText(target, widget.x, widget.y, widget.font, widget.text, C_BLACK);
+            Graphics::drawText(target, widget.x, widget.y, widget.font, widget.text, C_BLACK);
             widget.reset();
         }
     }
 
-    inline void drawTextDirty(DisplayTarget target, TextWidget &widget,
+    inline void drawTextDirty(GraphicsTarget target, TextWidget &widget,
                               const char* text, int16_t x, int16_t y,
                               const GFXfont* font, uint16_t color) {
         if (!widget.isDirty(text, font, x, y, color)) return;
         if (widget.drawn) {
-            Display::drawText(target, widget.x, widget.y, widget.font, widget.text, C_BLACK);
+            Graphics::drawText(target, widget.x, widget.y, widget.font, widget.text, C_BLACK);
         }
-        Display::drawText(target, x, y, font, text, color);
+        Graphics::drawText(target, x, y, font, text, color);
         widget.commit(text, font, x, y, color);
     }
 
@@ -99,7 +99,7 @@ namespace {
         return static_cast<int16_t>((pct * static_cast<int>(DisplayGeom::screenH())) / 100);
     }
 
-    void drawDefect(DisplayTarget target, const char* label, const LiftState &lift) {
+    void drawDefect(GraphicsTarget target, const char* label, const LiftState &lift) {
         const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
         const int16_t cx = DisplayGeom::centerX();
         char codeBuf[16];
@@ -112,14 +112,14 @@ namespace {
             { "0740.317.707",   pctY(84), C_YELLOW  },
         };
         for (const auto &r : rows) {
-            Display::drawText(target,
+            Graphics::drawText(target,
                 DisplayGeom::cursorXForCenter(&universalis12, r.txt, cx),
                 DisplayGeom::baselineForVCenter(&universalis12, r.txt, r.cy),
                 &universalis12, r.txt, r.col);
         }
     }
 
-    void drawRevizie(DisplayTarget target, const char* label) {
+    void drawRevizie(GraphicsTarget target, const char* label) {
         const int16_t cx = DisplayGeom::centerX();
         struct { const char* txt; int16_t cy; } rows[] = {
             { label,          pctY(22) },
@@ -127,14 +127,14 @@ namespace {
             { "0740.317.707", pctY(86) },
         };
         for (const auto &r : rows) {
-            Display::drawText(target,
+            Graphics::drawText(target,
                 DisplayGeom::cursorXForCenter(&universalis12, r.txt, cx),
                 DisplayGeom::baselineForVCenter(&universalis12, r.txt, r.cy),
                 &universalis12, r.txt, C_YELLOW);
         }
     }
 
-    void drawNoSerial(DisplayTarget target, const char* label) {
+    void drawNoSerial(GraphicsTarget target, const char* label) {
         const int16_t cx = DisplayGeom::centerX();
         struct { const char* txt; int16_t cy; uint16_t col; } rows[] = {
             { label,            pctY(15), C_YELLOW  },
@@ -145,14 +145,14 @@ namespace {
             { "0740.317.707",   pctY(86), C_YELLOW  },
         };
         for (const auto &r : rows) {
-            Display::drawText(target,
+            Graphics::drawText(target,
                 DisplayGeom::cursorXForCenter(&universalis12, r.txt, cx),
                 DisplayGeom::baselineForVCenter(&universalis12, r.txt, r.cy),
                 &universalis12, r.txt, r.col);
         }
     }
 
-    void drawStop(DisplayTarget target, const LiftState &lift, PanelScreenState &st) {
+    void drawStop(GraphicsTarget target, const LiftState &lift, PanelScreenState &st) {
         const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
         const int16_t xFloor = DisplayGeom::cursorXForCenter(&oneslot100, posStr, DisplayGeom::centerX());
         const int16_t yFloor = DisplayGeom::baselineForVCenter(&oneslot100, posStr, DisplayGeom::centerY());
@@ -166,7 +166,7 @@ namespace {
     // La coborâre poziția curentă (font mare, 129px) nu poate sta la ~31% — ar ieși
     // din ecran în sus — deci o coborâm la ~44% (baseline 140/320), sub care rămâne
     // loc pentru destinație.
-    void drawMovement(DisplayTarget target,
+    void drawMovement(GraphicsTarget target,
                       const LiftState &lift, PanelScreenState &st,
                       bool movingUp) {
         const char* posStr = (lift.pos < Config::Hardware::FLOORS) ? floorStr[lift.pos] : "??";
@@ -187,19 +187,19 @@ namespace {
 
 namespace PanelRenderer {
 
-void invalidate(DisplayTarget target) {
+void invalidate(GraphicsTarget target) {
     (void)target;
     stPanel.firstRender = true;
 }
 
-void render(DisplayTarget target, const LiftState &lift, const char* label) {
+void render(GraphicsTarget target, const LiftState &lift, const char* label) {
     (void)target;
     PanelScreenState &st = stPanel;
     PanelLayout newLayout = getLayout(lift.svc, lift.sj);
 
     // --- 1. FIRST RENDER ---
     if (st.firstRender) {
-        Display::clearTargetScreen(target);
+        Graphics::clearTargetScreen(target);
         st.firstRender = false;
         st.layout = PanelLayout::None;
         resetAllWidgets(st);
@@ -211,7 +211,7 @@ void render(DisplayTarget target, const LiftState &lift, const char* label) {
     // --- 2. LAYOUT CHANGE ---
     if (newLayout != st.layout) {
         if (isServiceLayout(newLayout) || isServiceLayout(st.layout)) {
-            Display::clearTargetScreen(target);
+            Graphics::clearTargetScreen(target);
         } else {
             eraseWidget(target, st.wFloor);
             eraseWidget(target, st.wEtd);
@@ -242,7 +242,7 @@ void render(DisplayTarget target, const LiftState &lift, const char* label) {
             break;
         case PanelLayout::Defect:
             if (lift.pos != st.lastPos) {
-                Display::clearTargetScreen(target);
+                Graphics::clearTargetScreen(target);
                 resetAllWidgets(st);
                 drawDefect(target, label, lift);
             }

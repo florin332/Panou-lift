@@ -8,6 +8,18 @@ namespace DisplayRenderer
         // Adaptor pur structural pasiv
     }
 
+    void showOverloadImage() {
+        Graphics::showOverloadImage();
+    }
+
+    void hideOverloadImage() {
+        Graphics::hideOverloadImage();
+    }
+
+    void showBacklight() {
+        Graphics::showBacklight();
+    }
+
     // Traducerea din stare semantică pură în cod de pixeli de sticlă
     static uint16_t mapTftColor(SemanticState state) {
         switch (state) {
@@ -19,12 +31,12 @@ namespace DisplayRenderer
         }
     }
 
-    void render(DisplayTarget target, const PageModel &logicalPage) {
-        Display::clearTargetScreen(target);
+    void render(GraphicsTarget target, const PageModel &logicalPage) {
+        Graphics::clearTargetScreen(target);
         
         // Extragerea titlului tradus prin cheia din UITheme (Viziunea ta)
         const char* humanTitle = UITheme::getText(logicalPage.title);
-        Display::printMenuHeader(target, humanTitle);
+        Graphics::printMenuHeader(target, humanTitle);
 
         // Buclă auto-documentată bazată pe constanta de limită MAX_PAGE_LINES (Observația ta)
         for (uint8_t i = 0; i < MAX_PAGE_LINES; i++) {
@@ -48,16 +60,16 @@ namespace DisplayRenderer
                         // Apelăm o linie rapidă gri direct din driverul hardware
                         // Notă: Putem adăuga drawFastHLine în Display.h sau o emitem nativ prin adaptor dacă avem instanțe
                         // Pentru a păstra Display.h intact, folosim o linie de caractere punctuale subțiri sau apelăm direct o primitivă
-                        Display::printMenuLineExt(target, physicalLineIndex, "----------------", "", 0x7BEF);
+                        Graphics::printMenuLineExt(target, physicalLineIndex, "----------------", "", 0x7BEF);
                     }
                     break;
 
                 case PageLineType::DataNumeric:
-                    Display::printMenuLineExt(target, physicalLineIndex, humanLabel, line.valueNum, currentPixelColor);
+                    Graphics::printMenuLineExt(target, physicalLineIndex, humanLabel, line.valueNum, currentPixelColor);
                     break;
 
                 case PageLineType::DataHex:
-                    Display::printMenuLineHex(target, physicalLineIndex, humanLabel, line.valueNum);
+                    Graphics::printMenuLineHex(target, physicalLineIndex, humanLabel, line.valueNum);
                     break;
 
                 case PageLineType::DataText:
@@ -65,7 +77,7 @@ namespace DisplayRenderer
                     const char* humanValueText = (strcmp(line.valueText, "OK") == 0 || strcmp(line.valueText, "running") == 0) 
                                                  ? line.valueText 
                                                  : line.valueText;
-                    Display::printMenuLineExt(target, physicalLineIndex, humanLabel, humanValueText, currentPixelColor);
+                    Graphics::printMenuLineExt(target, physicalLineIndex, humanLabel, humanValueText, currentPixelColor);
                     break;
             }
         }
@@ -73,6 +85,6 @@ namespace DisplayRenderer
         // CORECTAT DEFINITIV (Observația ta 1): Alocare fixă de 16 octeți sigură împotriva Stack Overflow!
         char footerBuf[16];
         snprintf(footerBuf, sizeof(footerBuf), "%d / %d", logicalPage.pageIndex, logicalPage.totalPages);
-        Display::printMenuFooterDecoration(target, footerBuf);
+        Graphics::printMenuFooterDecoration(target, footerBuf);
     }
 }

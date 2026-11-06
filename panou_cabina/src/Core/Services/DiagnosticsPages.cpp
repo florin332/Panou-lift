@@ -1,6 +1,6 @@
 
 #include "DiagnosticsPages.h"
-#include "Arduino.h"
+#include <cstring>
 
 namespace DiagnosticsPages
 {
@@ -31,9 +31,9 @@ namespace DiagnosticsPages
     // Traducător intern de siguranță pentru compatibilitatea stărilor de cabină din V10.25
     static SemanticState evalLiftState(const char* txt) {
         if (txt == NULL) return SemanticState::Neutral;
-        if (strcmp(txt, "Normal") == 0 || strcmp(txt, "Free") == 0) return SemanticState::Success;
-        if (strcmp(txt, "Revision") == 0 || strcmp(txt, "Busy") == 0) return SemanticState::Warning;
-        if (strcmp(txt, "Fault") == 0) return SemanticState::Alert;
+        if (std::strcmp(txt, "Normal") == 0 || std::strcmp(txt, "Free") == 0) return SemanticState::Success;
+        if (std::strcmp(txt, "Revision") == 0 || std::strcmp(txt, "Busy") == 0) return SemanticState::Warning;
+        if (std::strcmp(txt, "Fault") == 0) return SemanticState::Alert;
         return SemanticState::Neutral;
     }
 
@@ -63,8 +63,8 @@ namespace DiagnosticsPages
             case ServicePage::Communication:
                 output.title = "COMM_TITLE";
                 fillTxt(output.lines[0], "COMM_L1_STS",
-                    strcmp(info.lift1.svc, "No Serial") == 0 ? "MISSING" : "OK",
-                    strcmp(info.lift1.svc, "No Serial") == 0 ? SemanticState::Alert : SemanticState::Success);
+                    std::strcmp(info.lift1.svc, "No Serial") == 0 ? "MISSING" : "OK",
+                    std::strcmp(info.lift1.svc, "No Serial") == 0 ? SemanticState::Alert : SemanticState::Success);
                 fillNum(output.lines[1], "COMM_TIMEOUTS", info.rxTimeouts,
                     info.rxTimeouts == 0 ? SemanticState::Success : SemanticState::Alert);
                 fillEmpty(output.lines[2]);
@@ -99,8 +99,8 @@ namespace DiagnosticsPages
 
             case DevPage::MemoryLayout:
                 output.title = "DEV_MEM_TITLE";
-                fillHex(output.lines[0], "RAM_ADDR_MAP", ApplicationState::memoryAddress());
-                fillNum(output.lines[1], "SEQLOCK_VAL", ApplicationState::sequence(), SemanticState::Warning);
+                fillHex(output.lines[0], "RAM_ADDR_MAP", info.memoryAddress);
+                fillNum(output.lines[1], "SEQLOCK_VAL", info.sequence, SemanticState::Warning);
                 fillNum(output.lines[2], "RAM_ALIGN", alignof(SharedMemory), SemanticState::Success);
                 fillNum(output.lines[3], "SEQLOCK_COLL", info.seqlockCollisions, info.seqlockCollisions == 0 ? SemanticState::Success : SemanticState::Alert);
                 fillEmpty(output.lines[4]);
@@ -110,7 +110,7 @@ namespace DiagnosticsPages
                 output.title = "DEV_TSK_TITLE";
                 fillTxt(output.lines[0], "CORE0_PROC", "running", SemanticState::Success);
                 fillTxt(output.lines[1], "CORE1_PROC", "running", SemanticState::Success);
-                fillNum(output.lines[2], "LOOP0_JITT", millis() % 10, SemanticState::Success);
+                fillTxt(output.lines[2], "LOOP0_JITT", "N/A", SemanticState::Neutral);
                 fillNum(output.lines[3], "LOOP1_TACT", 640, SemanticState::Success);
                 fillEmpty(output.lines[4]);
                 break;
@@ -133,8 +133,8 @@ namespace DiagnosticsPages
                 fillTxt(output.lines[1], "ASRT_EEPROM", "OK", SemanticState::Success);
                 fillTxt(output.lines[2], "ASRT_UART1", "RESERVED", SemanticState::Warning);
                 fillTxt(output.lines[3], "ASRT_UART2",
-                    strcmp(info.lift1.svc, "No Serial") == 0 ? "NO" : "OK",
-                    strcmp(info.lift1.svc, "No Serial") == 0 ? SemanticState::Alert : SemanticState::Success);
+                    std::strcmp(info.lift1.svc, "No Serial") == 0 ? "NO" : "OK",
+                    std::strcmp(info.lift1.svc, "No Serial") == 0 ? SemanticState::Alert : SemanticState::Success);
                 fillTxt(output.lines[4], "ASRT_SPI_BUS", "OK", SemanticState::Success);
                 break;
         }

@@ -47,6 +47,8 @@ namespace Diagnostics
         output.boots = snapshot.system.bootCounter;
         output.resetReason = getResetReasonText(snapshot.system.lastResetReason);
         output.uptime = snapshot.system.uptimeSeconds;
+        output.memoryAddress = ApplicationState::memoryAddress();
+        output.sequence = ApplicationState::sequence();
 
         // 2. Mapare ierarhizată directă pentru Cabina 1 (lift1. ...)
         output.lift1.pos = snapshot.lift1.pos;

@@ -2,16 +2,13 @@
 
 #include "Arduino.h"
 #include "SharedPanel.h"
-#include "DiagnosticsNavigator.h"
-#include "UIPresenter.h"
 #include "DisplayRenderer.h"
 #include "PanelRenderer.h"
+#include "Graphics.h"
 #include "ServiceMenu.h"
-#include "DiagnosticService.h"
 #include "ServiceProtocol.h"
 #include "Presentation.h"
 #include "Pins.h"
-#include "Display.h"
 #include "Transport.h"
 #include <cstring>
 
@@ -75,14 +72,14 @@ namespace PresentationController
 
         static bool overloadImageWasActive = false;
         if (digitalRead(Pins::Inputs::OVERLOAD) == LOW) {
-            Display::showOverloadImage();
+            DisplayRenderer::showOverloadImage();
             overloadImageWasActive = true;
             return;
         }
 
         if (overloadImageWasActive) {
-            Display::hideOverloadImage();
-            PanelRenderer::invalidate(DisplayTarget::Panel);
+            DisplayRenderer::hideOverloadImage();
+            PanelRenderer::invalidate(GraphicsTarget::Panel);
             overloadImageWasActive = false;
         }
 
@@ -91,7 +88,7 @@ namespace PresentationController
         const bool enteredService = !wasInServiceMode && ServiceMenu::isInServiceMode();
         const bool returnedFromService = wasInServiceMode && !ServiceMenu::isInServiceMode();
         if (enteredService || returnedFromService) {
-            PanelRenderer::invalidate(DisplayTarget::Panel);
+            PanelRenderer::invalidate(GraphicsTarget::Panel);
         }
 
         if (ServiceMenu::isInServiceMode()) return;
@@ -100,31 +97,14 @@ namespace PresentationController
         if (!ApplicationState::read(snapshot)) return;
 
         const bool displayWoke = Presentation::update(snapshot);
-        if (displayWoke) PanelRenderer::invalidate(DisplayTarget::Panel);
+        if (displayWoke) PanelRenderer::invalidate(GraphicsTarget::Panel);
 
         if (snapshot.lift1.ocp == Occupancy::Free && snapshot.lift1.svc == ServiceState::Normal) {
             return;
         }
 
-        const DiagnosticsNavigator::NavigatorState &nav = DiagnosticsNavigator::getState();
-        if (!nav.isMenuOpen) {
-            PanelRenderer::render(DisplayTarget::Panel, snapshot.lift1, "ASCENSOR");
-        } else {
-            PanelRenderer::invalidate(DisplayTarget::Panel);
-        }
+        PanelRenderer::render(GraphicsTarget::Panel, snapshot.lift1, "ASCENSOR");
 
-        static unsigned long lastDiagMillis = 0;
-        if (nav.isMenuOpen && millis() - lastDiagMillis >= 500) {
-            lastDiagMillis = millis();
-            ProcessedDiagnostics info;
-            DiagnosticService::interpret(snapshot, info);
-            PageModel logicalPage;
-            const uint8_t pageIdx = (nav.currentProfile == DiagnosticsProfile::Service)
-                ? nav.servicePageIndex : nav.developerPageIndex;
-            UIPresenter::buildPage(info, nav.currentProfile, pageIdx, logicalPage);
-            DisplayRenderer::render(DisplayTarget::Panel, logicalPage);
-        }
-
-        if (displayWoke) Display::showBacklight();
+        if (displayWoke) DisplayRenderer::showBacklight();
     }
 }

@@ -17,6 +17,8 @@ struct ProcessedDiagnostics {
     uint16_t boots;
     const char* resetReason; 
     uint32_t uptime;
+    uint32_t memoryAddress;
+    uint32_t sequence;
 
     // Starea singurului ascensor
     LiftDiagnostics lift1;

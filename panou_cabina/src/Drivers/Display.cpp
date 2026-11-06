@@ -145,7 +145,7 @@ namespace Display
 
     // --- IMPLEMENTATION OF THE TECHNICAL DASHBOARD PRIMITIVES ---
 
-    void clearTargetScreen(DisplayTarget target) {
+    void clearTargetScreen(GraphicsTarget target) {
         (void)target;
         tft1.fillScreen(COLOR_BLACK);
     }
@@ -153,7 +153,7 @@ namespace Display
     // ← MODIFICAT: separator configurabil (culoare + grosime)
     // Titlul e centrat pe orizontală din metricile reale fontului și ale ecranului;
     // separatorul stă la o înălțime proporțională (11% din ecran), nu hardcodată.
-    void printMenuHeader(DisplayTarget target, const char* titluPagina,
+    void printMenuHeader(GraphicsTarget target, const char* titluPagina,
                          uint16_t sepColor, uint8_t sepThickness) {
         (void)target;
         Adafruit_ILI9341 &tft = tft1;
@@ -187,7 +187,7 @@ namespace Display
     static inline int16_t valueX()  { return DisplayGeom::screenW() * 59 / 100; }  // ~142/240
     static inline int16_t commValX(){ return DisplayGeom::screenW() * 44 / 100; }  // ~106/240
 
-    void printMenuLineExt(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare) {
+    void printMenuLineExt(GraphicsTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare) {
         (void)target;
         Adafruit_ILI9341 &tft = tft1;
         tft.setFont(&universalis12);
@@ -212,7 +212,7 @@ namespace Display
         }
     }
 
-    void printMenuLineExt(DisplayTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare) {
+    void printMenuLineExt(GraphicsTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare) {
         (void)target;
         Adafruit_ILI9341 &tft = tft1;
         tft.setFont(&universalis12);
@@ -227,7 +227,7 @@ namespace Display
         tft.print(valoareText);
     }
 
-    void printCommLine(DisplayTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare) {
+    void printCommLine(GraphicsTarget target, uint8_t linie, const char* eticheta, const char* valoareText, uint16_t culoareValoare) {
         (void)target;
         Adafruit_ILI9341 &tft = tft1;
         tft.setFont(&universalis12);
@@ -242,7 +242,7 @@ namespace Display
         tft.print(valoareText);
     }
 
-    void printCommLine(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare) {
+    void printCommLine(GraphicsTarget target, uint8_t linie, const char* eticheta, uint32_t valoare, uint16_t culoareValoare) {
         (void)target;
         Adafruit_ILI9341 &tft = tft1;
         tft.setFont(&universalis12);
@@ -257,7 +257,7 @@ namespace Display
         tft.print(valoare);
     }
 
-    void printMenuLineHex(DisplayTarget target, uint8_t linie, const char* eticheta, uint32_t valoareHex) {
+    void printMenuLineHex(GraphicsTarget target, uint8_t linie, const char* eticheta, uint32_t valoareHex) {
         (void)target;
         Adafruit_ILI9341 &tft = tft1;
         tft.setFont(&universalis12);
@@ -273,7 +273,7 @@ namespace Display
         tft.print(valoareHex, HEX);
     }
 
-    void printMenuFooterDecoration(DisplayTarget target, const char* numarPaginaText) {
+    void printMenuFooterDecoration(GraphicsTarget target, const char* numarPaginaText) {
         (void)target;
         Adafruit_ILI9341 &tft = tft1;
         tft.setFont(&universalis12);
@@ -301,7 +301,7 @@ namespace Display
         tft.print("Next a");
     }
 
-    void drawText(DisplayTarget target, int16_t x, int16_t y,
+    void drawText(GraphicsTarget target, int16_t x, int16_t y,
         const GFXfont* font, const char* text, uint16_t color) {
         if (!font || !text) return;
         (void)target;
@@ -312,14 +312,14 @@ namespace Display
         tft.print(text);
     }
 
-    void drawHLine(DisplayTarget target, int16_t x, int16_t y, int16_t w, uint16_t color) {
+    void drawHLine(GraphicsTarget target, int16_t x, int16_t y, int16_t w, uint16_t color) {
         (void)target;
         Adafruit_ILI9341 &tft = tft1;
         tft.drawFastHLine(x, y, w, color);
     }
 
     // --- Service overlay: chenar 3px, FĂRĂ text, dimensiuni din HAL ---
-    void drawServiceOverlay(DisplayTarget target, uint16_t color) {
+    void drawServiceOverlay(GraphicsTarget target, uint16_t color) {
         (void)target;
         const int16_t w = DisplayGeom::screenW();
         const int16_t h = DisplayGeom::screenH();

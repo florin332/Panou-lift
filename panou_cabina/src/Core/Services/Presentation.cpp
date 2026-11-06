@@ -2,18 +2,18 @@
 
 #include "Presentation.h" // Local în src/Logic/
 
-#include "../Drivers/Display.h"
+#include "../Drivers/Graphics.h"
 #include "Arduino.h"
 
 
 namespace Presentation
 {
     void init() {
-        Display::init();
+        Graphics::init();
     }
 
     bool update(const SharedPanel &snapshot) {
-        const bool displayWoke = Display::update(snapshot);
+        const bool displayWoke = Graphics::update(snapshot);
         return displayWoke;
     }
 }
