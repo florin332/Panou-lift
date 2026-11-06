@@ -31,8 +31,11 @@ struct Command {
     bool pending = false;
 };
 
+using ResponseSink = void (*)(const char *response);
+
 void init();
-void poll();
+void setResponseSink(ResponseSink sink);
+void submitLine(const char *line);
 bool consumeCommand(Command &out);
 void sendResponse(const char* response);
 bool hasPendingCommand();

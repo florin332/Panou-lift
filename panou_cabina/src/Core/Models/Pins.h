@@ -23,11 +23,11 @@ namespace Pins
         constexpr uint8_t BACKLIGHT = 26;
     }
 
-    namespace UART {
-        constexpr uint8_t ALARM_TX = 0;
-        constexpr uint8_t UART1_RX = 1;
-        constexpr uint8_t UART2_TX = 4;
-        constexpr uint8_t DATA_RX = 5;
+    namespace Ethernet {
+        constexpr uint8_t MISO = 12;
+        constexpr uint8_t CS = 13;
+        constexpr uint8_t SCK = 14;
+        constexpr uint8_t MOSI = 15;
     }
 
     namespace Inputs {

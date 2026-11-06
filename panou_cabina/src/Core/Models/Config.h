@@ -45,11 +45,10 @@ namespace Config
     }
 
     // =========================================================
-    // 4. PROTOCOL SERIAL / RS485
+    // 4. PROTOCOL ENCODER
     // =========================================================
     namespace Protocol
     {
-        constexpr uint32_t SERIAL_BAUD = 9600;
         constexpr char START_MARKER = '<';
         constexpr char END_MARKER = '>';
 
@@ -57,10 +56,16 @@ namespace Config
         // Ajustează în funcție de frecvența transmisiei controller-ului lift
         constexpr uint32_t PACKET_TIMEOUT_MS = 500;   // ← fostele 500ms hardcodate
 
-        // Timpi fizici de stabilizare electrică pentru transceiverul MAX485
-        constexpr uint32_t RS485_TX_SETTLE_US = 50;
-        constexpr uint32_t RS485_TX_RELEASE_US = 50;
-        constexpr uint32_t RS485_LISTEN_SETTLE_US = 10;
+    }
+
+    namespace Ethernet
+    {
+        constexpr uint8_t MAC[6] = {0x3C, 0xAB, 0x72, 0x52, 0x68, 0x12};
+        constexpr uint16_t ENCODER_PORT = 2000;
+        constexpr uint16_t DEVICE_PORT = 2004;
+        constexpr uint16_t SERVICE_PORT = 2005;
+        constexpr uint32_t DHCP_TIMEOUT_MS = 1500;
+        constexpr uint32_t DHCP_RESPONSE_TIMEOUT_MS = 250;
     }
 
     // =========================================================

@@ -14,12 +14,12 @@
 
 
 ## 4. W5500 Ethernet Migration - Cabin Panel
-- [ ] Update the panel hardware map: keep the ILI9341 on SPI0; connect W5500 to SPI1 (`GP12` MISO, `GP13` CS, `GP14` SCK, `GP15` MOSI). Keep I2S on `GP8`-`GP10`.
-- [ ] Add a W5500 hardware-SPI driver/HAL that exposes network and TCP byte-stream services only; keep encoder, alarm, and service message formats outside the HAL.
-- [ ] Add independent TCP channels for encoder data (default port `2000`), alarm equipment (`2004`), and service (`2005`); default the panel to TCP server mode.
-- [ ] Configure the W5500 with MAC `3C-AB-72-52-68-12` and DHCP; the router's MAC reservation is already configured.
-- [ ] Keep the W5500 driver owned by one core; route requests from other cores through a queue or synchronized shared state.
-- [ ] Adapt encoder reception to consume the TCP byte stream while retaining existing frame parsing, CRC checks, and validation in `EncoderProtocol`.
+- [x] Update the panel hardware map: keep the ILI9341 on SPI0; connect W5500 to SPI1 (`GP12` MISO, `GP13` CS, `GP14` SCK, `GP15` MOSI). Keep I2S on `GP8`-`GP10`.
+- [x] Add a W5500 hardware-SPI driver/HAL that exposes network and TCP byte-stream services only; keep encoder, alarm, and service message formats outside the HAL.
+- [x] Add independent TCP channels for encoder data (default port `2000`), alarm equipment (`2004`), and service (`2005`); default the panel to TCP server mode.
+- [x] Configure the W5500 with MAC `3C-AB-72-52-68-12` and DHCP; the router's MAC reservation is already configured.
+- [x] Keep the W5500 driver owned by one core; route requests from other cores through a queue or synchronized shared state.
+- [x] Adapt encoder reception to consume the TCP byte stream while retaining frame parsing, CRC checks, and semantic validation in hardware-independent modules.
 - [ ] Define `AlarmProtocol` separately from transport; implement/test the GSM and SSC30KQ command formats when each device protocol is specified.
 - [ ] Implement reconnect, disconnect, partial-read/write, timeout, and per-channel status handling; verify the remote CH9121 bridges against the panel's TCP roles.
 - [ ] Provide the web service over W5500; decide its HTTP port and confirm the available socket/RAM budget (W5500 has up to 8 sockets).

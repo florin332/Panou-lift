@@ -1,8 +1,11 @@
-// src/Core/Services/Protocol.cpp (UART Nativ + CRC-8-CCITT)
+// Encoder service: transport-independent framing and payload handling.
 
 #include "Protocol.h"
+#include "EncoderProtocol.h"
+#include "FrameDecoder.h"
 #include "Pins.h"
 #include "Config.h"
+#include "Transport.h"
 #include "Arduino.h"
 
 namespace Protocol
@@ -10,23 +13,26 @@ namespace Protocol
     // -------------------------------------------------------------------------
     // Constante de format
     // -------------------------------------------------------------------------
-    static constexpr char CRC_SEPARATOR = '*';
-    static constexpr uint8_t RX_FIELDS = 5;
     static constexpr uint8_t FRAME_BUFFER_SIZE = 40;
     static constexpr uint8_t ANALYZE_BUFFER_SIZE = 96;
 
     struct RxBuffer {
         char receivedChars[FRAME_BUFFER_SIZE];
-        byte ndx;
-        boolean recvInProgress;
-        boolean newData;
         unsigned long lastValidPacketMillis;
-        unsigned long frameStartMillis;   // setat la START, pentru timeout cadru
-        boolean frameTimedOut;            // timeout deja contorizat pentru cadrul curent
         char analyzeChars[ANALYZE_BUFFER_SIZE];
         uint8_t analyzeLength;
         boolean analyzeActive;
         boolean analyzeOverflow;
+        FrameDecoder decoder;
+
+        RxBuffer() : decoder(receivedChars, sizeof(receivedChars)) {}
+        void reset() {
+            lastValidPacketMillis = 0;
+            analyzeLength = 0;
+            analyzeActive = false;
+            analyzeOverflow = false;
+            decoder.reset();
+        }
     };
 
     static RxBuffer rxLift1;
@@ -69,203 +75,41 @@ namespace Protocol
     }
 
     // Rezultatul extragerii unui cadru complet delimitat
-    enum class FrameResult : uint8_t { None, FormatError, CrcError, Valid };
-
-    // Rezultatul validarii semantice a payload-ului
-    enum class ParseResult : uint8_t { FormatError, DataError, Valid };
-
-    // -------------------------------------------------------------------------
-    // CRC-8-CCITT: polinom 0x07, init 0x00, fara reflectare, fara XOR final
-    // -------------------------------------------------------------------------
-    static uint8_t crc8_ccitt(const char *data) {
-        uint8_t crc = 0x00;
-        while (*data) {
-            crc ^= static_cast<uint8_t>(*data++);
-            for (uint8_t i = 0; i < 8; ++i) {
-                crc = (crc & 0x80) ? (crc << 1) ^ 0x07 : (crc << 1);
-            }
-        }
-        return crc;
-    }
-
-    static bool hexByteFromChars(char high, char low, uint8_t &out) {
-        auto nibble = [](char c) -> int8_t {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            return -1;
-        };
-        int8_t h = nibble(high);
-        int8_t l = nibble(low);
-        if (h < 0 || l < 0) return false;
-        out = static_cast<uint8_t>((h << 4) | l);
-        return true;
-    }
-
-    static bool esteNumeric(const char *str) {
-        if (str == nullptr || *str == '\0') return false;
-        if (*str == '-') str++;
-        while (*str) {
-            if (!isdigit(static_cast<unsigned char>(*str))) return false;
-            str++;
-        }
-        return true;
-    }
-
     // -------------------------------------------------------------------------
     // Etapa 1: extrage cadru <payload*CC> in buffer.
     // Regula de resync: un START primit in timpul unui frame abandoneaza
     // frame-ul curent si incepe unul nou.
     // -------------------------------------------------------------------------
-    static FrameResult extrageFrame(RxBuffer &buffer, char payload[FRAME_BUFFER_SIZE]) {
-        if (!buffer.newData) return FrameResult::None;
-        buffer.newData = false;
-
-        // Cautam separatorul CRC si end marker
-        char *sep = strchr(buffer.receivedChars, CRC_SEPARATOR);
-        if (sep == nullptr) return FrameResult::FormatError;
-
-        *sep = '\0';
-        char *crcStr = sep + 1;
-
-        // CRC trebuie sa fie exact 2 caractere hex uppercase, urmat de end marker
-        if (crcStr[0] == '\0' || crcStr[1] == '\0' || crcStr[2] != '\0') return FrameResult::FormatError;
-        if (!isxdigit(static_cast<unsigned char>(crcStr[0])) ||
-            !isxdigit(static_cast<unsigned char>(crcStr[1]))) return FrameResult::FormatError;
-
-        uint8_t receivedCrc;
-        if (!hexByteFromChars(crcStr[0], crcStr[1], receivedCrc)) return FrameResult::FormatError;
-
-        if (crc8_ccitt(buffer.receivedChars) != receivedCrc) return FrameResult::CrcError;
-
-        strncpy(payload, buffer.receivedChars, FRAME_BUFFER_SIZE - 1);
-        payload[FRAME_BUFFER_SIZE - 1] = '\0';
-        return FrameResult::Valid;
-    }
-
-    // -------------------------------------------------------------------------
-    // Etapa 2: parseaza payload de forma a,b,c,d,e si valideaza semantic.
-    // -------------------------------------------------------------------------
-    static ParseResult parseazaPachet(const char* payload, LiftState &rezultat) {
-        // Numaram câmpurile
-        uint8_t commaCount = 0;
-        for (const char *p = payload; *p; p++) {
-            if (*p == ',') commaCount++;
-        }
-        if (commaCount != RX_FIELDS - 1) return ParseResult::FormatError;
-
-        char bufferLocal[FRAME_BUFFER_SIZE];
-        strncpy(bufferLocal, payload, sizeof(bufferLocal) - 1);
-        bufferLocal[sizeof(bufferLocal) - 1] = '\0';
-
-        // Parsam cele 5 campuri
-        char *fields[RX_FIELDS];
-        fields[0] = strtok(bufferLocal, ",");
-        for (uint8_t i = 1; i < RX_FIELDS; i++) {
-            fields[i] = strtok(nullptr, ",");
-            if (fields[i] == nullptr) return ParseResult::FormatError;
-        }
-
-        // Validare numerica pentru toate campurile
-        for (uint8_t i = 0; i < RX_FIELDS; i++) {
-            if (!esteNumeric(fields[i])) return ParseResult::FormatError;
-        }
-
-        int rawPos = atoi(fields[0]);
-        if (rawPos < 0 || rawPos >= Config::Hardware::FLOORS) return ParseResult::DataError;
-        rezultat.pos = static_cast<uint8_t>(rawPos);
-
-        int rawEtd = atoi(fields[1]);
-        if (rawEtd < 0 || rawEtd >= Config::Hardware::FLOORS) return ParseResult::DataError;
-        rezultat.etd = static_cast<uint8_t>(rawEtd);
-
-        int rawOcp = atoi(fields[2]);
-        if (rawOcp != 0 && rawOcp != 1) return ParseResult::DataError;
-        rezultat.ocp = rawOcp == 1 ? Occupancy::Busy : Occupancy::Free;
-
-        int rawSj = atoi(fields[3]);
-        if (rawSj < 0 || rawSj > 2) return ParseResult::DataError;
-        rezultat.sj = rawSj == 1 ? Direction::Up : rawSj == 2 ? Direction::Down : Direction::Idle;
-
-        int rawSvc = atoi(fields[4]);
-        if (rawSvc != 1 && rawSvc != 2 && rawSvc != 3 && rawSvc != 5) return ParseResult::DataError;
-        if (rawSvc == 1) rezultat.svc = ServiceState::Fault;
-        else if (rawSvc == 2) rezultat.svc = ServiceState::Revision;
-        else if (rawSvc == 3) rezultat.svc = ServiceState::Missing;
-        else rezultat.svc = ServiceState::Normal;
-
-        return ParseResult::Valid;
-    }
-
     // -------------------------------------------------------------------------
     // Receptor UART cu resync pe START in timpul receptiei.
     // liftIdx ramane parametrul indexat al contorului pentru RAW L1.
     // -------------------------------------------------------------------------
-    static void eantioneazaUART(HardwareSerial &serial, RxBuffer &buffer, uint8_t liftIdx) {
-        while (serial.available() > 0 && !buffer.newData) {
-            char rc = serial.read();
+    static void processByte(RxBuffer &buffer, char value, uint8_t liftIdx) {
+        const FrameDecoder::Event event = buffer.decoder.feed(
+            value, Config::Protocol::START_MARKER, Config::Protocol::END_MARKER, millis());
 
-            if (rc == Config::Protocol::START_MARKER) {
-                // Resync: un START in timpul unui cadru = cadru abandonat (eroare de format)
-                if (buffer.recvInProgress && !buffer.frameTimedOut && sCountingEnabled) {
-                    sRxFormatError[liftIdx]++;
-                }
-                if (buffer.analyzeActive) {
-                    emitAnalyzeFrame(buffer, liftIdx, false);
-                }
-                buffer.recvInProgress = true;
-                buffer.frameTimedOut = false;
-                buffer.frameStartMillis = millis();
-                buffer.ndx = 0;
-                buffer.analyzeLength = 0;
-                buffer.analyzeOverflow = false;
-                buffer.analyzeActive = sAnalyzeEnabled;
-                if (buffer.analyzeActive) appendAnalyzeByte(buffer, rc);
-                continue;
-            }
+        if (event == FrameDecoder::Event::Resynchronized) {
+            if (sCountingEnabled) sRxFormatError[liftIdx]++;
+            if (buffer.analyzeActive) emitAnalyzeFrame(buffer, liftIdx, false);
+        }
+        if (event == FrameDecoder::Event::Started || event == FrameDecoder::Event::Resynchronized) {
+            buffer.analyzeLength = 0;
+            buffer.analyzeOverflow = false;
+            buffer.analyzeActive = sAnalyzeEnabled;
+        }
+        if (buffer.analyzeActive && event != FrameDecoder::Event::Ignored) appendAnalyzeByte(buffer, value);
 
-            if (!buffer.recvInProgress) {
-                continue;
-            }
-
-            if (rc == Config::Protocol::END_MARKER) {
-                if (buffer.analyzeActive) {
-                    appendAnalyzeByte(buffer, rc);
-                    emitAnalyzeFrame(buffer, liftIdx, true);
-                    buffer.analyzeActive = false;
-                }
-                buffer.receivedChars[buffer.ndx] = '\0';
-                buffer.recvInProgress = false;
-                buffer.ndx = 0;
-                buffer.newData = true;
-                // Cadru complet delimitat
-                if (sCountingEnabled && !buffer.frameTimedOut) {
-                    sRxFrames[liftIdx]++;
-                }
-                continue;
-            }
-
-            if (buffer.ndx < FRAME_BUFFER_SIZE - 1) {
-                buffer.receivedChars[buffer.ndx++] = rc;
-            }
-            if (buffer.analyzeActive) appendAnalyzeByte(buffer, rc);
-            // daca bufferul e plin, continuam sa rescriem ultimul caracter
+        if (event == FrameDecoder::Event::Complete) {
+            if (buffer.analyzeActive) emitAnalyzeFrame(buffer, liftIdx, true);
+            buffer.analyzeActive = false;
+            if (sCountingEnabled) sRxFrames[liftIdx]++;
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Verifica timeout-ul unui cadru inceput (START fara END in fereastra)
-    // -------------------------------------------------------------------------
-    static void verificaTimeoutCadru(RxBuffer &buffer, uint8_t liftIdx) {
-        if (buffer.recvInProgress && !buffer.frameTimedOut &&
-            millis() - buffer.frameStartMillis > Config::Protocol::PACKET_TIMEOUT_MS) {
-            buffer.frameTimedOut = true;
-            buffer.recvInProgress = false;
-            buffer.ndx = 0;
-            if (buffer.analyzeActive) {
-                emitAnalyzeFrame(buffer, liftIdx, false);
-                buffer.analyzeActive = false;
-            }
+    static void verifyFrameTimeout(RxBuffer &buffer, uint8_t liftIdx) {
+        if (buffer.decoder.checkTimeout(millis(), Config::Protocol::PACKET_TIMEOUT_MS)) {
+            if (buffer.analyzeActive) emitAnalyzeFrame(buffer, liftIdx, false);
+            buffer.analyzeActive = false;
             if (sCountingEnabled) sRxTimeout[liftIdx]++;
         }
     }
@@ -274,15 +118,9 @@ namespace Protocol
     // Initializare
     // -------------------------------------------------------------------------
     void init() {
-        Serial1.setTX(Pins::UART::ALARM_TX);
-        Serial1.setRX(-1);
-        Serial2.setTX(-1);
-        Serial2.setRX(Pins::UART::DATA_RX);
-        Serial1.begin(Config::Protocol::SERIAL_BAUD);
-        Serial2.begin(Config::Protocol::SERIAL_BAUD);
         pinMode(Pins::Inputs::ALARM, INPUT_PULLUP);
         pinMode(Pins::Inputs::OVERLOAD, INPUT_PULLUP);
-        memset(&rxLift1, 0, sizeof(RxBuffer));
+        rxLift1.reset();
         rxLift1.lastValidPacketMillis = millis();
         // Dupa reboot numararea este inactiva si contoarele sunt zero
         sCountingEnabled = false;
@@ -296,23 +134,33 @@ namespace Protocol
     void update(SharedPanel &localPanel) {
         char payload[FRAME_BUFFER_SIZE];
 
-        eantioneazaUART(Serial2, rxLift1, 0);
-        verificaTimeoutCadru(rxLift1, 0);
-        FrameResult frame1 = extrageFrame(rxLift1, payload);
-        if (frame1 == FrameResult::Valid) {
+        Transport::IByteTransport &transport = Transport::instance();
+        while (transport.available(Transport::Channel::EncoderRx) > 0 && !rxLift1.decoder.hasFrame()) {
+            processByte(rxLift1, static_cast<char>(transport.read(Transport::Channel::EncoderRx)), 0);
+        }
+        verifyFrameTimeout(rxLift1, 0);
+
+        EncoderProtocol::FrameResult frame1 = EncoderProtocol::FrameResult::None;
+        if (rxLift1.decoder.hasFrame()) {
+            frame1 = rxLift1.decoder.overflowed()
+                ? EncoderProtocol::FrameResult::FormatError
+                : EncoderProtocol::validateFrame(rxLift1.decoder.frame(), payload, FRAME_BUFFER_SIZE);
+            rxLift1.decoder.consumeFrame();
+        }
+        if (frame1 == EncoderProtocol::FrameResult::Valid) {
             LiftState tempState;
-            ParseResult parsed = parseazaPachet(payload, tempState);
-            if (parsed == ParseResult::Valid) {
+            EncoderProtocol::ParseResult parsed = EncoderProtocol::parsePayload(payload, Config::Hardware::FLOORS, tempState);
+            if (parsed == EncoderProtocol::ParseResult::Valid) {
                 localPanel.lift1 = tempState;
                 rxLift1.lastValidPacketMillis = millis();
                 if (sCountingEnabled) sRxValid[0]++;
             } else if (sCountingEnabled) {
-                if (parsed == ParseResult::FormatError) sRxFormatError[0]++;
+                if (parsed == EncoderProtocol::ParseResult::FormatError) sRxFormatError[0]++;
                 else sRxDataError[0]++;
             }
-        } else if (frame1 == FrameResult::CrcError) {
+        } else if (frame1 == EncoderProtocol::FrameResult::CrcError) {
             if (sCountingEnabled) sRxCrcError[0]++;
-        } else if (frame1 == FrameResult::FormatError) {
+        } else if (frame1 == EncoderProtocol::FrameResult::FormatError) {
             if (sCountingEnabled) sRxFormatError[0]++;
         }
         if (millis() - rxLift1.lastValidPacketMillis > Config::Protocol::PACKET_TIMEOUT_MS) {

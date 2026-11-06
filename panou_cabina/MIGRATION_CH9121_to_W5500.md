@@ -1,6 +1,10 @@
 # Analiză Migrare CH9121 → WIZNET W5500
 
-## 1. Situația Curentă (CH9121)
+> Stare implementată: CH9121 local și recepția UART au fost eliminate. W5500 folosește SPI1 pe GP12/13/14/15, DHCP și MAC `3C:AB:72:52:68:12`. Panoul ascultă TCP pe 2000 (encoder), 2004 (transmitere echipament) și 2005 (service). Core 0 deține W5500; Core 1 accesează canalele prin cozi. Comenzile de service au parser comun pentru USB și TCP. Formatele GSM/SSC30KQ și accesul web nu sunt implementate aici.
+
+Secțiunile de mai jos păstrează analiza inițială de dinaintea migrării; recomandările de pinout și pașii enumerați acolo sunt istorice, nu descriu starea curentă.
+
+## 1. Situația Pre-Migrare (CH9121)
 
 ### Arhitectură Comunicație
 - **CH9121**: Modul Ethernet serial USB

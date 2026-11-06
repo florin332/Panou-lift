@@ -31,7 +31,7 @@ Responsabilitățile ciclice sunt împărțite astfel:
 
 Core 1 este unicul scriitor ciclic al stării: citește snapshot-ul stabil, actualizează liftul și alarmele prin servicii și îl publică prin contractul `ApplicationState`. Core 0 și componentele de service citesc prin același contract. La pornire, `Application::init()` publică starea inițială. Implementarea folosește secvența `seq` și bariere de memorie pentru a evita consumarea unui snapshot scris concurent; o citire nereușită după reîncercări abandonează iterația. Stocarea internă nu mai este expusă direct; paginile de developer primesc adresa și secvența prin API-ul de diagnostic al stării.
 
-Fluxul principal este, așadar: **Core 1: `ElevatorService`/`AlarmService`/timp → snapshot local → `ApplicationState` → Core 0: `PresentationController`/diagnostic → display**. Comenzile Service Box circulă separat pe Core 0 prin USB către `ServiceProtocol` și `ServiceMenu`; ele nu folosesc snapshot-ul ca mecanism de comandă între nuclee.
+Fluxul principal este, așadar: **Core 1: `ElevatorService`/`AlarmService`/timp → snapshot local → `ApplicationState` → Core 0: `PresentationController`/diagnostic → display**. Comenzile de service circulă pe Core 0 din USB sau TCP prin `ServiceProtocol` și `ServiceMenu`; ele nu folosesc snapshot-ul ca mecanism de comandă între nuclee.
 
 `Application` nu mai conține logică de desenare și nu apelează direct driverele UI. Serviciile expun contractele funcționale pentru lift, alarme, diagnosticare și configurare; controller-ul de prezentare deține fluxul UI. `SharedPanel` rămâne necesar pentru schimbul sincronizat de snapshot-uri între nuclee, iar accesul la memoria sa este centralizat în `ApplicationState`.
 
@@ -59,14 +59,20 @@ flowchart TD
     PanelRenderer --> Display
 
     Elevator --> Protocol[Protocol]
-    Protocol --> Arduino[Arduino UART / millis]
-    Protocol --> HardwareConfig[Pins / Config]
+    Protocol --> Transport[Byte transport interface]
+    Protocol --> Decoder[FrameDecoder]
+    Protocol --> EncoderWire[EncoderProtocol / CRC / validation]
+    Transport --> W5500[W5500 SPI1 TCP channels]
+    W5500 --> CoreQueues[Core 0 / Core 1 byte queues]
     Alarm --> Sound[Drivers / Sound]
     Sound --> I2S[ESP8266Audio / I2S]
     Config --> Settings[Settings / EEPROM]
     Settings[Core / Settings] --> EEPROM[EEPROM emulat]
-    ServiceProtocol --> USB[USB Serial]
-    ServiceProtocol --> Pico[Pico Boot ROM]
+    Controller --> USB[USB Serial adapter]
+    Controller --> ServiceTCP[W5500 service channel]
+    USB --> ServiceProtocol
+    ServiceTCP --> ServiceProtocol
+    ServiceMenu --> Pico[Pico Boot ROM]
     ServiceProtocol --> ServiceMenu
     Display --> TFT[ILI9341 / SPI / GPIO]
     Navigator[DiagnosticsNavigator] -. schelet; fără apelant .-> PageBuilder
@@ -76,9 +82,9 @@ flowchart TD
 
 - `Application` coordonează ciclurile; `PresentationController` deține desenarea și fluxul UI.
 - `SharedPanel` este necesar în forma actuală: Core 1 publică, iar Core 0 citește concurent. `ApplicationState` centralizează contractul de acces și ascunde bufferul seqlock.
-- `Protocol.cpp` amestecă recepția UART cu delimitarea cadrelor, CRC-ul, parsarea și validarea semantică. Algoritmii de parsare pot fi extrași, dar modulul actual depinde de `HardwareSerial`, `millis()`, `Pins` și `Config`.
+- `Protocol.cpp` consumă bytes din interfața de transport și actualizează starea liftului. `FrameDecoder` deține delimitarea și timeout-ul, iar `EncoderProtocol` deține CRC-ul și validarea semantică fără dependențe hardware.
 - `Settings.cpp` folosește EEPROM-ul emulat al platformei Arduino-Pico. Validarea datelor și CRC-ul sunt logică generală, dar stratul de persistență nu este portabil ca atare.
-- `ServiceProtocol.cpp` folosește USB Serial și API-ul Pico Boot ROM; comenzile de domeniu sunt delegate către `ElevatorService`, `ConfigurationService` și `AlarmService`, iar modul service către `ServiceMenu`.
+- `ServiceProtocol.cpp` primește linii complete și emite răspunsuri printr-un sink; `PresentationController` adaptează USB și TCP. API-ul Pico Boot ROM rămâne în `ServiceMenu`.
 - `Display.cpp` depinde de ILI9341, SPI, GPIO, imagini și fonturi. `DisplayGeometry` folosește Adafruit GFX și `GFXfont`; geometria este separată conceptual, dar nu independentă de biblioteca grafică.
 - `PanelRenderer` și `DisplayRenderer` apelează API-ul concret `Display`; înlocuirea ecranului sau a bibliotecii poate necesita adaptări în prezentare.
 - `SharedPanel.h` este un contract de date simplu, însă `SharedPanel.cpp` folosește bariere ARM (`dmb`) și presupune acces multicore compatibil cu hardware-ul curent.
@@ -88,8 +94,8 @@ flowchart TD
 | Nivel | Funcționalități | Condiții |
 |---|---|---|
 | Reutilizabile direct | Tipurile și enum-urile din `SharedPanel.h`; interpretarea din `Diagnostics.cpp`; dicționarul de chei din `UITheme.h`. | Schema de date și semnificația stărilor liftului rămân aceleași. |
-| Reutilizabile conceptual, cu dependențe păstrate | Structurile logice `PageModel`/`PageLine`; algoritmii CRC și parsarea payload-ului; calculele din `DisplayGeometry`; fonturile și imaginile. | `DiagnosticsPages.cpp` folosește și `millis()`; protocolul include transportul UART; geometria și asset-urile cer Adafruit GFX și formatele existente. |
-| Necesită adaptare pentru alt hardware/platformă | Driverele `Display`, `Sound`, `Leds`; sincronizarea din `SharedPanel.cpp`; UART/protocolul, EEPROM-ul, Service Mode și orchestrarea `Application`. | Sunt legate de placa Marble/Pico, de framework-ul Arduino și/sau de perifericele actuale. |
+| Reutilizabil conceptual, cu dependențe păstrate | Structurile logice `PageModel`/`PageLine`; framing-ul și validarea encoderului; calculele din `DisplayGeometry`; fonturile și imaginile. | Geometria și asset-urile cer Adafruit GFX și formatele existente. |
+| Necesită adaptare pentru alt hardware/platformă | Driverele `Display`, `Sound`, `Leds`; transportul W5500; sincronizarea din `SharedPanel.cpp`; EEPROM-ul, Service Mode și orchestrarea `Application`. | Sunt legate de placa Marble/Pico, de framework-ul Arduino și/sau de perifericele actuale. |
 
 Nu rezultă un subsistem complet de UI portabil fără modificări: modelele și interpretarea sunt cele mai reutilizabile, în timp ce randarea și fluxurile operaționale ajung la API-uri concrete de hardware.
 

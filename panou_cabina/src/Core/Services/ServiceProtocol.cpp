@@ -3,16 +3,14 @@
 #include "ConfigurationService.h"
 #include "AlarmService.h"
 #include "../../Presentation/ServiceMenu.h"
-#include <Arduino.h>
-#include <pico/bootrom.h>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 
 namespace ServiceProtocol {
 
 static Command sPendingCmd;
-static char sRxBuffer[64];
-static uint8_t sRxIndex = 0;
+static ResponseSink sResponseSink = nullptr;
 
 static void parseLine(const char* line);
 
@@ -46,23 +44,13 @@ static bool checkServiceMode() {
 }
 
 void init() {
-    sRxIndex = 0;
     sPendingCmd = Command{};
 }
 
-void poll() {
-    while (Serial.available()) {
-        char c = static_cast<char>(Serial.read());
-        if (c == '\n' || c == '\r') {
-            if (sRxIndex > 0) {
-                sRxBuffer[sRxIndex] = '\0';
-                parseLine(sRxBuffer);
-                sRxIndex = 0;
-            }
-        } else if (sRxIndex < sizeof(sRxBuffer) - 1) {
-            sRxBuffer[sRxIndex++] = c;
-        }
-    }
+void setResponseSink(ResponseSink sink) { sResponseSink = sink; }
+
+void submitLine(const char* line) {
+    if (line != nullptr) parseLine(line);
 }
 
 static void parseLine(const char* line) {
@@ -213,7 +201,7 @@ bool consumeCommand(Command &out) {
 }
 
 void sendResponse(const char* response) {
-    Serial.println(response);
+    if (sResponseSink != nullptr) sResponseSink(response);
 }
 
 bool hasPendingCommand() {
