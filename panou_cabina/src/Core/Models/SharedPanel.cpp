@@ -3,9 +3,9 @@
 #include "Arduino.h"
 
 // INSTANȚIEREA FIZICĂ A MAGISTRALEI DE DATE PARTAJATE PENTRU TOT PROIECTUL
-volatile SharedMemory gSharedMemory = {0, {}};
+static volatile SharedMemory gSharedMemory = {0, {}};
 
-void shared_panel_write(volatile SharedMemory &sharedMem, const SharedPanel &newData) {
+static void writePanel(volatile SharedMemory &sharedMem, const SharedPanel &newData) {
     sharedMem.seq++; // Pasul 1: Marcăm începutul scrierii (Devine IMPAR)
     asm volatile("dmb" : : : "memory"); // Barieră de memorie hardware ARM
     
@@ -44,7 +44,7 @@ void shared_panel_write(volatile SharedMemory &sharedMem, const SharedPanel &new
     sharedMem.seq++; // Pasul 2: Validăm snapshot-ul stabil (Devine PAR)
 }
 
-bool shared_panel_read(volatile const SharedMemory &sharedMem, SharedPanel &localCopy) {
+static bool readPanel(volatile const SharedMemory &sharedMem, SharedPanel &localCopy) {
     uint32_t start_seq, end_seq;
     uint8_t retries = 0;
     
@@ -94,4 +94,23 @@ bool shared_panel_read(volatile const SharedMemory &sharedMem, SharedPanel &loca
     } while ((start_seq != end_seq) || (start_seq & 1));
     
     return true;
+}
+
+namespace ApplicationState
+{
+    void publish(const SharedPanel &newData) {
+        writePanel(gSharedMemory, newData);
+    }
+
+    bool read(SharedPanel &localCopy) {
+        return readPanel(gSharedMemory, localCopy);
+    }
+
+    uint32_t memoryAddress() {
+        return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&gSharedMemory));
+    }
+
+    uint32_t sequence() {
+        return gSharedMemory.seq;
+    }
 }

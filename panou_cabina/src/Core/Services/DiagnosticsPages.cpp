@@ -99,8 +99,8 @@ namespace DiagnosticsPages
 
             case DevPage::MemoryLayout:
                 output.title = "DEV_MEM_TITLE";
-                fillHex(output.lines[0], "RAM_ADDR_MAP", reinterpret_cast<uint32_t>(&gSharedMemory));
-                fillNum(output.lines[1], "SEQLOCK_VAL", gSharedMemory.seq, SemanticState::Warning);
+                fillHex(output.lines[0], "RAM_ADDR_MAP", ApplicationState::memoryAddress());
+                fillNum(output.lines[1], "SEQLOCK_VAL", ApplicationState::sequence(), SemanticState::Warning);
                 fillNum(output.lines[2], "RAM_ALIGN", alignof(SharedMemory), SemanticState::Success);
                 fillNum(output.lines[3], "SEQLOCK_COLL", info.seqlockCollisions, info.seqlockCollisions == 0 ? SemanticState::Success : SemanticState::Alert);
                 fillEmpty(output.lines[4]);

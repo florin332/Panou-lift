@@ -2,6 +2,7 @@
 #define SHARED_PANEL_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 // ======== ENUMERĂRI TIPISATE EXCLUSIV PENTRU LIFTURI (Observația 1) ========
 enum class Direction : uint8_t {
@@ -92,9 +93,12 @@ struct alignas(8) SharedMemory {
     SharedPanel panel;
 };
 
-extern volatile SharedMemory gSharedMemory;
-
-void shared_panel_write(volatile SharedMemory &sharedMem, const SharedPanel &newData);
-bool shared_panel_read(volatile const SharedMemory &sharedMem, SharedPanel &localCopy);
+namespace ApplicationState
+{
+    void publish(const SharedPanel &newData);
+    bool read(SharedPanel &localCopy);
+    uint32_t memoryAddress();
+    uint32_t sequence();
+}
 
 #endif // SHARED_PANEL_H

@@ -1,7 +1,7 @@
 #include "ServiceProtocol.h"
-#include "Protocol.h"
-#include "Settings.h"
-#include "Sound.h"
+#include "ElevatorService.h"
+#include "ConfigurationService.h"
+#include "AlarmService.h"
 #include "../../Presentation/ServiceMenu.h"
 #include <Arduino.h>
 #include <pico/bootrom.h>
@@ -113,27 +113,27 @@ static void parseLine(const char* line) {
         cmd.param = static_cast<uint8_t>(atoi(line[1] == 'b' ? line + 9 : line + 10));
     } else if (strcmp(line, "comm_count_enable") == 0) {
         if (!checkServiceMode()) return;
-        Protocol::commCountEnable();
+        ElevatorService::commCountEnable();
         sendResponse("ACK COMM COUNT ON");
         return;
     } else if (strcmp(line, "comm_count_disable") == 0) {
         if (!checkServiceMode()) return;
-        Protocol::commCountDisable();
+        ElevatorService::commCountDisable();
         sendResponse("ACK COMM COUNT OFF");
         return;
     } else if (strcmp(line, "comm_count_reset") == 0) {
         if (!checkServiceMode()) return;
-        Protocol::commCountReset();
+        ElevatorService::commCountReset();
         sendResponse("ACK COMM COUNT RESET");
         return;
     } else if (strcmp(line, "com_analyze_enable") == 0) {
         if (!checkServiceMode()) return;
-        Protocol::commAnalyzeEnable();
+        ElevatorService::commAnalyzeEnable();
         sendResponse("ACK COM ANALYZE ON");
         return;
     } else if (strcmp(line, "com_analyze_disable") == 0) {
         if (!checkServiceMode()) return;
-        Protocol::commAnalyzeDisable();
+        ElevatorService::commAnalyzeDisable();
         sendResponse("ACK COM ANALYZE OFF");
         return;
     } else if (strncmp(line, "mb_lift", 7) == 0 && (line[7] == '\0' || line[7] == ' ' || line[7] == '<')) {
@@ -141,7 +141,7 @@ static void parseLine(const char* line) {
         if (!checkServiceMode()) return;
         char resp[48];
         if (line[7] == '\0') {
-            snprintf(resp, sizeof(resp), "OK LIFT %u", Settings::liftNumber());
+            snprintf(resp, sizeof(resp), "OK LIFT %u", ConfigurationService::liftNumber());
         } else {
             char scratch[16];
             const char* arg = numericArg(line + 7, scratch, sizeof(scratch));
@@ -151,8 +151,8 @@ static void parseLine(const char* line) {
                 sendResponse("ERR 08 INVALID_PARAM");
                 return;
             }
-            Settings::setLiftNumber(static_cast<uint16_t>(value));
-            snprintf(resp, sizeof(resp), "ACK LIFT %u", Settings::liftNumber());
+            ConfigurationService::setLiftNumber(static_cast<uint16_t>(value));
+            snprintf(resp, sizeof(resp), "ACK LIFT %u", ConfigurationService::liftNumber());
         }
         sendResponse(resp);
         return;
@@ -162,18 +162,18 @@ static void parseLine(const char* line) {
         char resp[48];
         char gainStr[12];
         if (line[7] == '\0') {
-            formatGain(gainStr, sizeof(gainStr), Sound::gain());
+            formatGain(gainStr, sizeof(gainStr), AlarmService::gain());
             snprintf(resp, sizeof(resp), "OK GAIN %s", gainStr);
         } else {
             char scratch[16];
             const char* arg = numericArg(line + 7, scratch, sizeof(scratch));
             char* endPtr = nullptr;
             float value = (arg != nullptr) ? strtof(arg, &endPtr) : 0.0f;
-            if (arg == nullptr || endPtr == arg || *endPtr != '\0' || !Sound::setGain(value)) {
+            if (arg == nullptr || endPtr == arg || *endPtr != '\0' || !AlarmService::setGain(value)) {
                 sendResponse("ERR 08 INVALID_PARAM");
                 return;
             }
-            formatGain(gainStr, sizeof(gainStr), Sound::gain());
+            formatGain(gainStr, sizeof(gainStr), AlarmService::gain());
             snprintf(resp, sizeof(resp), "ACK GAIN %s", gainStr);
         }
         sendResponse(resp);
@@ -181,9 +181,9 @@ static void parseLine(const char* line) {
     } else if (strcmp(line, "mb_defaults") == 0) {
         // Revine la default-urile din Config.h (lift + gain) și persistă
         if (!checkServiceMode()) return;
-        Settings::resetDefaults();
-        if (Sound::isPlaying()) Sound::stop();
-        Sound::setGain(Settings::audioGain());
+        ConfigurationService::resetDefaults();
+        if (AlarmService::isPlaying()) AlarmService::stop();
+        AlarmService::setGain(ConfigurationService::audioGain());
         sendResponse("ACK DEFAULTS");
         return;
     } else if (strcmp(line, "mb_com_status") == 0) {

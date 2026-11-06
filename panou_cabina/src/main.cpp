@@ -3,11 +3,9 @@
 #include "Arduino.h"
 
 #include "Application.h"
-#include "Settings.h"
 
 void setup() {
     Serial.begin(115200);
-    Settings::init();
     Application::init();
 }
 

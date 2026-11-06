@@ -14,8 +14,6 @@
 #include <hardware/watchdog.h>
 #include <atomic>
 
-extern volatile SharedMemory gSharedMemory;
-
 namespace ServiceMenu {
 
 static std::atomic<bool> sInService{false};
@@ -88,7 +86,7 @@ bool isDisplayCommandActive() {
 void update() {
     // 1. Citeste datele reale din memoria partajata
     SharedPanel localPanel;
-    bool haveNewData = shared_panel_read(gSharedMemory, localPanel);
+    bool haveNewData = ApplicationState::read(localPanel);
 
     // 2. In afara Service Mode, update() doar consuma comenzi de intrare.
     if (sInService.load(std::memory_order_relaxed) && !sDisplayTestActive) {
@@ -121,7 +119,7 @@ static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData) {
 // ==================== RESTAURARE PAGINA PRINCIPALA SERVICE ====================
 static void restoreServiceMain() {
     SharedPanel panel;
-    if (!shared_panel_read(gSharedMemory, panel)) return;
+    if (!ApplicationState::read(panel)) return;
 
     Display::clearTargetScreen(DisplayTarget::Panel);
     PanelRenderer::invalidate(DisplayTarget::Panel);
@@ -265,7 +263,7 @@ static bool checkService() {
 // ==================== COMUNICATION ====================
 static void runCommTest() {
     SharedPanel panel;
-    if (!shared_panel_read(gSharedMemory, panel)) {
+    if (!ApplicationState::read(panel)) {
         ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
         return;
     }
@@ -294,7 +292,7 @@ static void runCommTest() {
 
 static void sendCommStatus() {
     SharedPanel panel;
-    if (!shared_panel_read(gSharedMemory, panel)) {
+    if (!ApplicationState::read(panel)) {
         ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
         return;
     }
@@ -310,7 +308,7 @@ static void sendCommStatus() {
 // Format: OK COMM STATUS L1=frames,valid,timeout,formatErr,crcErr,dataErr ON|OFF
 static void sendCommCountStatus() {
     SharedPanel panel;
-    if (!shared_panel_read(gSharedMemory, panel)) {
+    if (!ApplicationState::read(panel)) {
         ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
         return;
     }
@@ -331,7 +329,7 @@ static void sendCommCountStatus() {
 
 static void sendDiagnostics() {
     SharedPanel panel;
-    if (!shared_panel_read(gSharedMemory, panel)) {
+    if (!ApplicationState::read(panel)) {
         ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
         return;
     }
@@ -374,7 +372,7 @@ static void exitDisplayTest() {
 // ==================== PICO / MCU (Serial only) ====================
 static void sendMcuUptime() {
     SharedPanel localPanel;
-    if (shared_panel_read(gSharedMemory, localPanel)) {
+    if (ApplicationState::read(localPanel)) {
         char buf[64];
         snprintf(buf, sizeof(buf), "OK MCU UPTIME %lu", localPanel.system.uptimeSeconds);
         ServiceProtocol::sendResponse(buf);
@@ -385,7 +383,7 @@ static void sendMcuUptime() {
 
 static void sendMcuResets() {
     SharedPanel localPanel;
-    if (shared_panel_read(gSharedMemory, localPanel)) {
+    if (ApplicationState::read(localPanel)) {
         char buf[64];
         snprintf(buf, sizeof(buf), "OK MCU RESETS %u", localPanel.system.bootCounter);
         ServiceProtocol::sendResponse(buf);
@@ -401,7 +399,7 @@ static void sendMcuWdt() {
 
 static void sendMcuLastReset() {
     SharedPanel localPanel;
-    if (shared_panel_read(gSharedMemory, localPanel)) {
+    if (ApplicationState::read(localPanel)) {
         const char* reason = "UNKNOWN";
         switch (localPanel.system.lastResetReason) {
             case 0: reason = "POR"; break;

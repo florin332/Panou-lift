@@ -5,13 +5,13 @@
 
 namespace Application
 {
-    // Inițializează memoria partajată globală și orchestrează pornirea tuturor modulelor din subordine
+    // Inițializează serviciile și publică starea inițială a aplicației.
     void init();
 
-    // Sarcina ciclică dedicată exclusiv pentru Core 0 (Afișaj, Screensaver, Sound, LEDs)
+    // Deleagă ciclul Core 0 către controller-ul de prezentare.
     void runCore0();
 
-    // Sarcina ciclică dedicată exclusiv pentru Core 1 (Protocol, Calcul comenzi, Actualizare RAM)
+    // Orchestrează serviciile de lift și alarmă și publică starea actualizată.
     void runCore1();
 }
 
