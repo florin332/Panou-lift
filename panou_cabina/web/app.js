@@ -20,6 +20,7 @@ themeToggle.addEventListener('change', () => {
 
 let webAuthorization = '';
 let webAuthenticated = false;
+let networkFormDirty = false;
 
 async function refresh() {
   try {
@@ -45,12 +46,14 @@ async function refresh() {
     text('network', s.network.ip + ' / ' + s.network.mac);
     text('network-detail', (s.network.dhcp ? 'DHCP' : 'Static') + '; IP activ ' + s.network.ip);
 
-    const n = $('network-settings').elements;
-    n.dhcp.checked = s.network.dhcp;
-    n.ip.value = s.network.staticIp;
-    n.subnet.value = s.network.subnet;
-    n.gateway.value = s.network.gateway;
-    n.dns.value = s.network.dns;
+    if (!networkFormDirty) {
+      const n = $('network-settings').elements;
+      n.dhcp.checked = s.network.dhcp;
+      n.ip.value = s.network.staticIp;
+      n.subnet.value = s.network.subnet;
+      n.gateway.value = s.network.gateway;
+      n.dns.value = s.network.dns;
+    }
     $('settings').elements.lift.value = s.config.lift;
     $('settings').elements.gain.value = s.config.gain;
 
@@ -87,7 +90,7 @@ async function authenticate() {
   }
 }
 
-async function command(path, value) {
+async function command(path, value, onSuccess) {
   const headers = { 'Content-Type': 'text/plain' };
   if (webAuthorization) headers.Authorization = webAuthorization;
   const r = await fetch(path, { method: 'POST', headers, body: value });
@@ -98,10 +101,13 @@ async function command(path, value) {
     await refresh();
   }
   text('result', r.ok ? body : 'Eroare ' + r.status + ': ' + body);
+  if (r.ok && onSuccess) onSuccess();
   setTimeout(refresh, 250);
 }
 
 $('web-login-button').onclick = authenticate;
+$('network-settings').addEventListener('input', () => { networkFormDirty = true; });
+$('network-settings').addEventListener('change', () => { networkFormDirty = true; });
 $('web-logout-button').onclick = () => {
   webAuthorization = '';
   webAuthenticated = false;
@@ -117,7 +123,10 @@ $('save-network').onclick = () => {
   const body = f.dhcp.checked
     ? 'DHCP'
     : 'STATIC ' + f.ip.value + ' ' + f.subnet.value + ' ' + f.gateway.value + ' ' + f.dns.value;
-  command('/api/network', body);
+  command('/api/network', body, () => {
+    networkFormDirty = false;
+    refresh();
+  });
 };
 
 refresh();
