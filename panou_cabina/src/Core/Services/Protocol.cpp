@@ -14,23 +14,15 @@ namespace Protocol
     // Constante de format
     // -------------------------------------------------------------------------
     static constexpr uint8_t FRAME_BUFFER_SIZE = 40;
-    static constexpr uint8_t ANALYZE_BUFFER_SIZE = 96;
 
     struct RxBuffer {
         char receivedChars[FRAME_BUFFER_SIZE];
         unsigned long lastValidPacketMillis;
-        char analyzeChars[ANALYZE_BUFFER_SIZE];
-        uint8_t analyzeLength;
-        boolean analyzeActive;
-        boolean analyzeOverflow;
         FrameDecoder decoder;
 
         RxBuffer() : decoder(receivedChars, sizeof(receivedChars)) {}
         void reset() {
             lastValidPacketMillis = 0;
-            analyzeLength = 0;
-            analyzeActive = false;
-            analyzeOverflow = false;
             decoder.reset();
         }
     };
@@ -42,7 +34,6 @@ namespace Protocol
     // Singurul canal RX activ: ascensorul cabinei.
     // -------------------------------------------------------------------------
     static bool sCountingEnabled = false;
-    static bool sAnalyzeEnabled = false;
     static uint32_t sRxFrames[1]      = {0}; // cadre complet delimitate (START...END)
     static uint32_t sRxValid[1]       = {0}; // cadre acceptate (format+CRC+domeniu)
     static uint32_t sRxTimeout[1]     = {0}; // cadru inceput, neterminat in timeout
@@ -57,23 +48,6 @@ namespace Protocol
         }
     }
 
-    static void appendAnalyzeByte(RxBuffer &buffer, char value) {
-        if (buffer.analyzeLength < sizeof(buffer.analyzeChars)) {
-            buffer.analyzeChars[buffer.analyzeLength++] = value;
-        } else {
-            buffer.analyzeOverflow = true;
-        }
-    }
-
-    static void emitAnalyzeFrame(const RxBuffer &buffer, uint8_t liftIdx, bool complete) {
-        Serial.print("RAW L");
-        Serial.print(liftIdx + 1);
-        Serial.print(complete ? ":" : " PARTIAL:");
-        Serial.write(reinterpret_cast<const uint8_t*>(buffer.analyzeChars), buffer.analyzeLength);
-        if (buffer.analyzeOverflow) Serial.print("[TRUNCATED]");
-        Serial.println();
-    }
-
     // Rezultatul extragerii unui cadru complet delimitat
     // -------------------------------------------------------------------------
     // Etapa 1: extrage cadru <payload*CC> in buffer.
@@ -82,7 +56,7 @@ namespace Protocol
     // -------------------------------------------------------------------------
     // -------------------------------------------------------------------------
     // Receptor UART cu resync pe START in timpul receptiei.
-    // liftIdx ramane parametrul indexat al contorului pentru RAW L1.
+    // liftIdx ramane parametrul indexat al contoarelor RX.
     // -------------------------------------------------------------------------
     static void processByte(RxBuffer &buffer, char value, uint8_t liftIdx) {
         const FrameDecoder::Event event = buffer.decoder.feed(
@@ -90,26 +64,15 @@ namespace Protocol
 
         if (event == FrameDecoder::Event::Resynchronized) {
             if (sCountingEnabled) sRxFormatError[liftIdx]++;
-            if (buffer.analyzeActive) emitAnalyzeFrame(buffer, liftIdx, false);
         }
-        if (event == FrameDecoder::Event::Started || event == FrameDecoder::Event::Resynchronized) {
-            buffer.analyzeLength = 0;
-            buffer.analyzeOverflow = false;
-            buffer.analyzeActive = sAnalyzeEnabled;
-        }
-        if (buffer.analyzeActive && event != FrameDecoder::Event::Ignored) appendAnalyzeByte(buffer, value);
 
         if (event == FrameDecoder::Event::Complete) {
-            if (buffer.analyzeActive) emitAnalyzeFrame(buffer, liftIdx, true);
-            buffer.analyzeActive = false;
             if (sCountingEnabled) sRxFrames[liftIdx]++;
         }
     }
 
     static void verifyFrameTimeout(RxBuffer &buffer, uint8_t liftIdx) {
         if (buffer.decoder.checkTimeout(millis(), Config::Protocol::PACKET_TIMEOUT_MS)) {
-            if (buffer.analyzeActive) emitAnalyzeFrame(buffer, liftIdx, false);
-            buffer.analyzeActive = false;
             if (sCountingEnabled) sRxTimeout[liftIdx]++;
         }
     }
@@ -124,7 +87,6 @@ namespace Protocol
         rxLift1.lastValidPacketMillis = millis();
         // Dupa reboot numararea este inactiva si contoarele sunt zero
         sCountingEnabled = false;
-        sAnalyzeEnabled = false;
         resetCounters();
     }
 
@@ -197,16 +159,4 @@ namespace Protocol
         return sCountingEnabled;
     }
 
-    void commAnalyzeEnable() {
-        sAnalyzeEnabled = true;
-        rxLift1.analyzeActive = false;
-    }
-
-    void commAnalyzeDisable() {
-        sAnalyzeEnabled = false;
-        if (rxLift1.analyzeActive) {
-            emitAnalyzeFrame(rxLift1, 0, false);
-            rxLift1.analyzeActive = false;
-        }
-    }
 }

@@ -11,7 +11,6 @@ namespace ServiceMenu {
 void init();
 void update();   // Apelează în runCore0()
 bool isInServiceMode();
-bool isDisplayCommandActive();   // true cât timp un test display e pe ecran
 
 } // namespace ServiceMenu
 

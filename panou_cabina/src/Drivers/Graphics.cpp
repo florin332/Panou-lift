@@ -10,7 +10,12 @@ namespace Graphics
     void hideOverloadImage() { Display::hideOverloadImage(); }
     void setServiceMode(bool active) { Display::setServiceMode(active); }
     bool isServiceMode() { return Display::isServiceMode(); }
+    void reinitialize() { Display::reinitialize(); }
     void clearTargetScreen(GraphicsTarget target) { Display::clearTargetScreen(target); }
+    void drawColorTestPage(GraphicsTarget target, uint8_t colorIndex, bool labelAtTop) {
+        (void)target;
+        Display::drawColorTestPage(colorIndex, labelAtTop);
+    }
     void printMenuHeader(GraphicsTarget target, const char* title, uint16_t separatorColor, uint8_t separatorThickness) {
         Display::printMenuHeader(target, title, separatorColor, separatorThickness);
     }

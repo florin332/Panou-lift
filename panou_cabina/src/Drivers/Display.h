@@ -17,7 +17,9 @@ namespace Display
     void setServiceMode(bool active);
     bool isServiceMode();
 
+    void reinitialize();
     void clearTargetScreen(GraphicsTarget target);
+    void drawColorTestPage(uint8_t colorIndex, bool labelAtTop);
 
     // Separator configurabil: culoare (default gri) si grosime in px (default 3)
     void printMenuHeader(GraphicsTarget target, const char* titluPagina,

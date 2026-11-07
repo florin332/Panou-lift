@@ -11,6 +11,7 @@
 #include "Arduino.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
+#include <Fonts/FreeSans12pt7b.h>
 #include <SPI.h>
 #include "../Core/Models/Images.h"
 
@@ -36,6 +37,7 @@ namespace Display
     constexpr uint16_t COLOR_GREY   = 0x7BEF;
     constexpr uint16_t COLOR_YELLOW = 0xFFE0;
     constexpr uint16_t COLOR_GREEN  = 0x07E0;
+    constexpr uint16_t COLOR_BLUE   = 0x001F;
     constexpr uint16_t COLOR_ORANGE = 0xFD20;
     constexpr uint16_t COLOR_RED    = 0xF800;
 
@@ -69,6 +71,13 @@ namespace Display
         digitalWrite(Pins::TFT1::CS, HIGH);
 
         initializeControllers();
+        tft1.fillScreen(COLOR_BLACK);
+    }
+
+    void reinitialize() {
+        initializeControllers();
+        displayActive = true;
+        setBacklight(true);
         tft1.fillScreen(COLOR_BLACK);
     }
 
@@ -148,6 +157,28 @@ namespace Display
     void clearTargetScreen(GraphicsTarget target) {
         (void)target;
         tft1.fillScreen(COLOR_BLACK);
+    }
+
+    void drawColorTestPage(uint8_t colorIndex, bool labelAtTop) {
+        static const uint16_t colors[] = {
+            COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_WHITE, COLOR_BLACK
+        };
+        static const char* labels[] = {"R", "G", "B", "W", "Black"};
+        const uint8_t index = colorIndex < 5 ? colorIndex : 0;
+        const uint16_t foreground = (index == 1 || index == 3) ? COLOR_BLACK : COLOR_WHITE;
+        const char* label = labels[index];
+
+        tft1.fillScreen(colors[index]);
+        tft1.setFont(&FreeSans12pt7b);
+        tft1.setTextSize(1);
+        tft1.setTextWrap(false);
+        const int16_t x = DisplayGeom::cursorXForCenter(&FreeSans12pt7b, label, DisplayGeom::centerX());
+        const int16_t y = labelAtTop
+            ? DisplayGeom::baselineForTop(&FreeSans12pt7b, label, 8)
+            : DisplayGeom::baselineForBottom(&FreeSans12pt7b, label, DisplayGeom::screenH() - 8);
+        tft1.setTextColor(foreground);
+        tft1.setCursor(x, y);
+        tft1.print(label);
     }
 
     // ← MODIFICAT: separator configurabil (culoare + grosime)

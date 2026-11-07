@@ -1,6 +1,6 @@
 // Presentation/ServiceMenu.cpp
 // Service Mode: date reale + chenar overlay (portocaliu/rosu)
-// Testele display raman pe ecran pana la mb_com_out (manual din Magic Box)
+// Pagina COMM ramane pe ecran pana la mb_com_out (manual din Magic Box)
 
 #include "ServiceMenu.h"
 #include "ServiceProtocol.h"
@@ -13,32 +13,37 @@
 #include <pico/multicore.h>
 #include <hardware/watchdog.h>
 #include <atomic>
+#include <cmath>
 
 namespace ServiceMenu {
 
 static std::atomic<bool> sInService{false};
 static unsigned long sLastActivityMillis = 0;
 
-// Stare display: false = idle (date reale + overlay), true = test activ
-static bool sDisplayTestActive = false;
+enum class ServicePageMode : uint8_t { Live, Communication, ColorTest };
+static ServicePageMode sServicePageMode = ServicePageMode::Live;
+static uint8_t sColorTestIndex = 0;
+static bool sColorTestLabelAtTop = true;
+static unsigned long sColorTestLastStepMillis = 0;
+static constexpr unsigned long COLOR_TEST_STEP_MS = 3000;
 
 // Forward declarations
 static void handleCommand(const ServiceProtocol::Command &cmd);
 static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData);
 static void restoreServiceMain();
+static void exitCommPage();
 static void runCommTest();
-static void sendCommStatus();
+static void drawCommPage(const SharedPanel &panel);
+static void startColorTest(uint8_t target);
+static void stopColorTest();
+static void updateColorTest();
 static void sendCommCountStatus();
 static void sendDiagnostics();
-static void runDispTest(uint8_t tftId);
-static void runDispReinit(uint8_t tftId);
-static void exitDisplayTest();
 static void sendMcuUptime();
 static void sendMcuResets();
 static void sendMcuWdt();
 static void sendMcuLastReset();
 static void sendMcuTemp();
-static void sendMcuStack(uint8_t coreId);
 static bool checkService();
 
 static const char* directionText(Direction direction) {
@@ -71,15 +76,14 @@ static const char* occupancyText(Occupancy occupancy) {
 void init() {
     sInService.store(false, std::memory_order_relaxed);
     sLastActivityMillis = 0;
-    sDisplayTestActive = false;
+    sServicePageMode = ServicePageMode::Live;
+    sColorTestIndex = 0;
+    sColorTestLabelAtTop = true;
+    sColorTestLastStepMillis = 0;
 }
 
 bool isInServiceMode() {
     return sInService.load(std::memory_order_relaxed);
-}
-
-bool isDisplayCommandActive() {
-    return sDisplayTestActive;
 }
 
 // ==================== UPDATE PRINCIPAL ====================
@@ -89,7 +93,7 @@ void update() {
     bool haveNewData = ApplicationState::read(localPanel);
 
     // 2. In afara Service Mode, update() doar consuma comenzi de intrare.
-    if (sInService.load(std::memory_order_relaxed) && !sDisplayTestActive) {
+    if (sInService.load(std::memory_order_relaxed) && sServicePageMode == ServicePageMode::Live) {
         if (haveNewData) {
             Graphics::update(localPanel);
             PanelRenderer::render(GraphicsTarget::Panel, localPanel.lift1, "ASCENSOR");
@@ -97,7 +101,9 @@ void update() {
         uint16_t overlayColor = getOverlayColor(localPanel, haveNewData);
         Graphics::drawServiceOverlay(GraphicsTarget::Panel, overlayColor);
     }
-    // Daca sDisplayTestActive == true, ecranul ramane asa cum l-a lasat ultima comanda
+    if (sInService.load(std::memory_order_relaxed) && sServicePageMode == ServicePageMode::ColorTest) {
+        updateColorTest();
+    }
 
     // 3. Consuma comenzi de la Core 1 (Magic Box)
     ServiceProtocol::Command cmd;
@@ -136,7 +142,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
         case ServiceProtocol::Command::Type::EnterService:
             if (sInService.load(std::memory_order_relaxed)) break;
             sInService.store(true, std::memory_order_relaxed);
-            sDisplayTestActive = false;
+            sServicePageMode = ServicePageMode::Live;
             Graphics::setServiceMode(true);
             char panelId[16];
             snprintf(panelId, sizeof(panelId), "%c_%02u_%u.%02u",
@@ -149,7 +155,7 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
 
         case ServiceProtocol::Command::Type::ExitService:
             sInService.store(false, std::memory_order_relaxed);
-            sDisplayTestActive = false;
+            sServicePageMode = ServicePageMode::Live;
             Graphics::setServiceMode(false);
             ServiceProtocol::sendResponse("ACK SRV EXIT");
             break;
@@ -182,39 +188,50 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             runCommTest();
             break;
 
-        case ServiceProtocol::Command::Type::CommStatus:
-            if (!checkService()) break;
-            sendCommStatus();
-            break;
-
         case ServiceProtocol::Command::Type::Diagnostics:
             if (!checkService()) break;
             sendDiagnostics();
             break;
 
-        case ServiceProtocol::Command::Type::DispTest:
+        case ServiceProtocol::Command::Type::ResetDisplay:
             if (!checkService()) break;
-            runDispTest(cmd.param);
+            Graphics::reinitialize();
+            if (sServicePageMode == ServicePageMode::ColorTest) {
+                Graphics::drawColorTestPage(GraphicsTarget::Panel, sColorTestIndex, sColorTestLabelAtTop);
+            } else if (sServicePageMode == ServicePageMode::Communication) {
+                SharedPanel panel;
+                if (!ApplicationState::read(panel)) {
+                    sServicePageMode = ServicePageMode::Live;
+                    PanelRenderer::invalidate(GraphicsTarget::Panel);
+                    ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
+                    break;
+                }
+                drawCommPage(panel);
+            } else {
+                restoreServiceMain();
+            }
+            ServiceProtocol::sendResponse("ACK_31 1");
             break;
 
-        case ServiceProtocol::Command::Type::DispReinit:
+        case ServiceProtocol::Command::Type::StartDisplayTest:
             if (!checkService()) break;
-            runDispReinit(cmd.param);
+            startColorTest(cmd.param);
+            break;
+
+        case ServiceProtocol::Command::Type::StopDisplayTest:
+            if (!checkService()) break;
+            stopColorTest();
+            ServiceProtocol::sendResponse("ACK_33");
             break;
 
         case ServiceProtocol::Command::Type::CommTestOut:
             if (!checkService()) break;
-            exitDisplayTest();
+            exitCommPage();
             break;
 
         case ServiceProtocol::Command::Type::CommCountStatus:
             if (!checkService()) break;
             sendCommCountStatus();
-            break;
-
-        case ServiceProtocol::Command::Type::DispTestExit:
-            if (!checkService()) break;
-            exitDisplayTest();
             break;
 
         case ServiceProtocol::Command::Type::McuUptime:
@@ -242,11 +259,6 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             sendMcuTemp();
             break;
 
-        case ServiceProtocol::Command::Type::McuStack:
-            if (!checkService()) break;
-            sendMcuStack(cmd.param);
-            break;
-
         default:
             ServiceProtocol::sendResponse("ERR 04 UNHANDLED");
             break;
@@ -269,7 +281,12 @@ static void runCommTest() {
         return;
     }
 
-    sDisplayTestActive = true;
+    drawCommPage(panel);
+    ServiceProtocol::sendResponse("OK mb_com L1=DATA");
+}
+
+static void drawCommPage(const SharedPanel &panel) {
+    sServicePageMode = ServicePageMode::Communication;
     Graphics::clearTargetScreen(GraphicsTarget::Panel);
 
     const GraphicsTarget panelDisplay = GraphicsTarget::Panel;
@@ -287,22 +304,6 @@ static void runCommTest() {
     Graphics::printCommLine(panelDisplay, 4, "Ocp :",
         svc1Normal ? occupancyText(panel.lift1.ocp) : "- ! -",
         svc1Normal ? 0xFFFF : 0xFE60);
-
-    ServiceProtocol::sendResponse("OK mb_com L1=DATA");
-}
-
-static void sendCommStatus() {
-    SharedPanel panel;
-    if (!ApplicationState::read(panel)) {
-        ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
-        return;
-    }
-
-    char response[128];
-    snprintf(response, sizeof(response),
-        "OK STATUS L1=%s",
-        serviceText(panel.lift1.svc));
-    ServiceProtocol::sendResponse(response);
 }
 
 // Raporteaza contoarele de receptie detaliate pe serial (afisarea se face pe Service Box)
@@ -342,30 +343,40 @@ static void sendDiagnostics() {
     ServiceProtocol::sendResponse(response);
 }
 
-// ==================== DISPLAY ====================
-static void runDispTest(uint8_t tftId) {
-    sDisplayTestActive = true;
-    if (tftId == 1) {
-        Graphics::clearTargetScreen(GraphicsTarget::Panel);
-        Graphics::printMenuHeader(GraphicsTarget::Panel, "DISPLAY TEST");
-        Graphics::printMenuLineExt(GraphicsTarget::Panel, 3, "RESULT", "PASS", 0x07E0);
-        ServiceProtocol::sendResponse("OK DISP TEST 1");
-    } else {
-        ServiceProtocol::sendResponse("ERR 05 INVALID_DISPLAY");
+static void startColorTest(uint8_t target) {
+    if (target != 1) {
+        ServiceProtocol::sendResponse("ERR 08 INVALID_PARAM");
+        return;
     }
+
+    sServicePageMode = ServicePageMode::ColorTest;
+    sColorTestIndex = 0;
+    sColorTestLabelAtTop = true;
+    sColorTestLastStepMillis = millis();
+    Graphics::drawColorTestPage(GraphicsTarget::Panel, sColorTestIndex, sColorTestLabelAtTop);
+    ServiceProtocol::sendResponse("ACK_32 1");
 }
 
-static void runDispReinit(uint8_t tftId) {
-    sDisplayTestActive = true;
-    if (tftId == 1) {
-        ServiceProtocol::sendResponse("OK DISP REINIT 1");
-    } else {
-        ServiceProtocol::sendResponse("ERR 05 INVALID_DISPLAY");
-    }
+static void stopColorTest() {
+    if (sServicePageMode != ServicePageMode::ColorTest) return;
+    sServicePageMode = ServicePageMode::Live;
+    restoreServiceMain();
 }
 
-static void exitDisplayTest() {
-    sDisplayTestActive = false;
+static void updateColorTest() {
+    if (millis() - sColorTestLastStepMillis < COLOR_TEST_STEP_MS) return;
+
+    sColorTestLastStepMillis = millis();
+    sColorTestIndex++;
+    if (sColorTestIndex >= 5) {
+        sColorTestIndex = 0;
+        sColorTestLabelAtTop = !sColorTestLabelAtTop;
+    }
+    Graphics::drawColorTestPage(GraphicsTarget::Panel, sColorTestIndex, sColorTestLabelAtTop);
+}
+
+static void exitCommPage() {
+    sServicePageMode = ServicePageMode::Live;
     restoreServiceMain();
     ServiceProtocol::sendResponse("ACK mb_com_out");
 }
@@ -375,7 +386,7 @@ static void sendMcuUptime() {
     SharedPanel localPanel;
     if (ApplicationState::read(localPanel)) {
         char buf[64];
-        snprintf(buf, sizeof(buf), "OK MCU UPTIME %lu", localPanel.system.uptimeSeconds);
+        snprintf(buf, sizeof(buf), "OK UPTIME %lu", localPanel.system.uptimeSeconds);
         ServiceProtocol::sendResponse(buf);
     } else {
         ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
@@ -418,23 +429,20 @@ static void sendMcuLastReset() {
 }
 
 static void sendMcuTemp() {
-    float temp = analogReadTemp();
-    char buf[64];
-    snprintf(buf, sizeof(buf), "OK MCU TEMP %.1f", temp);
-    ServiceProtocol::sendResponse(buf);
-}
-
-static void sendMcuStack(uint8_t coreId) {
-    if (coreId > 1) {
-        ServiceProtocol::sendResponse("ERR 07 INVALID_CORE");
+    const float temperatureC = analogReadTemp();
+    if (!std::isfinite(temperatureC)) {
+        ServiceProtocol::sendResponse("ERR 10 TEMP_READ_FAILED");
         return;
     }
-    uint32_t used = 2048;
-    uint32_t free = 4096;
-    uint32_t hw = 8192;
-    char buf[128];
-    snprintf(buf, sizeof(buf), "OK MCU STACK %u USED=%lu FREE=%lu HW=%lu",
-             coreId, used, free, hw);
+
+    const long centiDegrees = std::lround(temperatureC * 100.0f);
+    const unsigned long magnitude = static_cast<unsigned long>(
+        centiDegrees < 0 ? -centiDegrees : centiDegrees);
+    char buf[64];
+    snprintf(buf, sizeof(buf), "OK TEMP %s%lu.%02lu C",
+             centiDegrees < 0 ? "-" : "",
+             magnitude / 100,
+             magnitude % 100);
     ServiceProtocol::sendResponse(buf);
 }
 

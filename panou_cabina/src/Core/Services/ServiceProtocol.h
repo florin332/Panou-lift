@@ -13,17 +13,15 @@ struct Command {
         EnterBootsel,     // SRV BOOTSEL / mb_boot - executat pe core0
         CommTest,
         CommTestOut,      // exit COMM test
-        CommStatus,
         Diagnostics,
-        DispTest,
-        DispReinit,
-        DispTestExit,     // exit LCD test (fostul TestExit)
+        ResetDisplay,     // mb_31 1
+        StartDisplayTest, // mb_32 1
+        StopDisplayTest,  // mb_33
         McuUptime,
         McuResets,
         McuWdt,
         McuLastReset,
         McuTemp,
-        McuStack,
         CommCountStatus      // mb_com_status: raporteaza contoarele RX pe serial
     } type = Type::None;
 

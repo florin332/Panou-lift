@@ -12,8 +12,6 @@ namespace ElevatorService
     void commCountDisable();
     void commCountReset();
     bool commCountIsEnabled();
-    void commAnalyzeEnable();
-    void commAnalyzeDisable();
 }
 
 #endif

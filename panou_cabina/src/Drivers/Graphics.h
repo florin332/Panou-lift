@@ -20,7 +20,9 @@ namespace Graphics
     void setServiceMode(bool active);
     bool isServiceMode();
 
+    void reinitialize();
     void clearTargetScreen(GraphicsTarget target);
+    void drawColorTestPage(GraphicsTarget target, uint8_t colorIndex, bool labelAtTop);
     void printMenuHeader(GraphicsTarget target, const char* title,
                          uint16_t separatorColor = 0x7BEF, uint8_t separatorThickness = 3);
     void printMenuLine(GraphicsTarget target, uint8_t line, const char* label, uint32_t value);

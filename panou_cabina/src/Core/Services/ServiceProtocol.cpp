@@ -21,18 +21,10 @@ static void formatGain(char* out, size_t len, float gain) {
     snprintf(out, len, "%lu.%02lu", centi / 100UL, centi % 100UL);
 }
 
-// Extrage argumentul numeric: acceptă "mb_x 0.60" și "mb_x <0.60>".
-// Returnează pointer la textul curățat sau nullptr dacă lipsesc markerele.
-static const char* numericArg(const char* raw, char* scratch, size_t scratchLen) {
+// Argumentele numerice se transmit simplu, fără markere între paranteze.
+static const char* numericArg(const char* raw) {
     while (*raw == ' ') raw++;
-    if (*raw != '<') return raw;
-    const char* end = strchr(raw + 1, '>');
-    if (end == nullptr) return nullptr;
-    size_t n = static_cast<size_t>(end - (raw + 1));
-    if (n == 0 || n >= scratchLen) return nullptr;
-    memcpy(scratch, raw + 1, n);
-    scratch[n] = '\0';
-    return scratch;
+    return raw;
 }
 
 static bool checkServiceMode() {
@@ -61,7 +53,7 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::EnterService;
     } else if (strcmp(line, "SRV EXIT") == 0 || strcmp(line, "mb_00") == 0) {
         cmd.type = Command::Type::ExitService;
-    } else if (strcmp(line, "SRV BOOTSEL") == 0 || strcmp(line, "mb_boot") == 0) {
+    } else if (strcmp(line, "mb_02") == 0) {
         // Reset in bootloader USB (volum MSC "RPI-RP2") pentru flash-uire
         // de pe Service Box. Executia este amanata ca comanda si ruleaza pe
         // core0 (ServiceMenu::handleCommand) - TinyUSB nu este thread-safe.
@@ -73,20 +65,34 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::CommTest;
     } else if (strcmp(line, "mb_com_out") == 0) {
         cmd.type = Command::Type::CommTestOut;
-    } else if (strcmp(line, "mb_status") == 0) {
-        cmd.type = Command::Type::CommStatus;
     } else if (strcmp(line, "mb_diag") == 0) {
         cmd.type = Command::Type::Diagnostics;
-    } else if (strncmp(line, "DISP TEST ", 10) == 0 || strncmp(line, "mb_display_test ", 16) == 0) {
-        cmd.type = Command::Type::DispTest;
-        cmd.param = static_cast<uint8_t>(atoi(line[1] == 'b' ? line + 16 : line + 10));
-    } else if (strncmp(line, "DISP REINIT ", 12) == 0 || strncmp(line, "mb_display_reinit ", 19) == 0) {
-        cmd.type = Command::Type::DispReinit;
-        const char* argument = line[1] == 'b' ? line + 19 : line + 12;
-        cmd.param = strcmp(argument, "BOTH") == 0 ? 3 : static_cast<uint8_t>(atoi(argument));
-    } else if (strcmp(line, "TEST EXIT") == 0 || strcmp(line, "mb_test_out") == 0) {
-        cmd.type = Command::Type::DispTestExit;
-    } else if (strcmp(line, "MCU UPTIME") == 0 || strcmp(line, "mb_runtime") == 0) {
+    } else if (strncmp(line, "mb_31", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        const long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value != 1) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::ResetDisplay;
+        cmd.param = 1;
+    } else if (strncmp(line, "mb_32", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        const long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+        if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value != 1) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::StartDisplayTest;
+        cmd.param = 1;
+    } else if (strcmp(line, "mb_33") == 0) {
+        if (!checkServiceMode()) return;
+        cmd.type = Command::Type::StopDisplayTest;
+    } else if (strcmp(line, "mb_45") == 0) {
         cmd.type = Command::Type::McuUptime;
     } else if (strcmp(line, "MCU RESETS") == 0 || strcmp(line, "mb_resets") == 0) {
         cmd.type = Command::Type::McuResets;
@@ -94,11 +100,8 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::McuWdt;
     } else if (strcmp(line, "MCU LASTRESET") == 0 || strcmp(line, "mb_lastreset") == 0) {
         cmd.type = Command::Type::McuLastReset;
-    } else if (strcmp(line, "MCU TEMP") == 0 || strcmp(line, "mb_temp") == 0) {
+    } else if (strcmp(line, "mb_46") == 0) {
         cmd.type = Command::Type::McuTemp;
-    } else if (strncmp(line, "MCU STACK ", 10) == 0 || strncmp(line, "mb_stack ", 9) == 0) {
-        cmd.type = Command::Type::McuStack;
-        cmd.param = static_cast<uint8_t>(atoi(line[1] == 'b' ? line + 9 : line + 10));
     } else if (strcmp(line, "comm_count_enable") == 0) {
         if (!checkServiceMode()) return;
         ElevatorService::commCountEnable();
@@ -114,16 +117,6 @@ static void parseLine(const char* line) {
         ElevatorService::commCountReset();
         sendResponse("ACK COMM COUNT RESET");
         return;
-    } else if (strcmp(line, "com_analyze_enable") == 0) {
-        if (!checkServiceMode()) return;
-        ElevatorService::commAnalyzeEnable();
-        sendResponse("ACK COM ANALYZE ON");
-        return;
-    } else if (strcmp(line, "com_analyze_disable") == 0) {
-        if (!checkServiceMode()) return;
-        ElevatorService::commAnalyzeDisable();
-        sendResponse("ACK COM ANALYZE OFF");
-        return;
     } else if (strncmp(line, "mb_lift", 7) == 0 && (line[7] == '\0' || line[7] == ' ' || line[7] == '<')) {
         // Număr ascensor persistent (flash protejat)
         if (!checkServiceMode()) return;
@@ -131,8 +124,7 @@ static void parseLine(const char* line) {
         if (line[7] == '\0') {
             snprintf(resp, sizeof(resp), "OK LIFT %u", ConfigurationService::liftNumber());
         } else {
-            char scratch[16];
-            const char* arg = numericArg(line + 7, scratch, sizeof(scratch));
+            const char* arg = numericArg(line + 7);
             char* endPtr = nullptr;
             long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : 0;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 65535) {
@@ -153,8 +145,7 @@ static void parseLine(const char* line) {
             formatGain(gainStr, sizeof(gainStr), AlarmService::gain());
             snprintf(resp, sizeof(resp), "OK GAIN %s", gainStr);
         } else {
-            char scratch[16];
-            const char* arg = numericArg(line + 7, scratch, sizeof(scratch));
+            const char* arg = numericArg(line + 7);
             char* endPtr = nullptr;
             float value = (arg != nullptr) ? strtof(arg, &endPtr) : 0.0f;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' || !AlarmService::setGain(value)) {

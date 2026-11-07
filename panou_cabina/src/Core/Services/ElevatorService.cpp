@@ -15,6 +15,4 @@ namespace ElevatorService
     void commCountDisable() { Protocol::commCountDisable(); }
     void commCountReset() { Protocol::commCountReset(); }
     bool commCountIsEnabled() { return Protocol::commCountIsEnabled(); }
-    void commAnalyzeEnable() { Protocol::commAnalyzeEnable(); }
-    void commAnalyzeDisable() { Protocol::commAnalyzeDisable(); }
 }

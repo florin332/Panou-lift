@@ -63,4 +63,4 @@ Modificări necesare în `src/Core/Services/ServiceProtocol.cpp` și `src/Presen
 - [ ] **`mb_03`:** redenumire `mb_lift` → `mb_03`; interogare `OK LIFT <n>`, setare `ACK_03 <n>` (azi `ACK LIFT <n>`).
 - [ ] **`mb_04`:** redenumire `mb_gain` → `mb_04`; setare `ACK_04 <x.xx>` (azi `ACK GAIN <x.xx>`). Formatarea manuală `X.XX` (newlib-nano fără `%f`) rămâne.
 - [ ] **`mb_05`:** redenumire `mb_defaults` → `mb_05`, răspuns `ACK_05`. Atenție: handlerul actual oprește redarea audio și reaplică gain-ul — comportamentul se păstrează.
-- [ ] **De eliminat din parser** până la definirea grupurilor viitoare: `COMM TEST`/`mb_com`, `mb_com_out`, `mb_status`, `mb_diag`, `mb_com_status`, `mb_com_status_out`, `comm_count_*`, `com_analyze_*`, `DISP TEST/REINIT`, `TEST EXIT`, `MCU *`. Vor răspunde temporar `ERR 01 UNKNOWN_CMD`.
+- [ ] **De eliminat din parser** până la definirea grupurilor viitoare: `COMM TEST`/`mb_com`, `mb_com_out`, `mb_diag`, `mb_com_status`, `mb_com_status_out`, `comm_count_*`, `MCU *`. Vor răspunde temporar `ERR 01 UNKNOWN_CMD`.
