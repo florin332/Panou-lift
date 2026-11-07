@@ -14,6 +14,7 @@ namespace Config
     namespace Hardware
     {
         constexpr uint8_t FLOORS = 18;       // Total etaje instalație
+        constexpr uint32_t RESET_MAGIC_BUTTON = 0x4C505253UL;
 
 
         // Default număr ascensor — folosit doar la primul boot sau dacă
@@ -27,6 +28,9 @@ namespace Config
     namespace Timing
     {
         constexpr uint32_t BUTTON_INHIBIT_MS = 5000;     // Inhibare buton după apel; momentan nefolosită
+        constexpr uint32_t RESET_BUTTON_DEBOUNCE_MS = 40;
+        constexpr uint32_t RESET_PRESS_WINDOW_MS = 2000;
+        constexpr uint8_t RESET_PRESS_COUNT = 4;
         constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat; momentan nefolosită
         constexpr uint32_t LED_BLINK_SLOW = 500;         // Perioadă clipire lentă LED; momentan nefolosită
         constexpr uint32_t LED_BLINK_FAST = 150;         // Perioadă clipire rapidă LED; momentan nefolosită

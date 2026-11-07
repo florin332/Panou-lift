@@ -4,6 +4,7 @@ MCU: Raspberry Pi Pico / RP2040
 Display: ILI9341, 240×320
 
 GPIO	Funcție	Direcție	Observații
+GP11	RESET BUTTON IN	IN	Buton normal deschis la GND; patru apăsări în 2 s resetează panoul
 GP6	OVERLOAD IN	IN	Intrare suprasarcină
 GP7	ALARM IN	IN	Intrare alarmă
 GP8	I2S BCLK	OUT	MAX98357A bit clock

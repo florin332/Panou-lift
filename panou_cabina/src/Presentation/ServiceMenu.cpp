@@ -9,6 +9,7 @@
 #include "BuildInfo.h"
 #include "SharedPanel.h"
 #include "PanelRenderer.h"
+#include "ElevatorService.h"
 #include <Arduino.h>
 #include <Fonts/FreeSans12pt7b.h>
 #include <pico/bootrom.h>
@@ -277,6 +278,20 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             ServiceProtocol::sendResponse("ACK_62 1");
             break;
 
+        case ServiceProtocol::Command::Type::QueryCommunicationDisplay:
+            if (!checkService()) break;
+            ServiceProtocol::sendResponse(sServicePageMode == ServicePageMode::RxCounters
+                ? "OK COMM DISPLAY 1"
+                : "OK COMM DISPLAY 0");
+            break;
+
+        case ServiceProtocol::Command::Type::QueryCommunicationCounters:
+            if (!checkService()) break;
+            ServiceProtocol::sendResponse(ElevatorService::commCountIsEnabled()
+                ? "OK COMM COUNTERS 1"
+                : "OK COMM COUNTERS 0");
+            break;
+
         case ServiceProtocol::Command::Type::McuUptime:
             if (!checkService()) break;
             sendMcuUptime();
@@ -482,10 +497,10 @@ static void sendMcuLastReset() {
     if (ApplicationState::read(localPanel)) {
         const char* reason = "UNKNOWN";
         switch (localPanel.system.lastResetReason) {
-            case 0: reason = "POR"; break;
-            case 1: reason = "BOR"; break;
+            case 1: reason = "POR_BROWNOUT"; break;
             case 2: reason = "WDT"; break;
             case 3: reason = "SYSREQ"; break;
+            case 4: reason = "4PUSH"; break;
             default: break;
         }
         char buf[64];

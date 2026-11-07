@@ -14,8 +14,7 @@ MCU RESETS
 **mb_wdt** watchdog activare dezactivare? raporteaza starea wdt
 MCU WDT
 
-mb_lastreset  raportează doar cauza ultimei porniri (POR, BOR, WDT sau SYSREQ)
-MCU LASTRESET
+mb_47  raportează cauza ultimei resetări (POR_BROWNOUT, WDT, SYSREQ sau 4PUSH)
 
 
 

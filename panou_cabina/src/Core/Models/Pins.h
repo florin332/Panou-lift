@@ -33,6 +33,7 @@ namespace Pins
     namespace Inputs {
         constexpr uint8_t ALARM = 7;
         constexpr uint8_t OVERLOAD = 6;
+        constexpr uint8_t RESET = 11;
     }
 
     namespace Audio {

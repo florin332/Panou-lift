@@ -378,6 +378,25 @@ static void parseLine(const char* line) {
                  magnitude % 100);
         sendResponse(resp);
         return;
+    } else if (strcmp(line, "mb_47") == 0) {
+        if (!checkServiceMode()) return;
+        SharedPanel snapshot{};
+        if (!shared_panel_read(gSharedMemory, snapshot)) {
+            sendResponse("ERR 02 BUSY");
+            return;
+        }
+        const char* reason = "UNKNOWN";
+        switch (snapshot.system.lastResetReason) {
+            case 1: reason = "POR_BROWNOUT"; break;
+            case 2: reason = "WDT"; break;
+            case 3: reason = "SYSREQ"; break;
+            case 4: reason = "4PUSH"; break;
+            default: break;
+        }
+        char resp[64];
+        snprintf(resp, sizeof(resp), "OK MCU LASTRESET %s", reason);
+        sendResponse(resp);
+        return;
     } else if (strncmp(line, "mb_4", 4) == 0 && line[4] >= '1' && line[4] <= '4' &&
                (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;

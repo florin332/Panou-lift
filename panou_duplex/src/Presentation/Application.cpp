@@ -55,10 +55,15 @@ namespace Application
         // Categoria 2: reset real watchdog, prin timer sau comandă force.
         if (watchdogReason & (WATCHDOG_REASON_TIMER_BITS | WATCHDOG_REASON_FORCE_BITS)) return 2;
 
-        // Categoria 1: registrul grupează POR și brownout în același indicator.
-        if (chipResetReason & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS) return 1;
+        // Categoria 1: POR/brownout sau reset hardware pe pinul RUN.
+        // Pe Marble Pico, reteaua RC a butonului RST tine RUN activ scurt
+        // dupa POR, deci la intreruperea alimentarii ultimul reset vazut
+        // este RUN (HAD_POR ramane nesetat). Watchdog are prioritate,
+        // deoarece resetul watchdog seteaza si el HAD_RUN.
+        if (chipResetReason & (VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS |
+                               VREG_AND_CHIP_RESET_CHIP_RESET_HAD_RUN_BITS)) return 1;
 
-        // Categoria 3: RUN, debug, reset software sau cauză nedeterminată.
+        // Categoria 3: restart din debug (PSM) sau cauza nedeterminata.
         return 3;
     }
 

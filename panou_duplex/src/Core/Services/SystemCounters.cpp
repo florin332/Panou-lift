@@ -7,7 +7,9 @@
 namespace
 {
     constexpr int BOOT_COUNTER_OFFSET = 0;
-    constexpr int RESET_COUNTERS_OFFSET = 24; // Immediately follows the 20-byte Settings record at offset 4.
+    // Setarile ocupa 24 de octeti la offsetul 4 (pana la 27 inclusiv);
+    // contoarele incep dupa ele, altfel suprascriu CRC-ul setarilor.
+    constexpr int RESET_COUNTERS_OFFSET = 28;
     constexpr uint32_t RESET_COUNTERS_MAGIC = 0x52535443UL; // "RSTC"
     constexpr uint16_t RESET_COUNTERS_VERSION = 1;
 

@@ -54,6 +54,7 @@ RESET si INT raman nealocate pana la confirmarea modulului W5500 ales.
 ## 5. Intrări Digitale (Inputs)
 | Funcție | GPIO | Descriere |
 |---------|------|-----------|
+| RESET | 11 | Intrare cu pull-up; buton normal deschis la GND, 4 apăsări în 2 s pentru reset |
 | ALARM | 7 | Intrare semnal alarmă |
 | OVERLOAD | 6 | Intrare detectare supraîncărcare |
 
@@ -69,11 +70,11 @@ RESET si INT raman nealocate pana la confirmarea modulului W5500 ales.
 ---
 
 ## Rezumat Pinuri folosite
-- **Total GPIO-uri utilizate:** 15
+- **Total GPIO-uri utilizate:** 16
 - **Pinuri libere (teoretic):** 15 (pe Raspberry Pi Pico care are 30 GPIO în total)
 
 ### Pinuri alocate
-6, 7, 8, 9, 10, 12, 13, 14, 15, 18, 19, 20, 21, 22, 26
+6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 26
 
 ### Pinuri disponibile
-0, 1, 2, 3, 4, 5, 11, 16, 17, 23, 24, 25, 27, 28, 29
+0, 1, 2, 3, 4, 5, 16, 17, 23, 24, 25, 27, 28, 29

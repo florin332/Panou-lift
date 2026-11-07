@@ -1,6 +1,7 @@
 #include "ServiceProtocol.h"
 #include "ElevatorService.h"
 #include "ConfigurationService.h"
+#include "SystemCounters.h"
 #include "AlarmService.h"
 #include "../../Presentation/ServiceMenu.h"
 #include <cstring>
@@ -153,16 +154,49 @@ static void parseLine(const char* line) {
         ElevatorService::commCountReset();
         sendResponse("ACK_65 1");
         return;
+    } else if (strcmp(line, "mb_67") == 0) {
+        if (!checkServiceMode()) return;
+        cmd.type = Command::Type::QueryCommunicationDisplay;
+    } else if (strcmp(line, "mb_68") == 0) {
+        if (!checkServiceMode()) return;
+        cmd.type = Command::Type::QueryCommunicationCounters;
     } else if (strcmp(line, "mb_45") == 0) {
         cmd.type = Command::Type::McuUptime;
     } else if (strcmp(line, "MCU RESETS") == 0 || strcmp(line, "mb_resets") == 0) {
         cmd.type = Command::Type::McuResets;
     } else if (strcmp(line, "MCU WDT") == 0 || strcmp(line, "mb_wdt") == 0) {
         cmd.type = Command::Type::McuWdt;
-    } else if (strcmp(line, "MCU LASTRESET") == 0 || strcmp(line, "mb_lastreset") == 0) {
+    } else if (strcmp(line, "mb_47") == 0) {
         cmd.type = Command::Type::McuLastReset;
     } else if (strcmp(line, "mb_46") == 0) {
         cmd.type = Command::Type::McuTemp;
+    } else if (strncmp(line, "mb_4", 4) == 0 && line[4] >= '1' && line[4] <= '4' &&
+               (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const uint8_t category = static_cast<uint8_t>(line[4] - '0');
+        char response[48];
+        if (line[5] == '\0') {
+            uint32_t counts[4];
+            SystemCounters::readResetCounts(counts);
+            snprintf(response, sizeof(response), "OK COUNTER %u %lu",
+                     static_cast<unsigned>(category),
+                     static_cast<unsigned long>(counts[category - 1]));
+        } else {
+            const char* arg = numericArg(line + 5);
+            char* endPtr = nullptr;
+            const long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : -1;
+            if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value != 0) {
+                sendResponse("ERR 08 INVALID_PARAM");
+                return;
+            }
+            if (!SystemCounters::resetCategory(category)) {
+                sendResponse("ERR 09 EEPROM_WRITE_FAILED");
+                return;
+            }
+            snprintf(response, sizeof(response), "ACK_4%u 0", static_cast<unsigned>(category));
+        }
+        sendResponse(response);
+        return;
     } else if (strncmp(line, "mb_11", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
         // Număr ascensor persistent (flash protejat)
         if (!checkServiceMode()) return;

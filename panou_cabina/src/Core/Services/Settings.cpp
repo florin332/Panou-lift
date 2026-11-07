@@ -23,6 +23,8 @@ namespace
         uint32_t crc32;
     };
 
+    static_assert(sizeof(PersistedData) <= 32, "Settings overlap reset counter storage");
+
     PersistedData data{};
     bool loaded = false;
 

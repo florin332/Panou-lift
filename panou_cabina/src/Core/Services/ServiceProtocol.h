@@ -15,6 +15,8 @@ struct Command {
         CommTestOut,      // exit COMM test
         StartCommCounterDisplay, // mb_61 1
         StopCommCounterDisplay,  // mb_62 1
+        QueryCommunicationDisplay, // mb_67
+        QueryCommunicationCounters, // mb_68
         Diagnostics,
         ResetDisplay,     // mb_31 1
         StartDisplayTest, // mb_32 1
