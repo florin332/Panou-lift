@@ -1,12 +1,18 @@
 #define USING_SPI2 true
 
+#include "WebUi.h"
 #include "Transport.h"
+#include "ConfigurationService.h"
 #include "Pins.h"
 #include "Config.h"
 #include <Arduino.h>
 #include <Ethernet_Generic.h>
 #include <SPI.h>
 #include <atomic>
+
+#define WEB_UI_IMPLEMENTATION
+#include "WebUi.cpp"
+#undef WEB_UI_IMPLEMENTATION
 
 SPIClass *pCUR_SPI = &SPI1;
 
@@ -163,12 +169,23 @@ void init() {
 
 static void startNetwork() {
     sLastNetworkAttempt = millis();
-    sNetworkReady = Ethernet.begin(sMacAddress, &SPI1, Config::Ethernet::DHCP_TIMEOUT_MS,
-                                   Config::Ethernet::DHCP_RESPONSE_TIMEOUT_MS) != 0;
+    const Settings::NetworkSettings network = ConfigurationService::networkSettings();
+    if (network.dhcp != 0) {
+        sNetworkReady = Ethernet.begin(sMacAddress, &SPI1, Config::Ethernet::DHCP_TIMEOUT_MS,
+                                       Config::Ethernet::DHCP_RESPONSE_TIMEOUT_MS) != 0;
+    } else {
+        Ethernet.begin(sMacAddress,
+                       IPAddress(network.ip[0], network.ip[1], network.ip[2], network.ip[3]),
+                       IPAddress(network.dns[0], network.dns[1], network.dns[2], network.dns[3]),
+                       IPAddress(network.gateway[0], network.gateway[1], network.gateway[2], network.gateway[3]),
+                       IPAddress(network.subnet[0], network.subnet[1], network.subnet[2], network.subnet[3]));
+        sNetworkReady = true;
+    }
     if (!sNetworkReady) return;
     sEncoderServer.begin();
     sDeviceServer.begin();
     sServiceServer.begin();
+    WebUi::begin();
 }
 
 void poll() {
@@ -185,6 +202,7 @@ void poll() {
     updateEncoderRx();
     flushTx(sDeviceClient, sDeviceTx, sDevicePending);
     flushTx(sServiceClient, sServiceTx, sServicePending);
+    WebUi::poll();
 }
 
 }

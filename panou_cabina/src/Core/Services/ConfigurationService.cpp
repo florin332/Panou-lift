@@ -49,4 +49,8 @@ namespace ConfigurationService
     bool setLiftNumber(uint16_t number) { return Settings::setLiftNumber(number); }
     float audioGain() { return Settings::audioGain(); }
     bool resetDefaults() { return Settings::resetDefaults(); }
+    Settings::NetworkSettings networkSettings() { return Settings::networkSettings(); }
+    bool setNetworkSettings(const Settings::NetworkSettings &settings) {
+        return Settings::setNetworkSettings(settings);
+    }
 }

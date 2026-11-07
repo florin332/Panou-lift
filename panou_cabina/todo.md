@@ -19,9 +19,11 @@
 - [x] Adapt encoder reception to consume the TCP byte stream while retaining frame parsing, CRC checks, and semantic validation in hardware-independent modules.
 - [ ] Define `AlarmProtocol` separately from transport; implement/test the GSM and SSC30KQ command formats when each device protocol is specified.
 - [ ] Implement reconnect, disconnect, partial-read/write, timeout, and per-channel status handling; verify the remote CH9121 bridges against the panel's TCP roles.
-- [ ] Provide the web service over W5500; decide its HTTP port and confirm the available socket/RAM budget (W5500 has up to 8 sockets).
-- [ ] Route basic service commands through one shared dispatcher for USB and web; expose advanced network settings only in the web interface.
-- [ ] Add persistent service configuration for per-channel TCP role and ports, plus network settings; initially use DHCP, the fixed MAC above, server mode, and ports `2000`/`2004`/`2005` as defaults.
+- [x] Provide the web service over W5500 on HTTP port `80`; reserve a fourth listener socket for the UI.
+- [x] Route service commands through the shared `ServiceProtocol` dispatcher; keep advanced DHCP/static network settings in the web interface.
+- [x] Persist DHCP/static IPv4, subnet, gateway, and DNS settings while preserving existing EEPROM offsets.
+- [ ] Persist per-channel TCP roles and ports; current defaults remain server mode on `2000`/`2004`/`2005`.
 - [ ] Allow the MAC to be changed later through the web service interface; document that changing it requires updating the router's DHCP reservation.
 - [ ] Test simultaneous encoder, alarm, service-TCP, and web traffic; verify TCP stream framing, W5500 SPI1 operation alongside LCD SPI0, and behavior across both cores.
-- [ ] Keep the web interface on a trusted local network unless TLS or another secure access layer is added.
+- [x] Keep the web interface on a trusted local network; HTTP Basic Auth is not encrypted and TLS is not implemented.
+- [ ] Verify simultaneous encoder, alarm, service-TCP, and HTTP traffic on the physical Marble/W5500 board.

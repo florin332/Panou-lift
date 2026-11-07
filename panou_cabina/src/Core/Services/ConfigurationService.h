@@ -2,6 +2,7 @@
 #define CONFIGURATION_SERVICE_H
 
 #include "SharedPanel.h"
+#include "Settings.h"
 #include <cstdint>
 
 namespace ConfigurationService
@@ -13,6 +14,8 @@ namespace ConfigurationService
     bool setLiftNumber(uint16_t number);
     float audioGain();
     bool resetDefaults();
+    Settings::NetworkSettings networkSettings();
+    bool setNetworkSettings(const Settings::NetworkSettings &settings);
 }
 
 #endif

@@ -10,6 +10,7 @@
 #include "Presentation.h"
 #include "Pins.h"
 #include "Transport.h"
+#include "WebUi.h"
 #include <cstring>
 
 namespace PresentationController
@@ -24,6 +25,7 @@ namespace PresentationController
         ServiceInputBuffer sEthernetInput;
 
         void sendServiceResponse(const char *response) {
+            WebUi::captureServiceResponse(response);
             Serial.println(response);
             Transport::IByteTransport &transport = Transport::instance();
             transport.write(Transport::Channel::Service,

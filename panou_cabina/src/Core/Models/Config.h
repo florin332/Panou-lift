@@ -6,6 +6,14 @@
 
 #include <cstdint>
 
+#if __has_include("WebAuth.local.h")
+#include "WebAuth.local.h"
+#endif
+
+#ifndef WEB_UI_PASSWORD
+#define WEB_UI_PASSWORD ""
+#endif
+
 namespace Config
 {
     // =========================================================
@@ -69,6 +77,13 @@ namespace Config
         constexpr uint16_t SERVICE_PORT = 2005;
         constexpr uint32_t DHCP_TIMEOUT_MS = 1500;
         constexpr uint32_t DHCP_RESPONSE_TIMEOUT_MS = 250;
+    }
+
+    namespace Web
+    {
+        constexpr uint16_t PORT = 80;
+        constexpr const char *AUTH_USERNAME = "service";
+        constexpr const char *AUTH_PASSWORD = WEB_UI_PASSWORD;
     }
 
     // =========================================================

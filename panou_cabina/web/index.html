@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Panou lift</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header>
+  <div><small>PANOUL CABINEI</small><h1>Stare lift</h1></div>
+  <div class="header-controls">
+    <label class="theme-toggle" for="theme-toggle">
+      <input id="theme-toggle" type="checkbox" role="switch" aria-label="Tema intunecata">
+      Tema intunecata
+    </label>
+    <span id="network">Se conecteaza...</span>
+  </div>
+</header>
+<main>
+  <section class="lift">
+    <div><small>ETAJ</small><strong id="floor">--</strong></div>
+    <div><small>DESTINATIE</small><strong id="destination">--</strong></div>
+    <div><small>DIRECTIE</small><strong id="direction">--</strong></div>
+    <div><small>OCUPARE</small><strong id="occupancy">--</strong></div>
+    <div><small>STARE</small><strong id="service">--</strong></div>
+  </section>
+  <section class="diagnostics">
+    <h2>Diagnostic</h2>
+    <dl>
+      <dt>Uptime</dt><dd id="uptime">--</dd>
+      <dt>Ultimul reset</dt><dd id="reset">--</dd>
+      <dd class="reset-divider" aria-hidden="true"></dd>
+      <dt>Cadre totale</dt><dd id="frames">--</dd>
+      <dt>Cadre valide</dt><dd id="valid">--</dd>
+      <dt>Erori CRC</dt><dd id="crc">--</dd>
+      <dt>Timeout</dt><dd id="timeouts">--</dd>
+      <dt>Erori format / date</dt><dd id="errors">--</dd>
+      <dt>Contorizare</dt><dd id="counting">--</dd>
+    </dl>
+  </section>
+  <section>
+    <h2>Retea</h2>
+    <p id="network-detail">--</p>
+    <form id="network-settings">
+      <label>DHCP<input name="dhcp" type="checkbox"></label>
+      <label>IP static<input name="ip" inputmode="decimal" placeholder="192.168.1.50"></label>
+      <label>Masca subnet<input name="subnet" inputmode="decimal" placeholder="255.255.255.0"></label>
+      <label>Gateway<input name="gateway" inputmode="decimal" placeholder="192.168.1.1"></label>
+      <label>DNS<input name="dns" inputmode="decimal" placeholder="192.168.1.1"></label>
+      <button type="button" id="save-network" disabled>Salveaza reteaua</button>
+    </form>
+  </section>
+  <section class="service">
+    <h2>Service si configurare</h2>
+    <p id="auth-note">Autentificarea este necesara pentru comenzile de service.</p>
+    <form id="web-login">
+      <label>Parola<input id="web-password" type="password" autocomplete="current-password"></label>
+      <button type="button" id="web-login-button">Autentificare</button>
+      <button type="button" id="web-logout-button" disabled>Deconectare</button>
+    </form>
+    <div class="actions">
+      <button data-command="SRV ENTER" disabled>Intrare service</button>
+      <button data-command="SRV EXIT" disabled>Iesire service</button>
+      <button data-command="mb_32 1" disabled>Test display</button>
+      <button data-command="mb_33" disabled>Oprire test</button>
+      <button data-command="mb_31 1" disabled>Reset display</button>
+      <button data-command="mb_66 1" disabled>Pagina comunicatie</button>
+      <button data-command="mb_66 0" disabled>Inchide pagina</button>
+      <button data-command="mb_61 1" disabled>Afiseaza contoare</button>
+      <button data-command="mb_62 1" disabled>Ascunde contoare</button>
+      <button data-command="mb_63 1" disabled>Porneste numarare</button>
+      <button data-command="mb_64 1" disabled>Opreste numarare</button>
+      <button data-command="mb_65 1" disabled>Reseteaza contoare</button>
+      <button data-command="mb_67" disabled>Stare afisaj</button>
+      <button data-command="mb_68" disabled>Stare contoare</button>
+      <button data-command="mb_30" disabled>Reset configuratie</button>
+    </div>
+    <form id="settings">
+      <label>Numar ascensor<input name="lift" type="number" min="1" max="65535" required></label>
+      <button type="button" id="save-lift" disabled>Salveaza numarul</button>
+      <label>Gain audio<input name="gain" type="number" min="0" max="4" step="0.01" required></label>
+      <button type="button" id="save-gain" disabled>Salveaza gain</button>
+    </form>
+    <p id="result" role="status"></p>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

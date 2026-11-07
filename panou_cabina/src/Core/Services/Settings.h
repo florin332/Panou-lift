@@ -14,6 +14,15 @@
 
 namespace Settings
 {
+    struct NetworkSettings
+    {
+        uint8_t dhcp;
+        uint8_t ip[4];
+        uint8_t subnet[4];
+        uint8_t gateway[4];
+        uint8_t dns[4];
+    };
+
     // Citește setările din flash; la primul boot sau date corupte
     // încarcă default-urile din Config.h și le salvează.
     void init();
@@ -31,6 +40,9 @@ namespace Settings
 
     // Revine la default-urile din Config.h și persistă
     bool resetDefaults();
+
+    NetworkSettings networkSettings();
+    bool setNetworkSettings(const NetworkSettings &settings);
 }
 
 #endif // SETTINGS_H

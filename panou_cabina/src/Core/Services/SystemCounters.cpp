@@ -7,7 +7,7 @@
 namespace
 {
     constexpr int RESET_COUNTERS_OFFSET = 32;
-    constexpr int EEPROM_SIZE = 64;
+    constexpr int EEPROM_SIZE = 96;
     constexpr uint32_t RESET_COUNTERS_MAGIC = 0x52535443UL;
     constexpr uint16_t RESET_COUNTERS_VERSION = 1;
 
