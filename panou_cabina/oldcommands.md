@@ -21,13 +21,9 @@ MCU LASTRESET
 
 
 
-**mb_lift**  mb11 /mb11n
-**mb_lift număr**
 
-mb_gain
-mb_gain valoare
+
+
 
 mb_defaults
 
-mb_com_status raporteaza cadrul brut dispare
-mb_com_status_out  dispare

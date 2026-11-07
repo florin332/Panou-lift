@@ -13,9 +13,8 @@ namespace Config
     // =========================================================
     namespace Hardware
     {
-        constexpr uint8_t PANEL_FLOOR = 0;   // Parter (etajul unde e panoul)
         constexpr uint8_t FLOORS = 18;       // Total etaje instalație
-        constexpr uint8_t LIFTS = 1;         // Panou pentru un singur ascensor
+
 
         // Default număr ascensor — folosit doar la primul boot sau dacă
         // zona persistentă e coruptă; valoarea reală stă în Settings (flash)
@@ -27,11 +26,11 @@ namespace Config
     // =========================================================
     namespace Timing
     {
-        constexpr uint32_t BUTTON_INHIBIT_MS = 5000;     // Inhibare buton după apel
-        constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat
-        constexpr uint32_t LED_BLINK_SLOW = 500;         // Perioadă clipire lentă LED
-        constexpr uint32_t LED_BLINK_FAST = 150;         // Perioadă clipire rapidă LED
-        constexpr uint32_t BOOT_TIME_MS = 5000;          // Timp boot
+        constexpr uint32_t BUTTON_INHIBIT_MS = 5000;     // Inhibare buton după apel; momentan nefolosită
+        constexpr uint32_t BUTTON_STUCK_MS = 10000;      // Detecție buton blocat; momentan nefolosită
+        constexpr uint32_t LED_BLINK_SLOW = 500;         // Perioadă clipire lentă LED; momentan nefolosită
+        constexpr uint32_t LED_BLINK_FAST = 150;         // Perioadă clipire rapidă LED; momentan nefolosită
+        constexpr uint32_t BOOT_TIME_MS = 5000;          // Timp boot; momentan nefolosită
     }
 
     // =========================================================
@@ -73,8 +72,8 @@ namespace Config
     // =========================================================
     namespace Audio
     {
-        constexpr uint16_t BUZZER_FREQ = 4000;
-        constexpr uint32_t BOOT_BEEP_MS = 80;
+        constexpr uint16_t BUZZER_FREQ = 4000;                   // momentan nefolosită
+        constexpr uint32_t BOOT_BEEP_MS = 80;                    // momentan nefolosită
 
         // Gain audio — DEFAULT_GAIN e folosit doar la primul boot;
         // valoarea reală stă în Settings (flash protejat) și se aplică live
@@ -82,15 +81,15 @@ namespace Config
         constexpr float MIN_GAIN = 0.0f;
         constexpr float MAX_GAIN = 4.0f;
 
-        constexpr uint32_t ARRIVAL_FIRST_PULSE_MS = 60;
-        constexpr uint32_t ARRIVAL_GAP_MS = 160;
-        constexpr uint32_t ARRIVAL_SECOND_PULSE_MS = 310;
+        constexpr uint32_t ARRIVAL_FIRST_PULSE_MS = 60;          // momentan nefolosită
+        constexpr uint32_t ARRIVAL_GAP_MS = 160;                 // momentan nefolosită
+        constexpr uint32_t ARRIVAL_SECOND_PULSE_MS = 310;         // momentan nefolosită
 
-        constexpr uint32_t ALERT_FIRST_PULSE_MS = 40;
-        constexpr uint32_t ALERT_FIRST_GAP_MS = 80;
-        constexpr uint32_t ALERT_SECOND_PULSE_MS = 120;
-        constexpr uint32_t ALERT_SECOND_GAP_MS = 160;
-        constexpr uint32_t ALERT_THIRD_PULSE_MS = 200;
+        constexpr uint32_t ALERT_FIRST_PULSE_MS = 40;             // momentan nefolosită
+        constexpr uint32_t ALERT_FIRST_GAP_MS = 80;               // momentan nefolosită
+        constexpr uint32_t ALERT_SECOND_PULSE_MS = 120;           // momentan nefolosită
+        constexpr uint32_t ALERT_SECOND_GAP_MS = 160;             // momentan nefolosită
+        constexpr uint32_t ALERT_THIRD_PULSE_MS = 200;            // momentan nefolosită
     }
 }
 

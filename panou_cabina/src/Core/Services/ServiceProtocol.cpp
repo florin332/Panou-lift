@@ -163,14 +163,14 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::McuLastReset;
     } else if (strcmp(line, "mb_46") == 0) {
         cmd.type = Command::Type::McuTemp;
-    } else if (strncmp(line, "mb_lift", 7) == 0 && (line[7] == '\0' || line[7] == ' ' || line[7] == '<')) {
+    } else if (strncmp(line, "mb_11", 5) == 0 && (line[5] == '\0' || line[5] == ' ' || line[5] == '<')) {
         // Număr ascensor persistent (flash protejat)
         if (!checkServiceMode()) return;
         char resp[48];
-        if (line[7] == '\0') {
+        if (line[5] == '\0') {
             snprintf(resp, sizeof(resp), "OK LIFT %u", ConfigurationService::liftNumber());
         } else {
-            const char* arg = numericArg(line + 7);
+            const char* arg = numericArg(line + 5);
             char* endPtr = nullptr;
             long value = (arg != nullptr) ? strtol(arg, &endPtr, 10) : 0;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' || value < 1 || value > 65535) {
@@ -178,20 +178,22 @@ static void parseLine(const char* line) {
                 return;
             }
             ConfigurationService::setLiftNumber(static_cast<uint16_t>(value));
-            snprintf(resp, sizeof(resp), "ACK LIFT %u", ConfigurationService::liftNumber());
+            snprintf(resp, sizeof(resp), "ACK_11 %u", ConfigurationService::liftNumber());
         }
         sendResponse(resp);
         return;
-    } else if (strncmp(line, "mb_gain", 7) == 0 && (line[7] == '\0' || line[7] == ' ' || line[7] == '<')) {
+    } else if (strncmp(line, "mb_12", 5) == 0 &&
+               (line[5] == '\0' || line[5] == ' ' || line[5] == '<' ||
+                (line[5] >= '0' && line[5] <= '9') || line[5] == '.')) {
         // Gain audio persistent (flash protejat), aplicat live pe I2S
         if (!checkServiceMode()) return;
         char resp[48];
         char gainStr[12];
-        if (line[7] == '\0') {
+        if (line[5] == '\0') {
             formatGain(gainStr, sizeof(gainStr), AlarmService::gain());
             snprintf(resp, sizeof(resp), "OK GAIN %s", gainStr);
         } else {
-            const char* arg = numericArg(line + 7);
+            const char* arg = numericArg(line + 5);
             char* endPtr = nullptr;
             float value = (arg != nullptr) ? strtof(arg, &endPtr) : 0.0f;
             if (arg == nullptr || endPtr == arg || *endPtr != '\0' || !AlarmService::setGain(value)) {
@@ -199,7 +201,7 @@ static void parseLine(const char* line) {
                 return;
             }
             formatGain(gainStr, sizeof(gainStr), AlarmService::gain());
-            snprintf(resp, sizeof(resp), "ACK GAIN %s", gainStr);
+            snprintf(resp, sizeof(resp), "ACK_12 %s", gainStr);
         }
         sendResponse(resp);
         return;
@@ -210,12 +212,6 @@ static void parseLine(const char* line) {
         if (AlarmService::isPlaying()) AlarmService::stop();
         AlarmService::setGain(ConfigurationService::audioGain());
         sendResponse("ACK DEFAULTS");
-        return;
-    } else if (strcmp(line, "mb_com_status") == 0) {
-        cmd.type = Command::Type::CommCountStatus;
-    } else if (strcmp(line, "mb_com_status_out") == 0) {
-        // Fara pagina pe panou (afisarea e pe Service Box): ACK no-op
-        sendResponse("ACK COMM STATUS OUT");
         return;
     } else {
         sendResponse("ERR 01 UNKNOWN_CMD");

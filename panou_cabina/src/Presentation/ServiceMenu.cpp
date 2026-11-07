@@ -43,7 +43,6 @@ static void renderRxCounterValues(const SharedPanel &panel);
 static void startColorTest(uint8_t target);
 static void stopColorTest();
 static void updateColorTest();
-static void sendCommCountStatus();
 static void sendDiagnostics();
 static void sendMcuUptime();
 static void sendMcuResets();
@@ -278,11 +277,6 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             ServiceProtocol::sendResponse("ACK_62 1");
             break;
 
-        case ServiceProtocol::Command::Type::CommCountStatus:
-            if (!checkService()) break;
-            sendCommCountStatus();
-            break;
-
         case ServiceProtocol::Command::Type::McuUptime:
             if (!checkService()) break;
             sendMcuUptime();
@@ -401,29 +395,6 @@ static void renderRxCounterValues(const SharedPanel &panel) {
         }
     }
     sRxCounterValuesDirty = false;
-}
-
-// Raporteaza contoarele de receptie detaliate pe serial (afisarea se face pe Service Box)
-// Format: OK COMM STATUS L1=frames,valid,timeout,formatErr,crcErr,dataErr ON|OFF
-static void sendCommCountStatus() {
-    SharedPanel panel;
-    if (!ApplicationState::read(panel)) {
-        ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
-        return;
-    }
-
-    const CommLineCounters &c1 = panel.comm.lift1;
-    char response[96];
-    snprintf(response, sizeof(response),
-        "OK COMM STATUS L1=%lu,%lu,%lu,%lu,%lu,%lu %s",
-        static_cast<unsigned long>(c1.rxFrames),
-        static_cast<unsigned long>(c1.rxValid),
-        static_cast<unsigned long>(c1.rxTimeout),
-        static_cast<unsigned long>(c1.rxFormatError),
-        static_cast<unsigned long>(c1.rxCrcError),
-        static_cast<unsigned long>(c1.rxDataError),
-        panel.comm.countingEnabled ? "ON" : "OFF");
-    ServiceProtocol::sendResponse(response);
 }
 
 static void sendDiagnostics() {

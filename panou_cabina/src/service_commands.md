@@ -10,7 +10,7 @@ Specificația țintă (sursa de adevăr) este `service-box2/src/service_commands
 | --- | --- | --- |
 | 0 — Comenzi principale | `mb_00` – `mb_01` | Intrare / ieșire Service Mode |
 | 1 — Flash firmware | `mb_02` | Reset în bootloader USB pentru programare |
-| 2 — Setări persistente | `mb_03` – `mb_05` | Număr ascensor, gain audio, default-uri |
+| 2 — Setări persistente | `mb_05`, `mb_11` – `mb_12` | Număr ascensor, gain audio, default-uri |
 | 6 — COMM și contoare RX | `mb_61` – `mb_65` | Afișare și control contoare de comunicație |
 
 Parserul recunoaște **exclusiv** forma `mb_NN`; nu există aliasuri.
@@ -40,10 +40,10 @@ Argumentul numeric poate fi trimis simplu (`mb_04 0.60`) sau încadrat de marker
 
 | Comandă | Efect / răspuns |
 | --- | --- |
-| `mb_03` | Interoghează numărul ascensorului: `OK LIFT <n>`. |
-| `mb_03 <n>` | Setează numărul ascensorului (`1`–`65535`) și îl salvează în flash; `ACK_03 <n>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
-| `mb_04` | Interoghează gain-ul audio: `OK GAIN <x.xx>`. |
-| `mb_04 <x.xx>` | Setează gain-ul audio (`0.00`–`4.00`), îl aplică imediat pe ieșirea I2S și îl salvează în flash; `ACK_04 <x.xx>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
+| `mb_11` | Interoghează numărul ascensorului: `OK LIFT <n>`. |
+| `mb_11 <n>` | Setează numărul ascensorului (`1`–`65535`) și îl salvează în flash; `ACK_11 <n>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
+| `mb_12` | Interoghează gain-ul audio: `OK GAIN <x.xx>`. |
+| `mb_12<x.xx>` sau `mb_12 <x.xx>` | Setează gain-ul audio (`0.00`–`4.00`), îl aplică imediat pe ieșirea I2S și îl salvează în flash; `ACK_12 <x.xx>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
 | `mb_05` | Revine la default-urile din `Config.h` (număr ascensor + gain) și le persistă; `ACK_05`. |
 
 ## Grup 6 — COMM și contoare RX
@@ -73,7 +73,5 @@ Modificări necesare în `src/Core/Services/ServiceProtocol.cpp` și `src/Presen
 
 - [ ] **`mb_02` (critic):** parserul acceptă azi doar `SRV BOOTSEL` / `mb_boot` și răspunde `ACK SRV BOOTSEL`. De adăugat recunoaștere `mb_02` și răspuns `ACK_02`; de eliminat formele vechi. Box-ul trimite deja exclusiv `mb_02` — **flash-ul din box nu funcționează până la această modificare**. Markerii de diagnosticare `DBG P0/S1/S3/S4` rămân neschimbați (box-ul îi ignoră la așteptarea ACK-ului).
 - [ ] **`mb_01` / `mb_00`:** păstrate, dar `mb_00` trebuie să răspundă `ACK_00` (azi `ACK SRV EXIT`). De eliminat aliasurile `SRV ENTER` / `SRV EXIT`.
-- [ ] **`mb_03`:** redenumire `mb_lift` → `mb_03`; interogare `OK LIFT <n>`, setare `ACK_03 <n>` (azi `ACK LIFT <n>`).
-- [ ] **`mb_04`:** redenumire `mb_gain` → `mb_04`; setare `ACK_04 <x.xx>` (azi `ACK GAIN <x.xx>`). Formatarea manuală `X.XX` (newlib-nano fără `%f`) rămâne.
 - [ ] **`mb_05`:** redenumire `mb_defaults` → `mb_05`, răspuns `ACK_05`. Atenție: handlerul actual oprește redarea audio și reaplică gain-ul — comportamentul se păstrează.
-- [ ] **De eliminat din parser** până la definirea grupurilor viitoare: `COMM TEST`/`mb_com`, `mb_com_out`, `mb_diag`, `mb_com_status`, `mb_com_status_out`, `MCU *`. Vor răspunde temporar `ERR 01 UNKNOWN_CMD`.
+- [ ] **De eliminat din parser** până la definirea grupurilor viitoare: `COMM TEST`/`mb_com`, `mb_com_out`, `mb_diag`, `MCU *`. Vor răspunde temporar `ERR 01 UNKNOWN_CMD`. `mb_com_status` și `mb_com_status_out` au fost eliminate; contoarele RX folosesc `mb_61`–`mb_65`.
