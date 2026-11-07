@@ -45,7 +45,6 @@ namespace Diagnostics
 
     void interpret(const SharedPanel &snapshot, ProcessedDiagnostics &output) {
         // 1. Traducere metrici sistem
-        output.boots = snapshot.system.bootCounter;
         output.resetReason = getResetReasonText(snapshot.system.lastResetReason);
         output.uptime = snapshot.system.uptimeSeconds;
         output.memoryAddress = ApplicationState::memoryAddress();
@@ -59,7 +58,6 @@ namespace Diagnostics
         output.lift1.svc = getServiceText(snapshot.lift1.svc);
 
         // 3. Copiere statistici sistem
-        output.seqlockCollisions = snapshot.system.seqlockCollisions;
         output.rxFrames = snapshot.comm.lift1.rxFrames;
         output.rxTimeouts = snapshot.comm.lift1.rxTimeout;
         output.rxFormatErrors = snapshot.comm.lift1.rxFormatError;

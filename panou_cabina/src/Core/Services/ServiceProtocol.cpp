@@ -62,12 +62,17 @@ static void parseLine(const char* line) {
         // (parseLine ruleaza acum tot pe core0, sendResponse e sigur aici).
         sendResponse("DBG P0 bootsel-primit");
         cmd.type = Command::Type::EnterBootsel;
-    } else if (strcmp(line, "COMM TEST") == 0 || strcmp(line, "mb_com") == 0) {
-        cmd.type = Command::Type::CommTest;
-    } else if (strcmp(line, "mb_com_out") == 0) {
-        cmd.type = Command::Type::CommTestOut;
-    } else if (strcmp(line, "mb_diag") == 0) {
-        cmd.type = Command::Type::Diagnostics;
+    } else if (strncmp(line, "mb_66", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        const long value = strtol(arg, &endPtr, 10);
+        if (endPtr == arg || *endPtr != '\0' || (value != 0 && value != 1)) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = value == 1 ? Command::Type::ShowCommPage : Command::Type::HideCommPage;
+        cmd.param = static_cast<uint8_t>(value);
     } else if (strncmp(line, "mb_31", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;
         const char* arg = numericArg(line + 5);
@@ -162,10 +167,6 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::QueryCommunicationCounters;
     } else if (strcmp(line, "mb_45") == 0) {
         cmd.type = Command::Type::McuUptime;
-    } else if (strcmp(line, "MCU RESETS") == 0 || strcmp(line, "mb_resets") == 0) {
-        cmd.type = Command::Type::McuResets;
-    } else if (strcmp(line, "MCU WDT") == 0 || strcmp(line, "mb_wdt") == 0) {
-        cmd.type = Command::Type::McuWdt;
     } else if (strcmp(line, "mb_47") == 0) {
         cmd.type = Command::Type::McuLastReset;
     } else if (strcmp(line, "mb_46") == 0) {
@@ -239,13 +240,13 @@ static void parseLine(const char* line) {
         }
         sendResponse(resp);
         return;
-    } else if (strcmp(line, "mb_defaults") == 0) {
+    } else if (strcmp(line, "mb_30") == 0) {
         // Revine la default-urile din Config.h (lift + gain) și persistă
         if (!checkServiceMode()) return;
         ConfigurationService::resetDefaults();
         if (AlarmService::isPlaying()) AlarmService::stop();
         AlarmService::setGain(ConfigurationService::audioGain());
-        sendResponse("ACK DEFAULTS");
+        sendResponse("ACK_30");
         return;
     } else {
         sendResponse("ERR 01 UNKNOWN_CMD");

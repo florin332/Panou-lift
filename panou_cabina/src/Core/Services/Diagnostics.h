@@ -14,7 +14,6 @@ struct LiftDiagnostics {
 
 // Structura generală de diagnostic ierarhizată și scalabilă (Observația ta)
 struct ProcessedDiagnostics {
-    uint16_t boots;
     const char* resetReason; 
     uint32_t uptime;
     uint32_t memoryAddress;
@@ -24,7 +23,6 @@ struct ProcessedDiagnostics {
     LiftDiagnostics lift1;
 
     // Statistici de sistem
-    uint16_t seqlockCollisions;
     uint32_t rxFrames;
     uint32_t rxTimeouts;
     uint32_t rxFormatErrors;

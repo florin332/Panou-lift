@@ -1,6 +1,6 @@
 // Presentation/ServiceMenu.cpp
 // Service Mode: date reale + chenar overlay (portocaliu/rosu)
-// Pagina COMM ramane pe ecran pana la mb_com_out (manual din Magic Box)
+// Pagina COMM ramane pe ecran pana la mb_66 0 (manual din Service Box)
 
 #include "ServiceMenu.h"
 #include "ServiceProtocol.h"
@@ -34,20 +34,17 @@ static bool sRxCounterValuesDirty = true;
 
 // Forward declarations
 static void handleCommand(const ServiceProtocol::Command &cmd);
-static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData);
+static uint16_t getOverlayColor(bool haveNewData);
 static void restoreServiceMain();
-static void exitCommPage();
-static void runCommTest();
+static void closeCommPage();
+static void showCommPage();
 static void drawCommPage(const SharedPanel &panel);
 static void drawRxCounterPage(const SharedPanel &panel);
 static void renderRxCounterValues(const SharedPanel &panel);
 static void startColorTest(uint8_t target);
 static void stopColorTest();
 static void updateColorTest();
-static void sendDiagnostics();
 static void sendMcuUptime();
-static void sendMcuResets();
-static void sendMcuWdt();
 static void sendMcuLastReset();
 static void sendMcuTemp();
 static bool checkService();
@@ -105,7 +102,7 @@ void update() {
             Graphics::update(localPanel);
             PanelRenderer::render(GraphicsTarget::Panel, localPanel.lift1, "ASCENSOR");
         }
-        uint16_t overlayColor = getOverlayColor(localPanel, haveNewData);
+        uint16_t overlayColor = getOverlayColor(haveNewData);
         Graphics::drawServiceOverlay(GraphicsTarget::Panel, overlayColor);
     }
     if (sInService.load(std::memory_order_relaxed) && sServicePageMode == ServicePageMode::ColorTest) {
@@ -113,7 +110,7 @@ void update() {
     }
     if (sInService.load(std::memory_order_relaxed) && sServicePageMode == ServicePageMode::RxCounters) {
         if (haveNewData) renderRxCounterValues(localPanel);
-        Graphics::drawServiceOverlay(GraphicsTarget::Panel, getOverlayColor(localPanel, haveNewData));
+        Graphics::drawServiceOverlay(GraphicsTarget::Panel, getOverlayColor(haveNewData));
     }
 
     // 3. Consuma comenzi de la Core 1 (Magic Box)
@@ -125,11 +122,8 @@ void update() {
 }
 
 // ==================== CULOARE OVERLAY ====================
-static uint16_t getOverlayColor(const SharedPanel &panel, bool haveNewData) {
+static uint16_t getOverlayColor(bool haveNewData) {
     if (!haveNewData) return 0xF800; // COLOR_RED
-    if (panel.system.seqlockCollisions > 0) {
-        return 0xF800; // COLOR_RED
-    }
     return 0xFD20; // COLOR_ORANGE
 }
 
@@ -143,7 +137,7 @@ static void restoreServiceMain() {
 
     PanelRenderer::render(GraphicsTarget::Panel, panel.lift1, "ASCENSOR");
 
-    uint16_t color = getOverlayColor(panel, true);
+    uint16_t color = getOverlayColor(true);
     Graphics::drawServiceOverlay(GraphicsTarget::Panel, color);
 }
 
@@ -194,14 +188,9 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
                 delay(500);
             }
 
-        case ServiceProtocol::Command::Type::CommTest:
+        case ServiceProtocol::Command::Type::ShowCommPage:
             if (!checkService()) break;
-            runCommTest();
-            break;
-
-        case ServiceProtocol::Command::Type::Diagnostics:
-            if (!checkService()) break;
-            sendDiagnostics();
+            showCommPage();
             break;
 
         case ServiceProtocol::Command::Type::ResetDisplay:
@@ -244,9 +233,9 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             ServiceProtocol::sendResponse("ACK_33");
             break;
 
-        case ServiceProtocol::Command::Type::CommTestOut:
+        case ServiceProtocol::Command::Type::HideCommPage:
             if (!checkService()) break;
-            exitCommPage();
+            closeCommPage();
             break;
 
         case ServiceProtocol::Command::Type::StartCommCounterDisplay: {
@@ -297,16 +286,6 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
             sendMcuUptime();
             break;
 
-        case ServiceProtocol::Command::Type::McuResets:
-            if (!checkService()) break;
-            sendMcuResets();
-            break;
-
-        case ServiceProtocol::Command::Type::McuWdt:
-            if (!checkService()) break;
-            sendMcuWdt();
-            break;
-
         case ServiceProtocol::Command::Type::McuLastReset:
             if (!checkService()) break;
             sendMcuLastReset();
@@ -332,7 +311,7 @@ static bool checkService() {
 }
 
 // ==================== COMUNICATION ====================
-static void runCommTest() {
+static void showCommPage() {
     SharedPanel panel;
     if (!ApplicationState::read(panel)) {
         ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
@@ -340,7 +319,7 @@ static void runCommTest() {
     }
 
     drawCommPage(panel);
-    ServiceProtocol::sendResponse("OK mb_com L1=DATA");
+    ServiceProtocol::sendResponse("ACK_66 1");
 }
 
 static void drawCommPage(const SharedPanel &panel) {
@@ -412,20 +391,6 @@ static void renderRxCounterValues(const SharedPanel &panel) {
     sRxCounterValuesDirty = false;
 }
 
-static void sendDiagnostics() {
-    SharedPanel panel;
-    if (!ApplicationState::read(panel)) {
-        ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
-        return;
-    }
-
-    char response[128];
-    snprintf(response, sizeof(response),
-        "OK DIAG SEQ=%u RESET=%u",
-        panel.system.seqlockCollisions, panel.system.lastResetReason);
-    ServiceProtocol::sendResponse(response);
-}
-
 static void startColorTest(uint8_t target) {
     if (target != 1) {
         ServiceProtocol::sendResponse("ERR 08 INVALID_PARAM");
@@ -458,10 +423,10 @@ static void updateColorTest() {
     Graphics::drawColorTestPage(GraphicsTarget::Panel, sColorTestIndex, sColorTestLabelAtTop);
 }
 
-static void exitCommPage() {
+static void closeCommPage() {
     sServicePageMode = ServicePageMode::Live;
     restoreServiceMain();
-    ServiceProtocol::sendResponse("ACK mb_com_out");
+    ServiceProtocol::sendResponse("ACK_66 0");
 }
 
 // ==================== PICO / MCU (Serial only) ====================
@@ -474,22 +439,6 @@ static void sendMcuUptime() {
     } else {
         ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
     }
-}
-
-static void sendMcuResets() {
-    SharedPanel localPanel;
-    if (ApplicationState::read(localPanel)) {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "OK MCU RESETS %u", localPanel.system.bootCounter);
-        ServiceProtocol::sendResponse(buf);
-    } else {
-        ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
-    }
-}
-
-static void sendMcuWdt() {
-    bool wdtEnabled = true;
-    ServiceProtocol::sendResponse(wdtEnabled ? "OK MCU WDT ENABLED" : "OK MCU WDT DISABLED");
 }
 
 static void sendMcuLastReset() {

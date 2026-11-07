@@ -7,7 +7,7 @@
 namespace
 {
     constexpr int RESET_COUNTERS_OFFSET = 32;
-    constexpr int BOOT_COUNTER_OFFSET = 256;
+    constexpr int EEPROM_SIZE = 64;
     constexpr uint32_t RESET_COUNTERS_MAGIC = 0x52535443UL;
     constexpr uint16_t RESET_COUNTERS_VERSION = 1;
 
@@ -21,8 +21,8 @@ namespace
     };
 
     static_assert(sizeof(PersistedResetCounters) == 28, "Reset counter EEPROM layout changed");
-    static_assert(RESET_COUNTERS_OFFSET + sizeof(PersistedResetCounters) <= BOOT_COUNTER_OFFSET,
-                  "Reset counters overlap boot counter");
+    static_assert(RESET_COUNTERS_OFFSET + sizeof(PersistedResetCounters) <= EEPROM_SIZE,
+                  "Reset counters exceed EEPROM storage");
 
     uint32_t crc32(const uint8_t *bytes, size_t length)
     {

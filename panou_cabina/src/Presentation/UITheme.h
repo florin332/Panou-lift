@@ -45,7 +45,6 @@ namespace UITheme
         if (strcmp(labelKey, "RAM_ADDR_MAP") == 0)     return "Shared RAM A :";
         if (strcmp(labelKey, "SEQLOCK_VAL") == 0)      return "Seqlock Value:";
         if (strcmp(labelKey, "RAM_ALIGN") == 0)        return "RAM Alignment:";
-        if (strcmp(labelKey, "SEQLOCK_COLL") == 0)     return "Collisions   :";
         
         if (strcmp(labelKey, "CORE0_PROC") == 0)       return "Core0 Process:";
         if (strcmp(labelKey, "CORE1_PROC") == 0)       return "Core1 Process:";

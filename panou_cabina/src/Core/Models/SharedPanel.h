@@ -61,8 +61,6 @@ struct UiState {
 
 struct SystemState {
     uint32_t uptimeSeconds;
-    uint16_t seqlockCollisions;
-    uint16_t bootCounter;
     uint8_t  lastResetReason;
 };
 

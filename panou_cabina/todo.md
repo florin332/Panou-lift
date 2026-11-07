@@ -6,7 +6,6 @@
 
 ## 2. Dual TFT Graphic Rendering Layers
 - [ ] Code the service layout frame overlay to lock out standard display rendering when `mb_01` status is active.
-- [ ] Map the tokenized data array from the `mb_com` response payload directly into separate Left/Right text layout objects.
 - [x] Implement a nonblocking LCD color test following the `panou_duplex` model (`mb_32 1` / `mb_33`).
 
 

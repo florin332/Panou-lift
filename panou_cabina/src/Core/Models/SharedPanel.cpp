@@ -27,8 +27,6 @@ static void writePanel(volatile SharedMemory &sharedMem, const SharedPanel &newD
 
     // --- COPIERE PRIMITIVĂ TYPE-SAFE STRUCTURA SYSTEM ---
     sharedMem.panel.system.uptimeSeconds      = newData.system.uptimeSeconds;
-    sharedMem.panel.system.seqlockCollisions  = newData.system.seqlockCollisions;
-    sharedMem.panel.system.bootCounter        = newData.system.bootCounter;
     sharedMem.panel.system.lastResetReason    = newData.system.lastResetReason;
 
     // --- COPIERE PRIMITIVĂ TYPE-SAFE STRUCTURA COMM (CONTOARE RX DETALIATE) ---
@@ -68,8 +66,6 @@ static bool readPanel(volatile const SharedMemory &sharedMem, SharedPanel &local
         localCopy.ui.theme       = sharedMem.panel.ui.theme;
 
         localCopy.system.uptimeSeconds     = sharedMem.panel.system.uptimeSeconds;
-        localCopy.system.seqlockCollisions = sharedMem.panel.system.seqlockCollisions;
-        localCopy.system.bootCounter       = sharedMem.panel.system.bootCounter;
         localCopy.system.lastResetReason   = sharedMem.panel.system.lastResetReason;
 
         localCopy.comm.lift1.rxFrames      = sharedMem.panel.comm.lift1.rxFrames;
@@ -87,7 +83,6 @@ static bool readPanel(volatile const SharedMemory &sharedMem, SharedPanel &local
         
         // Corecție conform Observației 6: prag limitat strict la 3 reîncercări pentru fluiditate SPI
         if (retries > 3) {
-            localCopy.system.seqlockCollisions++; // Incrementăm contorul de diagnoză pe stiva locală
             return false; // Renunțăm instant la eșantionul corupt pentru a păstra determinismul
         }
         

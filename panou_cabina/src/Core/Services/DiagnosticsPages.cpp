@@ -44,11 +44,11 @@ namespace DiagnosticsPages
         switch (pageType) {
             case ServicePage::System:
                 output.title = "SYS_STATUS_TITLE"; // Cheie simbolică abstractă
-                fillNum(output.lines[0], "SYS_BOOT_CNT", info.boots, SemanticState::Neutral);
-                fillTxt(output.lines[1], "SYS_RST_REAS", info.resetReason, SemanticState::Warning);
-                fillNum(output.lines[2], "SYS_UPTIME", info.uptime, SemanticState::Success);
-                fillSeparator(output.lines[3]); // Randare direct structurală de separator hardware!
-                fillEmpty(output.lines[4]);     // Randare directă de rând liber
+                fillTxt(output.lines[0], "SYS_RST_REAS", info.resetReason, SemanticState::Warning);
+                fillNum(output.lines[1], "SYS_UPTIME", info.uptime, SemanticState::Success);
+                fillSeparator(output.lines[2]);
+                fillEmpty(output.lines[3]);
+                fillEmpty(output.lines[4]);
                 break;
 
             case ServicePage::Lift1:
@@ -102,7 +102,7 @@ namespace DiagnosticsPages
                 fillHex(output.lines[0], "RAM_ADDR_MAP", info.memoryAddress);
                 fillNum(output.lines[1], "SEQLOCK_VAL", info.sequence, SemanticState::Warning);
                 fillNum(output.lines[2], "RAM_ALIGN", alignof(SharedMemory), SemanticState::Success);
-                fillNum(output.lines[3], "SEQLOCK_COLL", info.seqlockCollisions, info.seqlockCollisions == 0 ? SemanticState::Success : SemanticState::Alert);
+                fillEmpty(output.lines[3]);
                 fillEmpty(output.lines[4]);
                 break;
 

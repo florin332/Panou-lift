@@ -11,19 +11,16 @@ struct Command {
         EnterService,
         ExitService,
         EnterBootsel,     // SRV BOOTSEL / mb_boot - executat pe core0
-        CommTest,
-        CommTestOut,      // exit COMM test
+        ShowCommPage,
+        HideCommPage,
         StartCommCounterDisplay, // mb_61 1
         StopCommCounterDisplay,  // mb_62 1
         QueryCommunicationDisplay, // mb_67
         QueryCommunicationCounters, // mb_68
-        Diagnostics,
         ResetDisplay,     // mb_31 1
         StartDisplayTest, // mb_32 1
         StopDisplayTest,  // mb_33
         McuUptime,
-        McuResets,
-        McuWdt,
         McuLastReset,
         McuTemp
     } type = Type::None;

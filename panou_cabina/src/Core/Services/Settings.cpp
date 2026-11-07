@@ -12,7 +12,7 @@ namespace
 {
     constexpr uint32_t SETTINGS_MAGIC   = 0x4C494654UL;  // "LIFT"
     constexpr uint16_t SETTINGS_VERSION = 1;
-    constexpr size_t   EEPROM_SIZE      = 258;           // setări + contor boot la offset 256
+    constexpr size_t   EEPROM_SIZE      = 64;            // setări + contoare reset la offset 32
 
     struct PersistedData
     {
