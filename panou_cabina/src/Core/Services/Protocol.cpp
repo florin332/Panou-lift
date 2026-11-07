@@ -7,6 +7,7 @@
 #include "Config.h"
 #include "Transport.h"
 #include "Arduino.h"
+#include <atomic>
 
 namespace Protocol
 {
@@ -33,7 +34,8 @@ namespace Protocol
     // Contoare receptie detaliate: inactive dupa reboot, pornite din Service Box
     // Singurul canal RX activ: ascensorul cabinei.
     // -------------------------------------------------------------------------
-    static bool sCountingEnabled = false;
+    static std::atomic<bool> sCountingEnabled{false};
+    static std::atomic<bool> sResetCountersRequested{false};
     static uint32_t sRxFrames[1]      = {0}; // cadre complet delimitate (START...END)
     static uint32_t sRxValid[1]       = {0}; // cadre acceptate (format+CRC+domeniu)
     static uint32_t sRxTimeout[1]     = {0}; // cadru inceput, neterminat in timeout
@@ -63,17 +65,17 @@ namespace Protocol
             value, Config::Protocol::START_MARKER, Config::Protocol::END_MARKER, millis());
 
         if (event == FrameDecoder::Event::Resynchronized) {
-            if (sCountingEnabled) sRxFormatError[liftIdx]++;
+            if (sCountingEnabled.load(std::memory_order_relaxed)) sRxFormatError[liftIdx]++;
         }
 
         if (event == FrameDecoder::Event::Complete) {
-            if (sCountingEnabled) sRxFrames[liftIdx]++;
+            if (sCountingEnabled.load(std::memory_order_relaxed)) sRxFrames[liftIdx]++;
         }
     }
 
     static void verifyFrameTimeout(RxBuffer &buffer, uint8_t liftIdx) {
         if (buffer.decoder.checkTimeout(millis(), Config::Protocol::PACKET_TIMEOUT_MS)) {
-            if (sCountingEnabled) sRxTimeout[liftIdx]++;
+            if (sCountingEnabled.load(std::memory_order_relaxed)) sRxTimeout[liftIdx]++;
         }
     }
 
@@ -86,7 +88,8 @@ namespace Protocol
         rxLift1.reset();
         rxLift1.lastValidPacketMillis = millis();
         // Dupa reboot numararea este inactiva si contoarele sunt zero
-        sCountingEnabled = false;
+        sCountingEnabled.store(false, std::memory_order_relaxed);
+        sResetCountersRequested.store(false, std::memory_order_relaxed);
         resetCounters();
     }
 
@@ -95,6 +98,10 @@ namespace Protocol
     // -------------------------------------------------------------------------
     void update(SharedPanel &localPanel) {
         char payload[FRAME_BUFFER_SIZE];
+
+        if (sResetCountersRequested.exchange(false, std::memory_order_relaxed)) {
+            resetCounters();
+        }
 
         Transport::IByteTransport &transport = Transport::instance();
         while (transport.available(Transport::Channel::EncoderRx) > 0 && !rxLift1.decoder.hasFrame()) {
@@ -115,15 +122,15 @@ namespace Protocol
             if (parsed == EncoderProtocol::ParseResult::Valid) {
                 localPanel.lift1 = tempState;
                 rxLift1.lastValidPacketMillis = millis();
-                if (sCountingEnabled) sRxValid[0]++;
-            } else if (sCountingEnabled) {
+                if (sCountingEnabled.load(std::memory_order_relaxed)) sRxValid[0]++;
+            } else if (sCountingEnabled.load(std::memory_order_relaxed)) {
                 if (parsed == EncoderProtocol::ParseResult::FormatError) sRxFormatError[0]++;
                 else sRxDataError[0]++;
             }
         } else if (frame1 == EncoderProtocol::FrameResult::CrcError) {
-            if (sCountingEnabled) sRxCrcError[0]++;
+            if (sCountingEnabled.load(std::memory_order_relaxed)) sRxCrcError[0]++;
         } else if (frame1 == EncoderProtocol::FrameResult::FormatError) {
-            if (sCountingEnabled) sRxFormatError[0]++;
+            if (sCountingEnabled.load(std::memory_order_relaxed)) sRxFormatError[0]++;
         }
         if (millis() - rxLift1.lastValidPacketMillis > Config::Protocol::PACKET_TIMEOUT_MS) {
             localPanel.lift1.svc = ServiceState::Missing;
@@ -136,27 +143,26 @@ namespace Protocol
         localPanel.comm.lift1.rxFormatError = sRxFormatError[0];
         localPanel.comm.lift1.rxCrcError    = sRxCrcError[0];
         localPanel.comm.lift1.rxDataError   = sRxDataError[0];
-        localPanel.comm.countingEnabled     = sCountingEnabled ? 1 : 0;
+        localPanel.comm.countingEnabled     = sCountingEnabled.load(std::memory_order_relaxed) ? 1 : 0;
     }
 
     // -------------------------------------------------------------------------
-    // API control contoare (apelat de ServiceProtocol pe acelasi Core 1)
+    // Cererile de control pot veni de pe Core 0; contoarele se modifica doar pe Core 1.
     // -------------------------------------------------------------------------
     void commCountEnable() {
-        sCountingEnabled = true;
+        sCountingEnabled.store(true, std::memory_order_relaxed);
     }
 
     void commCountDisable() {
-        sCountingEnabled = false;
-        resetCounters();
+        sCountingEnabled.store(false, std::memory_order_relaxed);
     }
 
     void commCountReset() {
-        resetCounters();
+        sResetCountersRequested.store(true, std::memory_order_relaxed);
     }
 
     bool commCountIsEnabled() {
-        return sCountingEnabled;
+        return sCountingEnabled.load(std::memory_order_relaxed);
     }
 
 }

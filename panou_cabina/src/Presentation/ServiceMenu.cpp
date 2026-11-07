@@ -5,10 +5,12 @@
 #include "ServiceMenu.h"
 #include "ServiceProtocol.h"
 #include "Graphics.h"
+#include "DisplayGeometry.h"
 #include "BuildInfo.h"
 #include "SharedPanel.h"
 #include "PanelRenderer.h"
 #include <Arduino.h>
+#include <Fonts/FreeSans12pt7b.h>
 #include <pico/bootrom.h>
 #include <pico/multicore.h>
 #include <hardware/watchdog.h>
@@ -20,12 +22,14 @@ namespace ServiceMenu {
 static std::atomic<bool> sInService{false};
 static unsigned long sLastActivityMillis = 0;
 
-enum class ServicePageMode : uint8_t { Live, Communication, ColorTest };
+enum class ServicePageMode : uint8_t { Live, Communication, RxCounters, ColorTest };
 static ServicePageMode sServicePageMode = ServicePageMode::Live;
 static uint8_t sColorTestIndex = 0;
 static bool sColorTestLabelAtTop = true;
 static unsigned long sColorTestLastStepMillis = 0;
 static constexpr unsigned long COLOR_TEST_STEP_MS = 3000;
+static uint32_t sLastRxCounterValues[6] = {};
+static bool sRxCounterValuesDirty = true;
 
 // Forward declarations
 static void handleCommand(const ServiceProtocol::Command &cmd);
@@ -34,6 +38,8 @@ static void restoreServiceMain();
 static void exitCommPage();
 static void runCommTest();
 static void drawCommPage(const SharedPanel &panel);
+static void drawRxCounterPage(const SharedPanel &panel);
+static void renderRxCounterValues(const SharedPanel &panel);
 static void startColorTest(uint8_t target);
 static void stopColorTest();
 static void updateColorTest();
@@ -80,6 +86,7 @@ void init() {
     sColorTestIndex = 0;
     sColorTestLabelAtTop = true;
     sColorTestLastStepMillis = 0;
+    sRxCounterValuesDirty = true;
 }
 
 bool isInServiceMode() {
@@ -103,6 +110,10 @@ void update() {
     }
     if (sInService.load(std::memory_order_relaxed) && sServicePageMode == ServicePageMode::ColorTest) {
         updateColorTest();
+    }
+    if (sInService.load(std::memory_order_relaxed) && sServicePageMode == ServicePageMode::RxCounters) {
+        if (haveNewData) renderRxCounterValues(localPanel);
+        Graphics::drawServiceOverlay(GraphicsTarget::Panel, getOverlayColor(localPanel, haveNewData));
     }
 
     // 3. Consuma comenzi de la Core 1 (Magic Box)
@@ -207,6 +218,15 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
                     break;
                 }
                 drawCommPage(panel);
+            } else if (sServicePageMode == ServicePageMode::RxCounters) {
+                SharedPanel panel;
+                if (!ApplicationState::read(panel)) {
+                    sServicePageMode = ServicePageMode::Live;
+                    PanelRenderer::invalidate(GraphicsTarget::Panel);
+                    ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
+                    break;
+                }
+                drawRxCounterPage(panel);
             } else {
                 restoreServiceMain();
             }
@@ -227,6 +247,35 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
         case ServiceProtocol::Command::Type::CommTestOut:
             if (!checkService()) break;
             exitCommPage();
+            break;
+
+        case ServiceProtocol::Command::Type::StartCommCounterDisplay: {
+            if (!checkService()) break;
+            if (cmd.param != 1) {
+                ServiceProtocol::sendResponse("ERR 08 INVALID_PARAM");
+                break;
+            }
+            SharedPanel panel;
+            if (!ApplicationState::read(panel)) {
+                ServiceProtocol::sendResponse("ERR 06 SEQLOCK");
+                break;
+            }
+            drawRxCounterPage(panel);
+            ServiceProtocol::sendResponse("ACK_61 1");
+            break;
+        }
+
+        case ServiceProtocol::Command::Type::StopCommCounterDisplay:
+            if (!checkService()) break;
+            if (cmd.param != 1) {
+                ServiceProtocol::sendResponse("ERR 08 INVALID_PARAM");
+                break;
+            }
+            if (sServicePageMode == ServicePageMode::RxCounters) {
+                sServicePageMode = ServicePageMode::Live;
+                restoreServiceMain();
+            }
+            ServiceProtocol::sendResponse("ACK_62 1");
             break;
 
         case ServiceProtocol::Command::Type::CommCountStatus:
@@ -304,6 +353,54 @@ static void drawCommPage(const SharedPanel &panel) {
     Graphics::printCommLine(panelDisplay, 4, "Ocp :",
         svc1Normal ? occupancyText(panel.lift1.ocp) : "- ! -",
         svc1Normal ? 0xFFFF : 0xFE60);
+}
+
+static void drawRxCounterPage(const SharedPanel &panel) {
+    static const char *labels[] = {"Total", "Valid", "Timeout", "Format", "CRC", "Data"};
+    sServicePageMode = ServicePageMode::RxCounters;
+    Graphics::clearTargetScreen(GraphicsTarget::Panel);
+    sRxCounterValuesDirty = true;
+
+    const int16_t labelX = DisplayGeom::screenW() * 3 / 100;
+    for (uint8_t row = 0; row < 6; row++) {
+        const int16_t baseline = DisplayGeom::screenH() * (22 + row * 13) / 100;
+        Graphics::drawText(GraphicsTarget::Panel, labelX, baseline,
+                           &FreeSans12pt7b, labels[row], 0xFFFF);
+    }
+    renderRxCounterValues(panel);
+}
+
+static void renderRxCounterValues(const SharedPanel &panel) {
+    const CommLineCounters &counters = panel.comm.lift1;
+    const uint32_t values[] = {
+        counters.rxFrames,
+        counters.rxValid,
+        counters.rxTimeout,
+        counters.rxFormatError,
+        counters.rxCrcError,
+        counters.rxDataError
+    };
+    const int16_t valueX = DisplayGeom::screenW() * 46 / 100;
+
+    for (uint8_t row = 0; row < 6; row++) {
+        if (sRxCounterValuesDirty || sLastRxCounterValues[row] != values[row]) {
+            char text[11];
+            if (!sRxCounterValuesDirty) {
+                char oldText[11];
+                snprintf(oldText, sizeof(oldText), "%lu",
+                         static_cast<unsigned long>(sLastRxCounterValues[row]));
+                const int16_t oldBaseline = DisplayGeom::screenH() * (22 + row * 13) / 100;
+                Graphics::drawText(GraphicsTarget::Panel, valueX, oldBaseline,
+                                   &FreeSans12pt7b, oldText, 0x0000);
+            }
+            snprintf(text, sizeof(text), "%lu", static_cast<unsigned long>(values[row]));
+            const int16_t baseline = DisplayGeom::screenH() * (22 + row * 13) / 100;
+            Graphics::drawText(GraphicsTarget::Panel, valueX, baseline,
+                               &FreeSans12pt7b, text, 0x07E0);
+            sLastRxCounterValues[row] = values[row];
+        }
+    }
+    sRxCounterValuesDirty = false;
 }
 
 // Raporteaza contoarele de receptie detaliate pe serial (afisarea se face pe Service Box)

@@ -11,6 +11,7 @@ Specificația țintă (sursa de adevăr) este `service-box2/src/service_commands
 | 0 — Comenzi principale | `mb_00` – `mb_01` | Intrare / ieșire Service Mode |
 | 1 — Flash firmware | `mb_02` | Reset în bootloader USB pentru programare |
 | 2 — Setări persistente | `mb_03` – `mb_05` | Număr ascensor, gain audio, default-uri |
+| 6 — COMM și contoare RX | `mb_61` – `mb_65` | Afișare și control contoare de comunicație |
 
 Parserul recunoaște **exclusiv** forma `mb_NN`; nu există aliasuri.
 
@@ -45,6 +46,18 @@ Argumentul numeric poate fi trimis simplu (`mb_04 0.60`) sau încadrat de marker
 | `mb_04 <x.xx>` | Setează gain-ul audio (`0.00`–`4.00`), îl aplică imediat pe ieșirea I2S și îl salvează în flash; `ACK_04 <x.xx>`. Valori invalide: `ERR 08 INVALID_PARAM`. |
 | `mb_05` | Revine la default-urile din `Config.h` (număr ascensor + gain) și le persistă; `ACK_05`. |
 
+## Grup 6 — COMM și contoare RX
+
+Panoul de cabină are un singur canal RX, deci Service Box trimite ținta `1`.
+
+| Comandă | Efect / răspuns |
+| --- | --- |
+| `mb_61 1` | Afișează pe LCD contoarele RX `Total`, `Valid`, `Timeout`, `Format`, `CRC`, `Data`; `ACK_61 1`. Necesită Service activ. |
+| `mb_62 1` | Închide pagina contoarelor și revine la afișarea normală; `ACK_62 1`. Necesită Service activ. |
+| `mb_63 1` | Pornește numărarea; `ACK_63 1`. |
+| `mb_64 1` | Oprește numărarea fără să șteargă valorile; `ACK_64 1`. |
+| `mb_65 1` | Resetează valorile fără să schimbe starea ON/OFF; `ACK_65 1`. |
+
 ## Erori comune
 
 | Răspuns | Semnificație |
@@ -63,4 +76,4 @@ Modificări necesare în `src/Core/Services/ServiceProtocol.cpp` și `src/Presen
 - [ ] **`mb_03`:** redenumire `mb_lift` → `mb_03`; interogare `OK LIFT <n>`, setare `ACK_03 <n>` (azi `ACK LIFT <n>`).
 - [ ] **`mb_04`:** redenumire `mb_gain` → `mb_04`; setare `ACK_04 <x.xx>` (azi `ACK GAIN <x.xx>`). Formatarea manuală `X.XX` (newlib-nano fără `%f`) rămâne.
 - [ ] **`mb_05`:** redenumire `mb_defaults` → `mb_05`, răspuns `ACK_05`. Atenție: handlerul actual oprește redarea audio și reaplică gain-ul — comportamentul se păstrează.
-- [ ] **De eliminat din parser** până la definirea grupurilor viitoare: `COMM TEST`/`mb_com`, `mb_com_out`, `mb_diag`, `mb_com_status`, `mb_com_status_out`, `comm_count_*`, `MCU *`. Vor răspunde temporar `ERR 01 UNKNOWN_CMD`.
+- [ ] **De eliminat din parser** până la definirea grupurilor viitoare: `COMM TEST`/`mb_com`, `mb_com_out`, `mb_diag`, `mb_com_status`, `mb_com_status_out`, `MCU *`. Vor răspunde temporar `ERR 01 UNKNOWN_CMD`.

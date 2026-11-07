@@ -92,6 +92,67 @@ static void parseLine(const char* line) {
     } else if (strcmp(line, "mb_33") == 0) {
         if (!checkServiceMode()) return;
         cmd.type = Command::Type::StopDisplayTest;
+    } else if (strncmp(line, "mb_61", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        const long value = strtol(arg, &endPtr, 10);
+        if (endPtr == arg || *endPtr != '\0' || value != 1) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::StartCommCounterDisplay;
+        cmd.param = 1;
+    } else if (strncmp(line, "mb_62", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        const long value = strtol(arg, &endPtr, 10);
+        if (endPtr == arg || *endPtr != '\0' || value != 1) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::StopCommCounterDisplay;
+        cmd.param = 1;
+    } else if (strncmp(line, "mb_63", 5) == 0 && (line[5] == ' ')) {
+        long target = 0;
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        target = strtol(arg, &endPtr, 10);
+        if (endPtr == arg || *endPtr != '\0' || target != 1) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        ElevatorService::commCountEnable();
+        sendResponse("ACK_63 1");
+        return;
+    } else if (strncmp(line, "mb_64", 5) == 0 && (line[5] == ' ')) {
+        long target = 0;
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        target = strtol(arg, &endPtr, 10);
+        if (endPtr == arg || *endPtr != '\0' || target != 1) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        ElevatorService::commCountDisable();
+        sendResponse("ACK_64 1");
+        return;
+    } else if (strncmp(line, "mb_65", 5) == 0 && (line[5] == ' ')) {
+        long target = 0;
+        if (!checkServiceMode()) return;
+        const char* arg = numericArg(line + 5);
+        char* endPtr = nullptr;
+        target = strtol(arg, &endPtr, 10);
+        if (endPtr == arg || *endPtr != '\0' || target != 1) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        ElevatorService::commCountReset();
+        sendResponse("ACK_65 1");
+        return;
     } else if (strcmp(line, "mb_45") == 0) {
         cmd.type = Command::Type::McuUptime;
     } else if (strcmp(line, "MCU RESETS") == 0 || strcmp(line, "mb_resets") == 0) {
@@ -102,21 +163,6 @@ static void parseLine(const char* line) {
         cmd.type = Command::Type::McuLastReset;
     } else if (strcmp(line, "mb_46") == 0) {
         cmd.type = Command::Type::McuTemp;
-    } else if (strcmp(line, "comm_count_enable") == 0) {
-        if (!checkServiceMode()) return;
-        ElevatorService::commCountEnable();
-        sendResponse("ACK COMM COUNT ON");
-        return;
-    } else if (strcmp(line, "comm_count_disable") == 0) {
-        if (!checkServiceMode()) return;
-        ElevatorService::commCountDisable();
-        sendResponse("ACK COMM COUNT OFF");
-        return;
-    } else if (strcmp(line, "comm_count_reset") == 0) {
-        if (!checkServiceMode()) return;
-        ElevatorService::commCountReset();
-        sendResponse("ACK COMM COUNT RESET");
-        return;
     } else if (strncmp(line, "mb_lift", 7) == 0 && (line[7] == '\0' || line[7] == ' ' || line[7] == '<')) {
         // Număr ascensor persistent (flash protejat)
         if (!checkServiceMode()) return;
