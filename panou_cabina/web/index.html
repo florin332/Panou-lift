@@ -43,22 +43,32 @@
     <h2>Retea</h2>
     <p id="network-detail">--</p>
     <form id="network-settings">
+      <label>Adresa MAC<input name="mac" type="text" placeholder="AA:BB:CC:DD:EE:FF"></label>
+
       <label>DHCP<input name="dhcp" type="checkbox"></label>
       <label>IP static<input name="ip" inputmode="decimal" placeholder="192.168.1.50"></label>
-      <label>Masca subnet<input name="subnet" inputmode="decimal" placeholder="255.255.255.0"></label>
+      <label>Subnet mask<input name="subnet" inputmode="decimal" placeholder="255.255.255.0"></label>
       <label>Gateway<input name="gateway" inputmode="decimal" placeholder="192.168.1.1"></label>
       <label>DNS<input name="dns" inputmode="decimal" placeholder="192.168.1.1"></label>
-      <button type="button" id="save-network" disabled>Salveaza reteaua</button>
+      <div class="form-actions">
+        <button type="button" id="save-network" disabled>Salveaza</button>
+      </div>
     </form>
   </section>
+
   <section class="service">
     <h2>Service si configurare</h2>
     <p id="auth-note">Autentificarea este necesara pentru comenzile de service.</p>
+    
     <form id="web-login">
+      <label>Utilizator<input id="web-username" type="text" autocomplete="username" placeholder="admin"></label>
       <label>Parola<input id="web-password" type="password" autocomplete="current-password"></label>
       <button type="button" id="web-login-button">Autentificare</button>
       <button type="button" id="web-logout-button" disabled>Deconectare</button>
+      <button type="button" id="web-save-button" disabled>Salveaza</button>
     </form>
+
+
     <div class="actions">
       <button data-command="SRV ENTER" disabled>Intrare service</button>
       <button data-command="SRV EXIT" disabled>Iesire service</button>
@@ -78,10 +88,16 @@
     </div>
     <form id="settings">
       <label>Numar ascensor<input name="lift" type="number" min="1" max="65535" required></label>
-      <button type="button" id="save-lift" disabled>Salveaza numarul</button>
+      <div class="form-actions">
+        <button type="button" id="save-lift" disabled>Salveaza numarul</button>
+      </div>
+      
       <label>Gain audio<input name="gain" type="number" min="0" max="4" step="0.01" required></label>
-      <button type="button" id="save-gain" disabled>Salveaza gain</button>
+      <div class="form-actions">
+        <button type="button" id="save-gain" disabled>Salveaza gain</button>
+      </div>
     </form>
+
     <p id="result" role="status"></p>
   </section>
 </main>

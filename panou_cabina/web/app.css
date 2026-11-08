@@ -1,35 +1,38 @@
 :root {
   color-scheme: dark;
-  --ink: #fff;
-  --muted: #9cbe9c;
-  --paper: #000;
-  --line: #465158;
-  --green: #00e676;
-  --red: #ff5252;
-  --input-bg: #111;
-  --button-bg: #192c39;
-  --button-hover: #263f50;
-  --button-active: #10212c;
-  --button-border: #fff;
-  --button-disabled-bg: #313131;
-  --button-disabled-text: #9cbe9c;
+  --ink: #f3f4f6;
+  --muted: #9ca3af;
+  --paper: #0f172a; /* Fundal Slate închis modern */
+  --card-bg: #1e293b; /* Fundal pentru carduri */
+  --line: #334155;
+  --green: #10b981; /* Verde vibrant pentru status activ */
+  --red: #ef4444;
+  --input-bg: #1e293b;
+  --button-bg: #334155;
+  --button-hover: #475569;
+  --button-active: #1e293b;
+  --button-border: #475569;
+  --button-disabled-bg: #1e293b;
+  --button-disabled-text: #475569;
+  --radius: 8px;
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --ink: #172a2c;
-  --muted: #607477;
-  --paper: #f1f5f1;
-  --line: #cbd6d1;
-  --green: #176d56;
-  --red: #a34232;
-  --input-bg: #fff;
-  --button-bg: #176d56;
-  --button-hover: #12533f;
-  --button-active: #0e4635;
-  --button-border: #176d56;
-  --button-disabled-bg: #dce4df;
-  --button-disabled-text: #607477;
+  --ink: #1e293b;
+  --muted: #64748b;
+  --paper: #f8fafc; /* Fundal deschis curat */
+  --card-bg: #ffffff;
+  --line: #e2e8f0;
+  --green: #059669;
+  --red: #dc2626;
+  --input-bg: #ffffff;
+  --button-bg: #f1f5f9;
+  --button-hover: #e2e8f0;
+  --button-active: #cbd5e1;
+  --button-border: #cbd5e1;
+  --button-disabled-bg: #f8fafc;
+  --button-disabled-text: #cbd5e1;
 }
 
 * { box-sizing: border-box; }
@@ -38,146 +41,298 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font: 16px Georgia, serif;
+  font: 14px system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
 }
 
-header, main { max-width: 880px; margin: auto; padding: 22px; }
+header, main { max-width: 940px; margin: auto; padding: 24px; }
 
 header {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--line);
+  padding-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 small {
   color: var(--muted);
-  font: 600 11px Arial, sans-serif;
+  font: 700 11px system-ui, sans-serif;
   letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
-h1 { font-size: 32px; margin: 6px 0 0; }
-h2 { font-size: 20px; margin: 0 0 14px; }
+h1 { font-size: 28px; font-weight: 800; margin: 4px 0 0; letter-spacing: -0.5px; }
+h2 { font-size: 18px; font-weight: 700; margin: 0 0 16px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
 
-header span { font: 13px Arial, sans-serif; color: var(--green); }
+header span { 
+  font: 600 13px system-ui, sans-serif; 
+  color: var(--green); 
+  background: rgba(16, 185, 129, 0.1); 
+  padding: 4px 10px; 
+  border-radius: 20px; 
+}
+
+:root[data-theme="light"] header span {
+  background: rgba(5, 150, 105, 0.1);
+}
 
 .header-controls {
   display: flex;
-  align-items: flex-end;
-  gap: 16px;
+  align-items: center;
+  gap: 20px;
 }
 
 .theme-toggle {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 8px;
   color: var(--muted);
   white-space: nowrap;
+  cursor: pointer;
 }
 
-section { padding: 20px 0; border-bottom: 1px solid var(--line); }
+section { padding: 24px 0; }
 
+/* Transformarea stării liftului în Carduri de Dashboard */
 .lift {
   display: grid;
-  grid-template-columns: repeat(5, minmax(64px, 1fr));
-  gap: 10px;
-  overflow-x: auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
 }
-.lift div { min-width: 0; }
+.lift div { 
+  background: var(--card-bg); 
+  border: 1px solid var(--line); 
+  border-radius: var(--radius); 
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
 .lift strong {
   display: block;
-  font-size: 26px;
-  margin-top: 8px;
-  overflow-wrap: anywhere;
+  font-size: 24px;
+  font-weight: 700;
+  margin-top: 6px;
+  color: var(--ink);
 }
 
+/* Diagnostic List */
 dl {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px 18px;
+  grid-template-columns: 200px 1fr;
+  gap: 10px;
   margin: 0;
-  max-width: 430px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
 }
-dt { color: var(--muted); }
-dd { margin: 0; font-variant-numeric: tabular-nums; }
+dt { color: var(--muted); font-weight: 500; }
+dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 dd.reset-divider {
   grid-column: 1 / -1;
-  width: min(calc(60vw - 20.4px), 507.6px);
+  width: 100%;
   height: 0;
-  margin: 4px 0 2px;
+  margin: 6px 0;
   border-top: 1px solid var(--line);
 }
 
-p { color: var(--muted); font: 14px Arial, sans-serif; }
+p { color: var(--muted); font-size: 14px; margin: 0 0 16px 0; }
 
-.actions { display: flex; flex-wrap: wrap; gap: 8px; }
-
-button {
-  border: 1px solid var(--button-border);
-  border-radius: 3px;
-  background: var(--button-bg);
-  color: white;
-  padding: 10px 13px;
-  font: 14px Arial, sans-serif;
-  cursor: pointer;
-}
-button:hover:not(:disabled) { background: var(--button-hover); }
-button:active:not(:disabled) { background: var(--button-active); }
-button:focus-visible { outline: 2px solid #176d56; outline-offset: 2px; }
-button:disabled {
-  border-color: var(--line);
-  background: var(--button-disabled-bg);
-  color: var(--button-disabled-text);
-  cursor: not-allowed;
-}
-
+/* Formulare și Inputs */
 form {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   gap: 12px;
-  max-width: 520px;
-  margin-top: 18px;
-  align-items: center;
+  max-width: 500px;
+  margin-bottom: 20px;
 }
 
-#web-login { grid-template-columns: 1fr auto auto; }
-
 label {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 180px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font: 14px Arial, sans-serif;
+  gap: 16px;
+  font-weight: 500;
 }
 
 input {
-  width: 120px;
-  padding: 8px;
+  width: 100%;
+  padding: 8px 12px;
   border: 1px solid var(--line);
+  border-radius: 6px;
   background: var(--input-bg);
   color: var(--ink);
   font: inherit;
+  transition: all 0.2s;
 }
-input[type=checkbox] { width: auto; }
-input:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+input[type=checkbox] { 
+  width: 18px; 
+  height: 18px; 
+  justify-self: start; 
+  cursor: pointer;
+}
+input:focus-visible { outline: 2px solid var(--green); outline-offset: 0px; }
 
-#result { min-height: 20px; color: var(--red); }
+/* Aliniere specifică pentru formularele cu butoane inline */
+/*
+#network-settings button, #settings button {
+  grid-column: 2 / 3;
+  margin-top: 4px;
+}
+*/
+
+/* ==========================================================================
+   1. STRUCTURA FORMULARELOR ȘI ALINIEREA BUTOANELOR DE SALVARE (180px)
+   ========================================================================== */
+
+/* Containerul care împinge butoanele de salvare spre marginea din dreapta */
+.form-actions {
+  grid-column: 1 / -1; /* Ocupă tot rândul în grid */
+  display: flex;
+  justify-content: flex-end; /* Împinge conținutul (butonul) spre dreapta */
+  margin-top: 2px;
+  margin-bottom: 10px; /* Separă vizual grupurile de setări */
+}
+
+/* Forțează TOATE butoanele de salvare să aibă lățimea exactă de 180px, text centrat și tăiere elegantă dacă textul e prea lung */
+#save-network, 
+#save-lift, 
+#save-gain, 
+#web-save-button {
+  width: 180px;
+  padding: 9px 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Suprascriere pentru a elimina comportamentele vechi moștenite */
+#network-settings button, 
+#settings button {
+  grid-column: auto;
+  margin-top: 0;
+}
+
+
+/* ==========================================================================
+   2. LINIA DE AUTENTIFICARE (#web-login) - ALINIERE FLUIDĂ PE DESKTOP
+   ========================================================================== */
+
+#web-login { 
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center; 
+  gap: 16px;
+  max-width: 100%;
+  margin-bottom: 20px;
+}
+
+#web-login label { 
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: none; /* Anulează structura de grid generală a formularelor */
+}
+
+#web-login input {
+  width: 140px; /* Lățime compactă potrivită pentru utilizator și parolă pe același rând */
+}
+
+
+/* ==========================================================================
+   3. CROMATICĂ ȘI STARE DISABELD PENTRU BUTOANELE VERZI
+   ========================================================================== */
+
+/* Grupare pentru butoanele cu funcție de salvare/confirmare (Verde IoT) */
+#web-login-button, 
+#save-network, 
+#save-lift, 
+#save-gain, 
+#web-save-button {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+/* Efect vizual la trecerea mouse-ului (doar când butoanele sunt active) */
+#web-login-button:hover:not(:disabled), 
+#save-network:hover:not(:disabled), 
+#save-lift:hover:not(:disabled), 
+#save-gain:hover:not(:disabled), 
+#web-save-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+
+/* Butoane */
+button {
+  border: 1px solid var(--button-border);
+  border-radius: 6px;
+  background: var(--button-bg);
+  color: var(--ink);
+  padding: 9px 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+button:hover:not(:disabled) { background: var(--button-hover); }
+button:active:not(:disabled) { background: var(--button-active); }
+button:disabled {
+  border-color: transparent;
+  background: var(--button-disabled-bg);
+  color: var(--button-disabled-text);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Evidențiere butoane importante */
+#web-login-button, #save-network, #save-lift, #save-gain {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+#web-login-button:hover:not(:disabled), #save-network:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* Grila de comenzi Service */
+.actions { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
+  gap: 8px; 
+  margin: 20px 0;
+}
+.actions button {
+  padding: 8px 10px;
+  font-size: 13px;
+  text-align: center;
+}
+
+#result { min-height: 20px; color: var(--red); font-weight: 600; }
+
+/* Ecran mobil și tablete mici */
+@media (max-width: 768px) {
+  .lift { grid-template-columns: repeat(3, 1fr); }
+}
 
 @media (max-width: 560px) {
   header, main { padding: 16px; }
-  header { gap: 12px; }
-  .header-controls { flex-direction: column; align-items: flex-end; gap: 8px; }
-  .lift { gap: 8px; }
-  .lift small { font-size: 10px; letter-spacing: 0; }
-  .lift strong { font-size: 20px; }
-  dd.reset-divider { width: calc(60vw - 14.4px); }
+  header { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .header-controls { width: 100%; justify-content: space-between; }
+  
+  .lift { grid-template-columns: repeat(2, 1fr); }
+  
+  dl { grid-template-columns: 1fr auto; }
+  
   form, #web-login { grid-template-columns: 1fr; }
-  label { justify-content: space-between; }
-  button { width: 100%; }
+  label { grid-template-columns: 1fr; gap: 6px; }
+  input, input[type=checkbox] { width: 100%; }
+  
+  #network-settings button, #settings button { grid-column: 1 / -1; }
+  #web-login label { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 390px) {
-  header { align-items: flex-start; flex-wrap: wrap; }
-  .header-controls { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
-}
