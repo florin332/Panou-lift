@@ -19,6 +19,13 @@ namespace Pins
         constexpr uint8_t SCK  = 18;
     }
 
+    namespace SD {
+        constexpr uint8_t MISO = 16;
+        constexpr uint8_t CS   = 17;
+        constexpr uint8_t MOSI = 19;
+        constexpr uint8_t SCK  = 18;
+    }
+
     namespace UI {
         constexpr uint8_t BACKLIGHT = 26;
     }

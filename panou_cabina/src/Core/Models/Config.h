@@ -50,7 +50,7 @@ namespace Config
     // =========================================================
     namespace Display
     {
-        constexpr uint32_t SPI_CLOCK = 8000000UL;   // Viteză SPI (8 MHz)
+        constexpr uint32_t SPI_CLOCK = 40000000UL;   // Viteza SPI pentru LCD (40 MHz)
 
         constexpr uint8_t ROTATION = 2;    // 0=portrait, 1=landscape, etc.
     }

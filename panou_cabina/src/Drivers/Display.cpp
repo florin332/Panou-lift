@@ -67,8 +67,11 @@ namespace Display
 
         SPI.setTX(Pins::TFT1::MOSI);
         SPI.setSCK(Pins::TFT1::SCK);
+        SPI.setRX(Pins::SD::MISO);
         pinMode(Pins::TFT1::CS, OUTPUT);
         digitalWrite(Pins::TFT1::CS, HIGH);
+        pinMode(Pins::SD::CS, OUTPUT);
+        digitalWrite(Pins::SD::CS, HIGH);
 
         initializeControllers();
         tft1.fillScreen(COLOR_BLACK);
