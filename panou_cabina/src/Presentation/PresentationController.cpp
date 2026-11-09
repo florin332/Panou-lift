@@ -11,7 +11,9 @@
 #include "Pins.h"
 #include "Transport.h"
 #include "WebUi.h"
+#include <atomic>
 #include <cstring>
+#include <pico/multicore.h>
 
 namespace PresentationController
 {
@@ -23,6 +25,12 @@ namespace PresentationController
 
         ServiceInputBuffer sUsbInput;
         ServiceInputBuffer sEthernetInput;
+        constexpr uint8_t RESPONSE_QUEUE_SIZE = 8;
+        constexpr size_t RESPONSE_SIZE = 96;
+        char sResponseQueue[RESPONSE_QUEUE_SIZE][RESPONSE_SIZE] = {};
+        std::atomic<uint8_t> sResponseHead{0};
+        std::atomic<uint8_t> sResponseTail{0};
+        std::atomic<bool> sCore1Ready{false};
 
         void sendServiceResponse(const char *response) {
             WebUi::captureServiceResponse(response);
@@ -32,6 +40,31 @@ namespace PresentationController
                             reinterpret_cast<const uint8_t *>(response), strlen(response));
             const uint8_t lineEnding[] = {'\r', '\n'};
             transport.write(Transport::Channel::Service, lineEnding, sizeof(lineEnding));
+        }
+
+        void queueOrSendServiceResponse(const char *response) {
+            if (get_core_num() == 0) {
+                sendServiceResponse(response);
+                return;
+            }
+
+            const uint8_t head = sResponseHead.load(std::memory_order_relaxed);
+            const uint8_t next = static_cast<uint8_t>((head + 1) % RESPONSE_QUEUE_SIZE);
+            if (next == sResponseTail.load(std::memory_order_acquire)) return;
+
+            strncpy(sResponseQueue[head], response, RESPONSE_SIZE - 1);
+            sResponseQueue[head][RESPONSE_SIZE - 1] = '\0';
+            sResponseHead.store(next, std::memory_order_release);
+        }
+
+        void flushServiceResponses() {
+            uint8_t tail = sResponseTail.load(std::memory_order_relaxed);
+            const uint8_t head = sResponseHead.load(std::memory_order_acquire);
+            while (tail != head) {
+                sendServiceResponse(sResponseQueue[tail]);
+                tail = static_cast<uint8_t>((tail + 1) % RESPONSE_QUEUE_SIZE);
+                sResponseTail.store(tail, std::memory_order_release);
+            }
         }
 
         void consumeServiceByte(ServiceInputBuffer &input, char value) {
@@ -60,18 +93,28 @@ namespace PresentationController
         }
     }
 
-    void init() {
-        Presentation::init();
+    void initCore0() {
+        sCore1Ready.store(false, std::memory_order_relaxed);
         Transport::init();
         ServiceProtocol::init();
-        ServiceProtocol::setResponseSink(sendServiceResponse);
-        ServiceMenu::init();
+        ServiceProtocol::setResponseSink(queueOrSendServiceResponse);
     }
 
-    void update() {
+    void initCore1() {
+        ServiceMenu::init();
+        Presentation::init();
+        sCore1Ready.store(true, std::memory_order_release);
+    }
+
+    void pollCore0() {
+        if (!sCore1Ready.load(std::memory_order_acquire)) return;
         Transport::poll();
         pollServiceInputs();
+        flushServiceResponses();
+    }
 
+    void updateCore1() {
+        if (!sCore1Ready.load(std::memory_order_acquire)) return;
         static bool overloadImageWasActive = false;
         if (digitalRead(Pins::Inputs::OVERLOAD) == LOW) {
             DisplayRenderer::showOverloadImage();

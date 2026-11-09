@@ -7,11 +7,21 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <pico/critical_section.h>
 
 namespace ServiceProtocol {
 
 static Command sPendingCmd;
 static ResponseSink sResponseSink = nullptr;
+static critical_section_t sCommandLock;
+
+static void lockCommand() {
+    critical_section_enter_blocking(&sCommandLock);
+}
+
+static void unlockCommand() {
+    critical_section_exit(&sCommandLock);
+}
 
 static void parseLine(const char* line);
 
@@ -37,7 +47,10 @@ static bool checkServiceMode() {
 }
 
 void init() {
+    critical_section_init(&sCommandLock);
+    lockCommand();
     sPendingCmd = Command{};
+    unlockCommand();
 }
 
 void setResponseSink(ResponseSink sink) { sResponseSink = sink; }
@@ -253,18 +266,26 @@ static void parseLine(const char* line) {
         return;
     }
 
+    lockCommand();
     if (!sPendingCmd.pending) {
         sPendingCmd = cmd;
         sPendingCmd.pending = true;
+        unlockCommand();
     } else {
+        unlockCommand();
         sendResponse("ERR 02 BUSY");
     }
 }
 
 bool consumeCommand(Command &out) {
-    if (!sPendingCmd.pending) return false;
+    lockCommand();
+    if (!sPendingCmd.pending) {
+        unlockCommand();
+        return false;
+    }
     out = sPendingCmd;
     sPendingCmd.pending = false;
+    unlockCommand();
     return true;
 }
 
@@ -273,7 +294,10 @@ void sendResponse(const char* response) {
 }
 
 bool hasPendingCommand() {
-    return sPendingCmd.pending;
+    lockCommand();
+    const bool pending = sPendingCmd.pending;
+    unlockCommand();
+    return pending;
 }
 
 } // namespace ServiceProtocol

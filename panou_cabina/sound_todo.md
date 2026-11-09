@@ -74,7 +74,8 @@ W5500 ramane pe SPI1 (GP12-GP15), separat de cardul SD si LCD. Tinta este SD la 
 - Masurarea dimensiunii fisierelor si a RAM-ului utilizabil; stabilirea daca se incarca toate sunetele sau doar cele principale si daca se foloseste cache RAM sau flash. Cele trei copii fallback din firmware raman fixe.
 - Comportamentul la evenimente audio simultane: intrerupere, coada sau prioritati.
 - Masurarea latentei pornirii sub 1 ms din cache. Masoara separat indexarea/reincarcarea SD si efectul acestora asupra actualizarii LCD; redarea nu citeste de pe card.
-- Implementarea separarii reale pe nuclee (de exemplu `setup1()`/`loop1()` pe Core 1) si a sincronizarii cache-ului audio intre nuclee; in codul curent `runCore0()` si `runCore1()` sunt apelate secvential din aceeasi bucla.
+- Separarea pe nuclee este implementata prin `setup1()`/`loop1()`: Core 0 detine modelul, evenimentele, audio si transportul USB/W5500; Core 1 detine LCD-ul si prezentarea. `SharedPanel` ramane publicat de Core 0 si citit cu seqlock pe Core 1. Comenzile service trec Core 0 -> Core 1, iar raspunsurile sunt puse intr-o coada Core 1 -> Core 0, astfel incat transportul sa ramana exclusiv pe Core 0.
+- Protocolul de schimb al cache-ului audio ramane de implementat odata cu catalogul SD: Core 1 construieste si valideaza un bank imuabil, apoi publica pointerul si generatia; Core 0 comuta la bank-ul nou doar la o limita sigura a redarii si confirma generatia. Core 1 nu modifica si nu reutilizeaza bank-ul vechi pana la confirmare; redarea nu citeste niciodata de pe SD.
 - Fluxul web pentru incarcare si stergere, inclusiv protectia operatiilor cat timp un fisier este folosit la redare.
 - Accesul direct de pe PC si procedura recomandata pentru actualizarea fisierelor pe card.
 - Stabilirea modului de salvare/persistenta a maparii eveniment-sunet configurate din web.

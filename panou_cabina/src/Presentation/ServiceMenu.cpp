@@ -113,7 +113,7 @@ void update() {
         Graphics::drawServiceOverlay(GraphicsTarget::Panel, getOverlayColor(haveNewData));
     }
 
-    // 3. Consuma comenzi de la Core 1 (Magic Box)
+    // 3. Consuma comenzile service trimise de Core 0.
     ServiceProtocol::Command cmd;
     while (ServiceProtocol::consumeCommand(cmd)) {
         sLastActivityMillis = millis();

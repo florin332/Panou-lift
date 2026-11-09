@@ -3,8 +3,10 @@
 
 namespace PresentationController
 {
-    void init();
-    void update();
+    void initCore0();
+    void initCore1();
+    void pollCore0();
+    void updateCore1();
 }
 
 #endif

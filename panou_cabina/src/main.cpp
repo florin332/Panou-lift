@@ -9,7 +9,14 @@ void setup() {
     Application::init();
 }
 
+void setup1() {
+    Application::initCore1();
+}
+
 void loop() {
-    Application::runCore1();
     Application::runCore0();
+}
+
+void loop1() {
+    Application::runCore1();
 }

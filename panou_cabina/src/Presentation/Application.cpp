@@ -74,7 +74,7 @@ namespace Application
         AlarmService::init();
         ElevatorService::init();
         DiagnosticService::init();
-        PresentationController::init();
+        PresentationController::initCore0();
 
         SharedPanel initPanel = {};
         ConfigurationService::initializeStartupState(initPanel);
@@ -82,12 +82,12 @@ namespace Application
         ApplicationState::publish(initPanel);
     }
 
-    void runCore0() {
-        updateResetButton();
-        PresentationController::update();
+    void initCore1() {
+        PresentationController::initCore1();
     }
 
-    void runCore1() {
+    void runCore0() {
+        updateResetButton();
         static SharedPanel localState = {};
         static unsigned long lastUptimeUpdate = 0;
 
@@ -103,5 +103,10 @@ namespace Application
         }
 
         ApplicationState::publish(localState);
+        PresentationController::pollCore0();
+    }
+
+    void runCore1() {
+        PresentationController::updateCore1();
     }
 }

@@ -8,10 +8,13 @@ namespace Application
     // Inițializează serviciile și publică starea inițială a aplicației.
     void init();
 
-    // Deleagă ciclul Core 0 către controller-ul de prezentare.
+    // Inițializează hardware-ul de prezentare pe Core 1.
+    void initCore1();
+
+    // Core 0: evenimente, audio, transport și actualizarea modelului.
     void runCore0();
 
-    // Orchestrează serviciile de lift și alarmă și publică starea actualizată.
+    // Core 1: LCD și prezentare.
     void runCore1();
 }
 
