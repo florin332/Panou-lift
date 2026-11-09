@@ -12,6 +12,7 @@ Specificația țintă (sursa de adevăr) este `service-box2/src/service_commands
 | 1 — Flash firmware | `mb_02` | Reset în bootloader USB pentru programare |
 | 2 — Setări persistente | `mb_11` – `mb_12`, `mb_30` | Număr ascensor, gain audio, default-uri |
 | 6 — COMM și contoare RX | `mb_61` – `mb_68` | Pagină COMM și control contoare de comunicație |
+| 8 — Audio SD | `mb_83` | Listare și redare fișiere audio de pe card |
 
 Parserul recunoaște **exclusiv** forma `mb_NN`; nu există aliasuri.
 
@@ -60,6 +61,15 @@ Panoul de cabină are un singur canal RX, deci Service Box trimite ținta `1`.
 | `mb_66 1` | Afișează pe LCD poziția, destinația, direcția, starea și ocuparea ascensorului; `ACK_66 1`. Necesită Service activ. |
 | `mb_66 0` | Închide pagina și revine la afișarea normală; `ACK_66 0`. Necesită Service activ. |
 
+## Grup 8 — Audio SD
+
+Comenzile `mb_83` sunt disponibile oricând, inclusiv în funcționare normală și fără Service Mode.
+
+| Comandă | Efect / răspuns |
+| --- | --- |
+| `mb_83` | Scanează cardul SD și listează fișierele audio cu nume valid. Răspunde cu `OK SD COUNT n`, apoi câte un `OK SD FILE nn filename size` pentru fiecare fișier (`nn` = ID `01`–`31`, `size` în octeți). |
+| `mb_83 nn` | Redă fișierul WAV cu ID-ul `nn` (`01`–`31`) prin streaming de pe SD către I2S. Format acceptat: PCM mono 16 kHz/16-bit. Răspunde `ACK_83 nn` când pornește redarea. |
+
 ## Erori comune
 
 | Răspuns | Semnificație |
@@ -67,6 +77,7 @@ Panoul de cabină are un singur canal RX, deci Service Box trimite ținta `1`.
 | `ERR 01 UNKNOWN_CMD` | Comandă necunoscută, neimplementată pe acest tip de panou sau scrisă cu altă capitalizare. |
 | `ERR 02 BUSY` | Coada de comenzi este ocupată. |
 | `ERR 03 NOT_IN_SERVICE` | Comanda necesită Service Mode activ. |
+| `ERR 05 SD_*` | Card indisponibil, fișier lipsă/duplicat sau WAV incompatibil; detaliul urmează după `SD_`. |
 | `ERR 08 INVALID_PARAM` | Parametru în afara intervalului valid (număr ascensor sau gain). |
 
 ## TODO implementare
