@@ -10,6 +10,7 @@
 #include "DiagnosticService.h"
 #include "ElevatorService.h"
 #include "PresentationController.h"
+#include "Sound.h"
 #include <hardware/watchdog.h>
 
 namespace
@@ -87,22 +88,25 @@ namespace Application
     }
 
     void runCore0() {
+        Sound::update();
         updateResetButton();
         static SharedPanel localState = {};
         static unsigned long lastUptimeUpdate = 0;
 
-        if (!ApplicationState::read(localState)) return;
+        if (ApplicationState::read(localState)) {
+            const Direction previousDirection = localState.lift1.sj;
+            ElevatorService::update(localState);
+            AlarmService::update(localState, previousDirection);
 
-        const Direction previousDirection = localState.lift1.sj;
-        ElevatorService::update(localState);
-        AlarmService::update(localState, previousDirection);
+            if (millis() - lastUptimeUpdate >= 1000) {
+                lastUptimeUpdate += 1000;
+                localState.system.uptimeSeconds++;
+            }
 
-        if (millis() - lastUptimeUpdate >= 1000) {
-            lastUptimeUpdate += 1000;
-            localState.system.uptimeSeconds++;
+            ApplicationState::publish(localState);
+            Sound::update();
         }
 
-        ApplicationState::publish(localState);
         PresentationController::pollCore0();
     }
 

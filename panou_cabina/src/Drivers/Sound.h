@@ -1,15 +1,13 @@
 //Drivers/Sound.h (Interfața Driverului Acustic)
 #pragma once
 
-#include "SharedPanel.h"
-
 namespace Sound
 {
-    // Initialize audio hardware and ESP8266Audio
+    // Initialize native RP2040 I2S and validate built-in WAV clips.
     void init();
 
-    // Non-blocking audio processing
-    void update(const SharedPanel &localPanel);
+    // Feed available DMA buffers without blocking.
+    void update();
 
     // Play warning sounds
     void alarm();

@@ -27,8 +27,6 @@ namespace AlarmService
             Sound::liftStopped();
         }
 
-        Sound::update(state);
-
         const bool overloadActive = digitalRead(Pins::Inputs::OVERLOAD) == LOW;
         if (!overloadActive) {
             overloadWasActive = false;
