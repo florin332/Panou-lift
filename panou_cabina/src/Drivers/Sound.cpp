@@ -7,6 +7,7 @@
 
 #include <I2S.h>
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 
 namespace
@@ -17,6 +18,8 @@ namespace
     constexpr size_t DMA_BUFFER_COUNT = 8;
     constexpr size_t DMA_BUFFER_WORDS = 256;
     constexpr size_t DMA_QUEUE_BYTES = DMA_BUFFER_COUNT * DMA_BUFFER_WORDS * sizeof(uint32_t);
+    constexpr size_t SD_STREAM_RING_SAMPLES = 8192;
+    constexpr uint32_t SD_STREAM_PREBUFFER_SAMPLES = 4096;
 
     struct WavClip {
         const uint8_t *samples = nullptr;
@@ -25,6 +28,11 @@ namespace
     };
 
     I2S i2s(OUTPUT, I2S_BCLK, I2S_DATA);
+    int16_t sdStreamRing[SD_STREAM_RING_SAMPLES] = {};
+    std::atomic<uint32_t> sdStreamReadIndex{0};
+    std::atomic<uint32_t> sdStreamWriteIndex{0};
+    std::atomic<bool> sdStreamActive{false};
+    std::atomic<bool> sdStreamFinished{false};
     WavClip alarmClip;
     WavClip overloadClip;
     WavClip stoppedClip;
@@ -35,6 +43,7 @@ namespace
     float currentGain = 1.0f;
     bool initialized = false;
     bool playbackActive = false;
+    bool sdStreamPlaying = false;
 
     uint16_t readLe16(const uint8_t *data) {
         return static_cast<uint16_t>(data[0]) |
@@ -115,6 +124,23 @@ namespace
     void fillDmaQueue() {
         if (!initialized) return;
 
+        if (sdStreamActive.load(std::memory_order_acquire) && !sdStreamPlaying) {
+            playbackActive = false;
+            activeClip = nullptr;
+
+            const uint32_t writeIndex = sdStreamWriteIndex.load(std::memory_order_acquire);
+            const uint32_t readIndex = sdStreamReadIndex.load(std::memory_order_relaxed);
+            const uint32_t bufferedSamples = writeIndex - readIndex;
+            if (bufferedSamples < SD_STREAM_PREBUFFER_SAMPLES &&
+                !sdStreamFinished.load(std::memory_order_acquire)) {
+                return;
+            }
+            if (i2s.availableForWrite() < static_cast<int>(DMA_QUEUE_BYTES)) return;
+
+            outputBufferOffset = 0;
+            sdStreamPlaying = true;
+        }
+
         while (true) {
             const int availableBytes = i2s.availableForWrite();
             if (availableBytes < static_cast<int>(sizeof(uint32_t))) return;
@@ -123,6 +149,36 @@ namespace
             const size_t bufferFramesRemaining = DMA_BUFFER_WORDS - outputBufferOffset;
             const size_t framesToWrite = std::min(availableFrames, bufferFramesRemaining);
             if (framesToWrite == 0) return;
+
+            if (sdStreamPlaying) {
+                const uint32_t readIndex = sdStreamReadIndex.load(std::memory_order_relaxed);
+                const uint32_t writeIndex = sdStreamWriteIndex.load(std::memory_order_acquire);
+                const uint32_t bufferedSamples = writeIndex - readIndex;
+                if (bufferedSamples == 0) {
+                    if (sdStreamFinished.load(std::memory_order_acquire)) {
+                        sdStreamPlaying = false;
+                        sdStreamActive.store(false, std::memory_order_release);
+                    }
+                    return;
+                }
+
+                const size_t streamFrames = std::min(framesToWrite, static_cast<size_t>(bufferedSamples));
+                for (size_t i = 0; i < streamFrames; i++) {
+                    const int16_t sample = applyGain(sdStreamRing[(readIndex + i) % SD_STREAM_RING_SAMPLES]);
+                    const uint16_t packedSample = static_cast<uint16_t>(sample);
+                    audioFrames[i] = (static_cast<uint32_t>(packedSample) << 16) | packedSample;
+                }
+
+                const size_t writtenBytes = i2s.write(
+                    reinterpret_cast<const uint8_t *>(audioFrames),
+                    streamFrames * sizeof(uint32_t));
+                const size_t writtenFrames = writtenBytes / sizeof(uint32_t);
+                sdStreamReadIndex.store(readIndex + static_cast<uint32_t>(writtenFrames),
+                                        std::memory_order_release);
+                outputBufferOffset = (outputBufferOffset + writtenFrames) % DMA_BUFFER_WORDS;
+                if (writtenFrames < streamFrames) return;
+                continue;
+            }
 
             size_t audioFramesToWrite = 0;
             if (playbackActive && activeClip != nullptr) {
@@ -165,6 +221,8 @@ namespace
 
     void playClip(const WavClip &clip) {
         if (!initialized || !clip.valid) return;
+        sdStreamActive.store(false, std::memory_order_release);
+        sdStreamPlaying = false;
         activeClip = &clip;
         playbackOffset = 0;
         playbackActive = true;
@@ -194,6 +252,50 @@ namespace Sound
         fillDmaQueue();
     }
 
+    bool beginSdStream() {
+        if (!initialized) return false;
+        sdStreamReadIndex.store(0, std::memory_order_relaxed);
+        sdStreamWriteIndex.store(0, std::memory_order_relaxed);
+        sdStreamFinished.store(false, std::memory_order_relaxed);
+        sdStreamActive.store(true, std::memory_order_release);
+        return true;
+    }
+
+    size_t sdStreamFreeSamples() {
+        if (!sdStreamActive.load(std::memory_order_acquire)) return 0;
+        const uint32_t writeIndex = sdStreamWriteIndex.load(std::memory_order_relaxed);
+        const uint32_t readIndex = sdStreamReadIndex.load(std::memory_order_acquire);
+        const uint32_t usedSamples = writeIndex - readIndex;
+        return usedSamples >= SD_STREAM_RING_SAMPLES ? 0 : SD_STREAM_RING_SAMPLES - usedSamples;
+    }
+
+    size_t pushSdStreamSamples(const int16_t *samples, size_t count) {
+        if (samples == nullptr || !sdStreamActive.load(std::memory_order_acquire)) return 0;
+
+        const uint32_t writeIndex = sdStreamWriteIndex.load(std::memory_order_relaxed);
+        const uint32_t readIndex = sdStreamReadIndex.load(std::memory_order_acquire);
+        const uint32_t usedSamples = writeIndex - readIndex;
+        const size_t freeSamples = usedSamples >= SD_STREAM_RING_SAMPLES
+            ? 0
+            : SD_STREAM_RING_SAMPLES - usedSamples;
+        const size_t samplesToWrite = std::min(count, freeSamples);
+
+        for (size_t i = 0; i < samplesToWrite; i++) {
+            sdStreamRing[(writeIndex + i) % SD_STREAM_RING_SAMPLES] = samples[i];
+        }
+        sdStreamWriteIndex.store(writeIndex + static_cast<uint32_t>(samplesToWrite),
+                                 std::memory_order_release);
+        return samplesToWrite;
+    }
+
+    void finishSdStream() {
+        sdStreamFinished.store(true, std::memory_order_release);
+    }
+
+    bool isSdStreamActive() {
+        return sdStreamActive.load(std::memory_order_acquire);
+    }
+
     void alarm() {
         playClip(alarmClip);
     }
@@ -209,12 +311,15 @@ namespace Sound
     void stop() {
         playbackActive = false;
         activeClip = nullptr;
+        sdStreamActive.store(false, std::memory_order_release);
+        sdStreamPlaying = false;
         fillDmaQueue();
     }
 
     bool isPlaying() {
         return initialized &&
-               (playbackActive || i2s.availableForWrite() < static_cast<int>(DMA_QUEUE_BYTES));
+               (playbackActive || sdStreamActive.load(std::memory_order_acquire) ||
+            sdStreamPlaying || i2s.availableForWrite() < static_cast<int>(DMA_QUEUE_BYTES));
     }
 
     bool setGain(float gain) {

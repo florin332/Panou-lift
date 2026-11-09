@@ -25,7 +25,7 @@ namespace PresentationController
 
         ServiceInputBuffer sUsbInput;
         ServiceInputBuffer sEthernetInput;
-        constexpr uint8_t RESPONSE_QUEUE_SIZE = 8;
+        constexpr uint8_t RESPONSE_QUEUE_SIZE = 40;
         constexpr size_t RESPONSE_SIZE = 96;
         char sResponseQueue[RESPONSE_QUEUE_SIZE][RESPONSE_SIZE] = {};
         std::atomic<uint8_t> sResponseHead{0};

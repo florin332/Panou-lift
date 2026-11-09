@@ -178,6 +178,22 @@ static void parseLine(const char* line) {
     } else if (strcmp(line, "mb_68") == 0) {
         if (!checkServiceMode()) return;
         cmd.type = Command::Type::QueryCommunicationCounters;
+    } else if (strcmp(line, "mb_83") == 0) {
+        cmd.type = Command::Type::QuerySdAudioFiles;
+    } else if (strncmp(line, "mb_83", 5) == 0 && line[5] == ' ') {
+        const char* arg = numericArg(line + 5);
+        if (strlen(arg) != 2 || arg[0] < '0' || arg[0] > '9' ||
+            arg[1] < '0' || arg[1] > '9') {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        const uint8_t id = static_cast<uint8_t>((arg[0] - '0') * 10 + (arg[1] - '0'));
+        if (id == 0 || id > 31) {
+            sendResponse("ERR 08 INVALID_PARAM");
+            return;
+        }
+        cmd.type = Command::Type::PlaySdAudioFile;
+        cmd.param = id;
     } else if (strcmp(line, "mb_45") == 0) {
         cmd.type = Command::Type::McuUptime;
     } else if (strcmp(line, "mb_47") == 0) {

@@ -17,6 +17,8 @@ struct Command {
         StopCommCounterDisplay,  // mb_62 1
         QueryCommunicationDisplay, // mb_67
         QueryCommunicationCounters, // mb_68
+        QuerySdAudioFiles, // mb_83
+        PlaySdAudioFile, // mb_83 nn
         ResetDisplay,     // mb_31 1
         StartDisplayTest, // mb_32 1
         StopDisplayTest,  // mb_33

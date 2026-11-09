@@ -10,6 +10,7 @@
 #include "DiagnosticService.h"
 #include "ElevatorService.h"
 #include "PresentationController.h"
+#include "SDCard.h"
 #include "Sound.h"
 #include <hardware/watchdog.h>
 
@@ -111,6 +112,7 @@ namespace Application
     }
 
     void runCore1() {
+        SDCard::update();
         PresentationController::updateCore1();
     }
 }

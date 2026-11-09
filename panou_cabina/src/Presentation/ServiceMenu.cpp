@@ -10,6 +10,7 @@
 #include "SharedPanel.h"
 #include "PanelRenderer.h"
 #include "ElevatorService.h"
+#include "SDCard.h"
 #include <Arduino.h>
 #include <Fonts/FreeSans12pt7b.h>
 #include <pico/bootrom.h>
@@ -280,6 +281,53 @@ static void handleCommand(const ServiceProtocol::Command &cmd) {
                 ? "OK COMM COUNTERS 1"
                 : "OK COMM COUNTERS 0");
             break;
+
+        case ServiceProtocol::Command::Type::QuerySdAudioFiles: {
+            if (!SDCard::scanAudioFiles()) {
+                ServiceProtocol::sendResponse("ERR 05 SD_NOT_READY");
+                break;
+            }
+
+            char response[96];
+            const uint8_t count = SDCard::audioFileCount();
+            snprintf(response, sizeof(response), "OK SD COUNT %u", static_cast<unsigned>(count));
+            ServiceProtocol::sendResponse(response);
+            for (uint8_t index = 0; index < count; index++) {
+                SDCard::AudioFileInfo info{};
+                if (!SDCard::audioFileInfo(index, info)) continue;
+                snprintf(response, sizeof(response), "OK SD FILE %02u %s %lu",
+                         static_cast<unsigned>(info.id), info.name,
+                         static_cast<unsigned long>(info.size));
+                ServiceProtocol::sendResponse(response);
+            }
+            break;
+        }
+
+        case ServiceProtocol::Command::Type::PlaySdAudioFile: {
+            char response[32];
+            switch (SDCard::playAudioFile(cmd.param)) {
+                case SDCard::PlayResult::Started:
+                    snprintf(response, sizeof(response), "ACK_83 %02u", static_cast<unsigned>(cmd.param));
+                    ServiceProtocol::sendResponse(response);
+                    break;
+                case SDCard::PlayResult::NotReady:
+                    ServiceProtocol::sendResponse("ERR 05 SD_NOT_READY");
+                    break;
+                case SDCard::PlayResult::NotFound:
+                    ServiceProtocol::sendResponse("ERR 05 SD_FILE_NOT_FOUND");
+                    break;
+                case SDCard::PlayResult::DuplicateId:
+                    ServiceProtocol::sendResponse("ERR 05 SD_DUPLICATE_ID");
+                    break;
+                case SDCard::PlayResult::InvalidWav:
+                    ServiceProtocol::sendResponse("ERR 05 SD_BAD_WAV");
+                    break;
+                case SDCard::PlayResult::Busy:
+                    ServiceProtocol::sendResponse("ERR 02 BUSY");
+                    break;
+            }
+            break;
+        }
 
         case ServiceProtocol::Command::Type::McuUptime:
             if (!checkService()) break;

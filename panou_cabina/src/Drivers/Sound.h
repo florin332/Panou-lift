@@ -1,6 +1,9 @@
 //Drivers/Sound.h (Interfața Driverului Acustic)
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 namespace Sound
 {
     // Initialize native RP2040 I2S and validate built-in WAV clips.
@@ -8,6 +11,13 @@ namespace Sound
 
     // Feed available DMA buffers without blocking.
     void update();
+
+    // Cross-core SD streaming interface; producer runs on Core 1.
+    bool beginSdStream();
+    size_t sdStreamFreeSamples();
+    size_t pushSdStreamSamples(const int16_t *samples, size_t count);
+    void finishSdStream();
+    bool isSdStreamActive();
 
     // Play warning sounds
     void alarm();
