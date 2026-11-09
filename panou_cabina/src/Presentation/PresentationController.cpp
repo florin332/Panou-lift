@@ -111,6 +111,9 @@ namespace PresentationController
         Transport::poll();
         pollServiceInputs();
         flushServiceResponses();
+        if (ServiceProtocol::consumeBootselRequest()) {
+            ServiceMenu::enterBootsel();
+        }
     }
 
     void updateCore1() {

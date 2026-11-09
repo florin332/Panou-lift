@@ -12,6 +12,7 @@
 namespace ServiceProtocol {
 
 static Command sPendingCmd;
+static bool sBootselPending = false;
 static ResponseSink sResponseSink = nullptr;
 static critical_section_t sCommandLock;
 
@@ -50,6 +51,7 @@ void init() {
     critical_section_init(&sCommandLock);
     lockCommand();
     sPendingCmd = Command{};
+    sBootselPending = false;
     unlockCommand();
 }
 
@@ -68,13 +70,18 @@ static void parseLine(const char* line) {
     } else if (strcmp(line, "SRV EXIT") == 0 || strcmp(line, "mb_00") == 0) {
         cmd.type = Command::Type::ExitService;
     } else if (strcmp(line, "mb_02") == 0) {
-        // Reset in bootloader USB (volum MSC "RPI-RP2") pentru flash-uire
-        // de pe Service Box. Executia este amanata ca comanda si ruleaza pe
-        // core0 (ServiceMenu::handleCommand) - TinyUSB nu este thread-safe.
-        // Markerul P0 dovedeste in logul box-ului ca comanda a AJUNS pe panou
-        // (parseLine ruleaza acum tot pe core0, sendResponse e sigur aici).
+        // BOOTSEL trebuie executat pe core0: ServiceMenu::update ruleaza pe
+        // core1, iar resetarea core1 din el ar opri chiar codul de handoff.
+        lockCommand();
+        const bool busy = sPendingCmd.pending || sBootselPending;
+        if (!busy) sBootselPending = true;
+        unlockCommand();
+        if (busy) {
+            sendResponse("ERR 02 BUSY");
+            return;
+        }
         sendResponse("DBG P0 bootsel-primit");
-        cmd.type = Command::Type::EnterBootsel;
+        return;
     } else if (strncmp(line, "mb_66", 5) == 0 && (line[5] == '\0' || line[5] == ' ')) {
         if (!checkServiceMode()) return;
         const char* arg = numericArg(line + 5);
@@ -303,6 +310,14 @@ bool consumeCommand(Command &out) {
     sPendingCmd.pending = false;
     unlockCommand();
     return true;
+}
+
+bool consumeBootselRequest() {
+    lockCommand();
+    const bool pending = sBootselPending;
+    sBootselPending = false;
+    unlockCommand();
+    return pending;
 }
 
 void sendResponse(const char* response) {

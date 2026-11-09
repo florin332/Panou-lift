@@ -9,7 +9,8 @@
 namespace ServiceMenu {
 
 void init();
-void update();   // Apelează în runCore0()
+void update();
+void enterBootsel(); // Execută mb_02 pe core0
 bool isInServiceMode();
 
 } // namespace ServiceMenu

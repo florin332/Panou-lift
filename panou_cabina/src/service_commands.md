@@ -82,8 +82,8 @@ Comenzile `mb_83` sunt disponibile oricând, inclusiv în funcționare normală 
 
 ## TODO implementare
 
-Modificări necesare în `src/Core/Services/ServiceProtocol.cpp` și `src/Presentation/ServiceMenu.cpp` pentru alinierea la specificație:
+Alinierea implementării la protocolul Service Box:
 
-- [ ] **`mb_02` (critic):** parserul acceptă azi doar `SRV BOOTSEL` / `mb_boot` și răspunde `ACK SRV BOOTSEL`. De adăugat recunoaștere `mb_02` și răspuns `ACK_02`; de eliminat formele vechi. Box-ul trimite deja exclusiv `mb_02` — **flash-ul din box nu funcționează până la această modificare**. Markerii de diagnosticare `DBG P0/S1/S3/S4` rămân neschimbați (box-ul îi ignoră la așteptarea ACK-ului).
+- [x] **`mb_02`:** parserul recunoaște comanda și răspunde `ACK_02` înainte de resetul în bootloader USB. Markerii `DBG P0/S1/S3/S4` rămân pentru diagnosticare; Service Box îi ignoră când așteaptă ACK-ul.
 - [ ] **`mb_01` / `mb_00`:** păstrate, dar `mb_00` trebuie să răspundă `ACK_00` (azi `ACK SRV EXIT`). De eliminat aliasurile `SRV ENTER` / `SRV EXIT`.
 - [ ] **De eliminat din parser** până la definirea grupurilor viitoare: `MCU *`. Vor răspunde temporar `ERR 01 UNKNOWN_CMD`. `mb_com`, `mb_com_out`, `mb_com_status` și `mb_com_status_out` au fost înlocuite/eliminate; contoarele RX folosesc `mb_61`–`mb_65`.

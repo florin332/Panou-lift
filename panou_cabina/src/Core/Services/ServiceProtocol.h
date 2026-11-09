@@ -10,7 +10,6 @@ struct Command {
         None,
         EnterService,
         ExitService,
-        EnterBootsel,     // SRV BOOTSEL / mb_boot - executat pe core0
         ShowCommPage,
         HideCommPage,
         StartCommCounterDisplay, // mb_61 1
@@ -37,6 +36,7 @@ void init();
 void setResponseSink(ResponseSink sink);
 void submitLine(const char *line);
 bool consumeCommand(Command &out);
+bool consumeBootselRequest();
 void sendResponse(const char* response);
 bool hasPendingCommand();
 
