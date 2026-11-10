@@ -295,6 +295,29 @@ button:disabled {
   color: #fff;
   border-color: var(--green);
 }
+
+/* Update firmware (UF2 via SD) */
+.ota {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+.ota-hint { font-size: 12px; margin-bottom: 12px; }
+.ota input[type=file] { padding: 6px; width: 100%; }
+.progress {
+  height: 8px;
+  background: var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 10px 0 4px;
+}
+#ota-progress {
+  height: 100%;
+  width: 0;
+  background: var(--green);
+  transition: width .15s linear;
+}
+#ota-status { min-height: 18px; font-weight: 600; font-size: 13px; }
 #web-login-button:hover:not(:disabled), #save-network:hover:not(:disabled) {
   opacity: 0.9;
 }

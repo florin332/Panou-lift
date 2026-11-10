@@ -12,6 +12,7 @@
 #include "PresentationController.h"
 #include "SDCard.h"
 #include "Sound.h"
+#include "UpdateService.h"
 #include <hardware/watchdog.h>
 
 namespace
@@ -76,6 +77,7 @@ namespace Application
         AlarmService::init();
         ElevatorService::init();
         DiagnosticService::init();
+        UpdateService::init();
         PresentationController::initCore0();
 
         SharedPanel initPanel = {};
@@ -109,9 +111,13 @@ namespace Application
         }
 
         PresentationController::pollCore0();
+        UpdateService::update();
     }
 
     void runCore1() {
+        // Handshake quiesce (update firmware): parcheaza nucleul inainte de
+        // orice alta activitate; returneaza true o data, la reluare.
+        if (UpdateService::pollQuiesce()) return;
         SDCard::update();
         PresentationController::updateCore1();
     }

@@ -27,3 +27,15 @@ A failed login returns `401` with a short reason that is also shown in the page:
 `POST /api/network` accepts `DHCP` or `STATIC <ip> <subnet> <gateway> <dns>`. Static values are validated and saved in a checksummed EEPROM record. The current network session is not interrupted; restart the panel to apply changes. The MAC and existing TCP listener roles/ports remain fixed.
 
 Only one HTTP client is serviced at a time. The web listener uses the fourth W5500 server socket alongside ports `2000`, `2004`, and `2005`.
+
+## Firmware update (OTA via SD)
+
+The service section exposes a three-phase update flow, visible after authentication and enabled only in Service Mode:
+
+1. **Upload pe SD** — streams a `.uf2` file to `/UPDATE/FIRMWARE.UF2` (`POST /api/update/upload`, raw `application/octet-stream`, filename in `X-Filename`). While the panel owns the SD card, Core 1 pauses audio and display rendering (SD and LCD share SPI0) and the watchdog is armed (2 s) against hangs.
+2. **Verifica** — `POST /api/update/verify`: full UF2 structural validation (magics, RP2040 family, 256 B payloads, coherent block numbering, strictly consecutive addresses within physical flash, excluding the settings sector) plus SHA-256 over the entire file; results are stored in `/UPDATE/FIRMWARE.META`.
+3. **Aplica update** — `POST /api/update/apply`: re-hashes the file against the manifest, gracefully parks Core 1 (audio stream closed, SPI released, ack), then a Core 0 installer programs 4 KB pages, skipping identical pages and the boot2/OTA-shim region below `0x10003000`, with read-back verification. The panel reboots into the new firmware.
+
+The UF2 file is kept on the card until the new firmware confirms a successful boot (first boot removes `/UPDATE/BOOT.PND` and the UI shows "boot confirmat"). A failed install leaves `/UPDATE/FAILED.TXT`, reported as the update error on next boot. `POST /api/update/cancel` abandons the flow. Progress and errors are exposed in `GET /api/state` under `update`.
+
+Recovery remains unchanged: physical BOOTSEL or the Service Box (`mb_02`). Filenames following the `<tip>_<hh>_<v.vv>` convention (e.g. `C_01_1.02.uf2`) are compatibility-checked against the panel identity; known mismatches are rejected.

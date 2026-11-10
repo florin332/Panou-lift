@@ -98,6 +98,19 @@
       </div>
     </form>
 
+    <div class="ota" id="ota-section" hidden>
+      <h3>Update firmware (UF2 via SD)</h3>
+      <p class="ota-hint">Fisierul este incarcat pe cardul SD, apoi verificat local. Instalarea ruleaza exclusiv pe panou; nu intrerupeti alimentarea.</p>
+      <input type="file" id="ota-file" accept=".uf2">
+      <div class="progress"><div id="ota-progress"></div></div>
+      <div class="actions">
+        <button type="button" id="ota-upload" disabled>Upload pe SD</button>
+        <button type="button" id="ota-verify" disabled>Verifica</button>
+        <button type="button" id="ota-apply" disabled>Aplica update</button>
+      </div>
+      <p id="ota-status"></p>
+    </div>
+
     <p id="result" role="status"></p>
   </section>
 </main>

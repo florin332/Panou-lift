@@ -9,6 +9,7 @@
 #include "ServiceProtocol.h"
 #include "Presentation.h"
 #include "Pins.h"
+#include "SDCard.h"
 #include "Transport.h"
 #include "WebUi.h"
 #include <atomic>
@@ -118,6 +119,10 @@ namespace PresentationController
 
     void updateCore1() {
         if (!sCore1Ready.load(std::memory_order_acquire)) return;
+        // Cat timp UpdateService detine cardul SD (upload/verificare), SD si
+        // display-ul impart SPI0: inghetam randarea ca sa nu corupem
+        // tranzactiile SD de pe Core 0. Comenzile queued se consuma dupa.
+        if (SDCard::isExclusiveRequested()) return;
         static bool overloadImageWasActive = false;
         if (digitalRead(Pins::Inputs::OVERLOAD) == LOW) {
             DisplayRenderer::showOverloadImage();

@@ -7,6 +7,7 @@
 #include "ServiceMenu.h"
 #include "ServiceProtocol.h"
 #include "SharedPanel.h"
+#include "UpdateService.h"
 #include "WebUiContent.h"
 
 #include <Arduino.h>
@@ -27,7 +28,9 @@ namespace
     constexpr size_t HEADER_LINE_SIZE = 160;
     constexpr size_t BODY_SIZE = 96;
     constexpr uint32_t REQUEST_TIMEOUT_MS = 3000;
+    constexpr uint32_t UPLOAD_TIMEOUT_MS = 30000;
     constexpr uint8_t POLL_BYTE_BUDGET = 96;
+    constexpr uint8_t UPLOAD_CHUNK_BUDGET = 8;   // iteratii x 512 B per poll
 
     struct Request
     {
@@ -40,6 +43,7 @@ namespace
         char host[72] = {};
         char origin[96] = {};
         char contentType[40] = {};
+        char uploadFileName[48] = {};
         char body[BODY_SIZE] = {};
         size_t bodyLength = 0;
         size_t contentLength = 0;
@@ -47,6 +51,7 @@ namespace
         bool headersDone = false;
         bool active = false;
         bool overflow = false;
+        bool isUploadStream = false;   // POST /api/update/upload (binar)
     };
 
     EthernetServer sServer(Config::Web::PORT);
@@ -280,17 +285,21 @@ namespace
         }
         const IPAddress ip = Ethernet.localIP();
         const Settings::NetworkSettings network = ConfigurationService::networkSettings();
+        UpdateService::Status updateStatus;
+        UpdateService::getStatus(updateStatus);
         // newlib-nano nu suporta %f; formatare manuala cu doua zecimale.
         const float gain = ConfigurationService::audioGain();
         const unsigned gainCents = static_cast<unsigned>(gain * 100.0f + 0.5f);
-        char json[768];
+        char json[1152];
         const int length = snprintf(json, sizeof(json),
             "{\"lift\":{\"floor\":%u,\"destination\":%u,\"direction\":\"%s\",\"service\":\"%s\",\"occupied\":%s},"
             "\"system\":{\"uptime\":%lu,\"resetReason\":%u},\"diagnostics\":{\"frames\":%lu,\"valid\":%lu,\"timeouts\":%lu,\"format\":%lu,\"crc\":%lu,\"data\":%lu,\"counting\":%s},"
             "\"network\":{\"ip\":\"%u.%u.%u.%u\",\"mac\":\"%02X:%02X:%02X:%02X:%02X:%02X\",\"dhcp\":%s,"
             "\"staticIp\":\"%u.%u.%u.%u\",\"subnet\":\"%u.%u.%u.%u\","
             "\"gateway\":\"%u.%u.%u.%u\",\"dns\":\"%u.%u.%u.%u\"},"
-            "\"config\":{\"lift\":%u,\"gain\":%u.%02u,\"auth\":%s}}",
+            "\"config\":{\"lift\":%u,\"gain\":%u.%02u,\"auth\":%s,\"serviceMode\":%s},"
+            "\"update\":{\"phase\":%u,\"bytes\":%lu,\"total\":%lu,\"error\":\"%s\",\"file\":\"%s\","
+            "\"compatKnown\":%s,\"compat\":%s,\"bootOk\":%s}}",
             static_cast<unsigned>(panel.lift1.pos), static_cast<unsigned>(panel.lift1.etd),
             directionName(panel.lift1.sj), serviceName(panel.lift1.svc),
             panel.lift1.ocp == Occupancy::Busy ? "true" : "false",
@@ -313,7 +322,15 @@ namespace
             network.dns[0], network.dns[1], network.dns[2], network.dns[3],
             static_cast<unsigned>(ConfigurationService::liftNumber()),
             gainCents / 100, gainCents % 100,
-            Config::Web::AUTH_PASSWORD[0] != '\0' ? "true" : "false");
+            Config::Web::AUTH_PASSWORD[0] != '\0' ? "true" : "false",
+            ServiceMenu::isInServiceMode() ? "true" : "false",
+            static_cast<unsigned>(updateStatus.phase),
+            static_cast<unsigned long>(updateStatus.bytes),
+            static_cast<unsigned long>(updateStatus.total),
+            updateStatus.error, updateStatus.fileName,
+            updateStatus.compatibilityKnown ? "true" : "false",
+            updateStatus.compatible ? "true" : "false",
+            updateStatus.bootConfirmed ? "true" : "false");
         if (length <= 0 || static_cast<size_t>(length) >= sizeof(json)) {
             sendText(500, "Internal Server Error", "Eroare serializare stare");
             return;
@@ -332,6 +349,13 @@ namespace
             return;
         }
         sendText(200, "OK", "Autentificare reusita");
+    }
+
+    // Corpul upload-ului UF2 este consumat ca stream; aici ajung doar
+    // cererile fara Content-Length.
+    void handleUploadNoBody()
+    {
+        sendText(400, "Bad Request", "Lipseste continutul UF2");
     }
 
     void handleService()
@@ -361,6 +385,71 @@ namespace
         } else {
             sendText(503, "Service Unavailable", "Fara raspuns de la dispatcher");
         }
+    }
+
+    // Pornirea stream-ului de upload UF2, apelata imediat dupa headere.
+    // Toate verificarile de securitate ruleaza inainte de primirea corpului.
+    void beginUploadStream()
+    {
+        if (!requireAuth() || !requireSameOrigin()) return;
+        if (!ServiceMenu::isInServiceMode()) {
+            sendText(403, "Forbidden", "Intrati in Service Mode pentru upload firmware");
+            return;
+        }
+        if (strncmp(sRequest.contentType, "application/octet-stream", 24) != 0) {
+            sendText(415, "Unsupported Media Type", "Trimiteti fisierul ca application/octet-stream");
+            return;
+        }
+        if (!UpdateService::beginUpload(sRequest.contentLength, sRequest.uploadFileName)) {
+            sendText(409, "Conflict", UpdateService::lastError());
+            return;
+        }
+    }
+
+    void handleUpdateVerify()
+    {
+        if (!requireAuth() || !requireSameOrigin() || !requirePlainTextBody()) return;
+        terminateBody();
+        if (!ServiceMenu::isInServiceMode()) {
+            sendText(403, "Forbidden", "Intrati in Service Mode pentru verificare");
+            return;
+        }
+        if (strcmp(sRequest.body, "VERIFY") != 0) {
+            sendText(400, "Bad Request", "Corp de cerere neasteptat");
+            return;
+        }
+        if (!UpdateService::startVerify()) {
+            sendText(409, "Conflict", UpdateService::lastError());
+            return;
+        }
+        sendText(200, "OK", "Verificare pornita");
+    }
+
+    void handleUpdateApply()
+    {
+        if (!requireAuth() || !requireSameOrigin() || !requirePlainTextBody()) return;
+        terminateBody();
+        if (strcmp(sRequest.body, "APPLY") != 0) {
+            sendText(400, "Bad Request", "Corp de cerere neasteptat");
+            return;
+        }
+        if (!UpdateService::requestApply()) {
+            sendText(409, "Conflict", UpdateService::lastError());
+            return;
+        }
+        sendText(200, "OK", "Instalare pornita; panoul va reporni");
+    }
+
+    void handleUpdateCancel()
+    {
+        if (!requireAuth() || !requireSameOrigin() || !requirePlainTextBody()) return;
+        terminateBody();
+        if (strcmp(sRequest.body, "CANCEL") != 0) {
+            sendText(400, "Bad Request", "Corp de cerere neasteptat");
+            return;
+        }
+        UpdateService::cancel();
+        sendText(200, "OK", "Update abandonat");
     }
 
     void handleNetwork()
@@ -413,6 +502,10 @@ namespace
         { "POST", "/api/auth",    handleAuth },
         { "POST", "/api/service", handleService },
         { "POST", "/api/network", handleNetwork },
+        { "POST", "/api/update/upload", handleUploadNoBody },
+        { "POST", "/api/update/verify", handleUpdateVerify },
+        { "POST", "/api/update/apply",  handleUpdateApply },
+        { "POST", "/api/update/cancel", handleUpdateCancel },
     };
 
     void handleRequest()
@@ -446,7 +539,11 @@ namespace
         sRequest.line[sRequest.lineLength] = '\0';
         if (sRequest.lineLength == 0) {
             sRequest.headersDone = true;
-            if (sRequest.contentLength == 0) handleRequest();
+            if (sRequest.isUploadStream) {
+                beginUploadStream();
+            } else if (sRequest.contentLength == 0) {
+                handleRequest();
+            }
         } else if (sRequest.method[0] == '\0') {
             if (sscanf(sRequest.line, "%7s %95s", sRequest.method, sRequest.path) != 2) sRequest.overflow = true;
         } else if (strncasecmp(sRequest.line, "Authorization: Basic ", 21) == 0) {
@@ -457,10 +554,20 @@ namespace
             copyHeaderValue(sRequest.origin, sizeof(sRequest.origin), sRequest.line + 8);
         } else if (strncasecmp(sRequest.line, "Content-Type: ", 14) == 0) {
             copyHeaderValue(sRequest.contentType, sizeof(sRequest.contentType), sRequest.line + 14);
+        } else if (strncasecmp(sRequest.line, "X-Filename: ", 12) == 0) {
+            copyHeaderValue(sRequest.uploadFileName, sizeof(sRequest.uploadFileName), sRequest.line + 12);
         } else if (strncasecmp(sRequest.line, "Content-Length: ", 16) == 0) {
             const unsigned long length = strtoul(sRequest.line + 16, nullptr, 10);
-            if (length >= BODY_SIZE) sRequest.overflow = true;
-            else sRequest.contentLength = static_cast<size_t>(length);
+            const bool uploadRequest = strcmp(sRequest.method, "POST") == 0 &&
+                                       strcmp(sRequest.path, "/api/update/upload") == 0;
+            if (uploadRequest) {
+                sRequest.contentLength = static_cast<size_t>(length);
+                sRequest.isUploadStream = true;
+            } else if (length >= BODY_SIZE) {
+                sRequest.overflow = true;
+            } else {
+                sRequest.contentLength = static_cast<size_t>(length);
+            }
         }
         sRequest.lineLength = 0;
     }
@@ -482,12 +589,39 @@ namespace
             resetRequest();
             return;
         }
-        if (millis() - sRequest.lastByteAt > REQUEST_TIMEOUT_MS) {
+        const uint32_t timeout = sRequest.isUploadStream ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+        if (millis() - sRequest.lastByteAt > timeout) {
+            if (sRequest.isUploadStream) UpdateService::abortUpload();
             sendText(408, "Request Timeout", "Timeout");
             return;
         }
-        uint8_t budget = POLL_BYTE_BUDGET;
+        uint8_t budget = sRequest.isUploadStream ? UPLOAD_CHUNK_BUDGET : POLL_BYTE_BUDGET;
         while (budget-- > 0 && sRequest.client.available() > 0) {
+            if (sRequest.isUploadStream && sRequest.headersDone) {
+                // Stream binar catre UpdateService (SD), in tranșe, fara
+                // a stoca firmware-ul in RAM.
+                uint8_t chunk[512];
+                const size_t remaining = sRequest.contentLength - sRequest.bodyLength;
+                const size_t wanted = remaining < sizeof(chunk) ? remaining : sizeof(chunk);
+                const int got = sRequest.client.read(chunk, wanted);
+                if (got <= 0) break;
+                sRequest.lastByteAt = millis();
+                if (!UpdateService::writeChunk(chunk, static_cast<size_t>(got))) {
+                    UpdateService::abortUpload();
+                    sendText(500, "Internal Server Error", "Eroare scriere pe cardul SD");
+                    return;
+                }
+                sRequest.bodyLength += static_cast<size_t>(got);
+                if (sRequest.bodyLength == sRequest.contentLength) {
+                    if (UpdateService::endUpload()) {
+                        sendText(200, "OK", "Upload complet; rulati Verificare");
+                    } else {
+                        sendText(500, "Internal Server Error", UpdateService::lastError());
+                    }
+                    return;
+                }
+                continue;
+            }
             const int next = sRequest.client.read();
             if (next < 0) break;
             sRequest.lastByteAt = millis();

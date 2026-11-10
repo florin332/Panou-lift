@@ -7,6 +7,7 @@
 #include <SD.h>
 #include <SPI.h>
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 
@@ -15,6 +16,8 @@ namespace
     constexpr uint8_t AUDIO_FILE_CAPACITY = 31;
     constexpr size_t PCM_READ_SAMPLES = 512;
     bool initialized = false;
+    std::atomic<bool> sExclusiveRequested{false};
+    std::atomic<bool> sExclusiveAck{false};
     SDCard::AudioFileInfo audioFiles[AUDIO_FILE_CAPACITY] = {};
     uint8_t sAudioFileCount = 0;
     File audioTestFile;
@@ -268,6 +271,56 @@ namespace SDCard
 
     void update()
     {
+        // Handshake de acces exclusiv (upload/verificare update): terminam
+        // chunk-ul curent, oprim stream-ul audio si confirmam; cat timp
+        // cererea e activa nu mai atingem cardul.
+        if (sExclusiveRequested.load(std::memory_order_acquire)) {
+            if (!sExclusiveAck.load(std::memory_order_relaxed)) {
+                abortAudioStream();
+                sExclusiveAck.store(true, std::memory_order_release);
+            }
+            return;
+        }
+        sExclusiveAck.store(false, std::memory_order_relaxed);
         updateAudioPlayback();
+    }
+
+    void abortAudioStream()
+    {
+        if (audioTestReading) {
+            audioTestReading = false;
+            audioTestFile.close();
+            Sound::finishSdStream();
+        }
+        audioDataRemaining = 0;
+        pendingSamples = 0;
+        pendingSampleOffset = 0;
+    }
+
+    bool acquireExclusive(uint32_t timeoutMs)
+    {
+        if (!initialized) return false;
+        sExclusiveAck.store(false, std::memory_order_relaxed);
+        sExclusiveRequested.store(true, std::memory_order_release);
+        const uint32_t deadline = millis() + timeoutMs;
+        while (!sExclusiveAck.load(std::memory_order_acquire)) {
+            if (static_cast<int32_t>(millis() - deadline) > 0) {
+                sExclusiveRequested.store(false, std::memory_order_release);
+                return false;
+            }
+            delay(1);
+        }
+        return true;
+    }
+
+    void releaseExclusive()
+    {
+        sExclusiveRequested.store(false, std::memory_order_release);
+        sExclusiveAck.store(false, std::memory_order_relaxed);
+    }
+
+    bool isExclusiveRequested()
+    {
+        return sExclusiveRequested.load(std::memory_order_acquire);
     }
 }
